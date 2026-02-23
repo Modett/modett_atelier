@@ -1,0 +1,810 @@
+---
+description: Modett e-commerce platform — complete rules covering architecture, safety-critical patterns, code style, and domain conventions
+alwaysApply: true
+---
+
+# =============================================================================
+# MODETT E-COMMERCE PLATFORM — CURSOR AI RULES
+# =============================================================================
+# These rules are ABSOLUTE. They encode deliberate architectural and safety
+# decisions. Do not deviate without explicit instruction from the developer.
+# When in doubt: read the rule, follow the rule, ask if unclear.
+# =============================================================================
+
+
+# =============================================================================
+# 0) OPERATING MODE
+# =============================================================================
+
+Act as a senior engineer who ships production-grade code.
+- Prefer small, composable modules. No duplication.
+- Use Receive an Object, Return an Object (RORO) for functions and service methods.
+- No classes — functional style throughout.
+- Optimize for: correctness first, then maintainability, Web Vitals, accessibility.
+- Provide minimal, correct diffs. Prefer small commits.
+- Extract shared helpers into packages/shared or packages/ui before duplicating.
+
+
+# =============================================================================
+# 1) PROJECT OVERVIEW
+# =============================================================================
+
+Modett is a premium fashion e-commerce platform (multi-currency: LKR, SGD, USD).
+
+Stack:
+  Frontend : Next.js 14 App Router on Vercel (serverless / edge)
+  API      : Node.js + TypeScript on Railway (long-running process)
+  Worker   : Same API codebase, separate Railway service, different entry point
+  Database : PostgreSQL 15 on Railway (same private network as API)
+  Cache    : Redis on Railway (same private network as API)
+  Storage  : Cloudflare R2 — product images, review media, styling videos
+  Payments : Stripe (payment intents, webhooks, refunds)
+  Email    : Resend (transactional emails)
+  Errors   : Sentry on both web and api
+
+Monorepo (pnpm workspaces + Turborepo):
+  apps/
+    api/          Railway API service
+    worker/       Railway Worker service (scheduled jobs + async tasks)
+    web/          Vercel Next.js storefront + admin portal
+  packages/
+    db/           Drizzle schema, pg pool, Redis client, all query functions
+    ui/           Shared UI primitives (shadcn wrappers, design tokens, CVA variants)
+    shared/       Shared domain types, Zod schemas, pure utilities
+    config/       ESLint, tsconfig, Tailwind config
+    observability/ Sentry helpers, logging utilities
+
+Directory naming: lowercase-with-dashes (e.g. components/cart-drawer)
+
+
+# =============================================================================
+# 2) THE SINGLE MOST IMPORTANT RULE
+# =============================================================================
+
+## apps/web NEVER connects to the database or Redis — ever.
+
+- Do NOT add DATABASE_URL to Vercel environment variables or apps/web code.
+- Do NOT add REDIS_URL to Vercel environment variables or apps/web code.
+- Do NOT import anything from packages/db inside apps/web.
+- Do NOT import pg, postgres, drizzle-orm, or ioredis inside apps/web.
+- apps/web gets ALL data by calling the Railway API via fetch().
+- apps/web/middleware.ts (Edge middleware) reads/writes cookies only. No DB.
+
+If you are about to write a database import in apps/web — stop.
+Route it through the API instead.
+
+
+# =============================================================================
+# 3) TECH STACK (APPROVED — DO NOT SUBSTITUTE)
+# =============================================================================
+
+### Frontend (apps/web)
+  Next.js 14 App Router (RSC-first)
+  React + TypeScript
+  Tailwind CSS
+  Radix UI + shadcn/ui  (admin portal and shared primitives)
+  CVA (class-variance-authority) for component variants
+  Zod for validation
+  next-safe-action for all Server Actions
+
+### Backend (apps/api + apps/worker)
+  Node.js + TypeScript — functional style, no classes
+  Drizzle ORM (node-postgres driver)
+  Zod for all input validation
+  Sentry for error tracking
+  Redis on Railway (same private network — inventory locks, sessions, rate limiting)
+
+### Payments + Comms
+  Stripe — payment intents, webhooks, refunds, tokenised cards
+  Resend — transactional emails
+  Cloudflare R2 — object storage (signed URLs for private assets)
+
+Do NOT introduce Prisma, Mongoose, Sequelize, or any other ORM.
+Do NOT introduce a separate auth library (Clerk, Auth.js) without developer approval.
+Do NOT use localStorage or sessionStorage for anything security-related.
+
+
+# =============================================================================
+# 4) DOMAIN MODULE STRUCTURE
+# =============================================================================
+
+Backend modules mirror the 12 PostgreSQL schemas exactly.
+One folder per domain in apps/api/src/modules/ and apps/worker/src/jobs/.
+
+  Backend modules:
+    iam/          auth, sessions, admin invites, RBAC
+    catalog/      products, categories, prices, images, styling guides
+    inventory/    variants, stock, barcodes, movements, reconciliation
+    cart/         cart CRUD, stock hints
+    checkout/     two-window reservation creation
+    payments/     Stripe intents, webhook handling, idempotency
+    orders/       state machine, timeline, fulfilment scanning
+    shipping/     zones, methods, flat rates per currency
+    returns/      eligibility, item-level selection, status sync
+    reviews/      tokens, verified purchase, moderation
+    loyalty/      earn/redeem, tiers, ledger, expiry
+    messaging/    outbox, templates, campaigns, back-in-stock
+
+  Frontend modules (apps/web/src/modules/):
+    catalog/      product listing, search, filters
+    product/      PDP, variants, gallery, notify-me
+    cart/         cart UI, server actions
+    checkout/     checkout flow, Stripe, countdown
+    orders/       order history, order detail, timeline
+    account/      profile, addresses, payment methods, loyalty, inbox
+    admin/        product mgmt, inventory, orders, returns, reviews, messaging
+    content/      landing pages, banners
+
+Module import rules:
+  A module may import from: its own files, packages/shared, packages/db,
+  packages/ui, packages/config, packages/observability.
+  Cross-domain imports must go through the module's public interface:
+    modules/<domain>/index.ts exporting named functions only.
+  Never import directly from another module's internal files.
+
+
+# =============================================================================
+# 5) MONEY AND CURRENCY RULES
+# =============================================================================
+
+## 5.1 — Money is NEVER a plain JavaScript number.
+
+  // packages/shared/src/types/money.ts
+  export type CurrencyCode = 'LKR' | 'SGD' | 'USD'
+  export interface Money { amount: string; currency: CurrencyCode }
+
+- amount is a STRING (e.g. "1250.00"). JS numbers lose float precision.
+- Every function accepting or returning money uses the Money interface.
+- PriceDisplay component accepts Money only — never a raw number.
+- API responses always return { amount: string, currency: CurrencyCode }.
+  Never return a bare number for any price, total, or cost field.
+
+## 5.2 — Monetary arithmetic uses Decimal.js.
+
+  import Decimal from 'decimal.js'
+  const total = new Decimal(subtotal).plus(shippingCost).plus(taxAmount)
+  // Serialise as string: total.toFixed(2)
+
+Never use + - * / operators on monetary strings directly.
+
+## 5.3 — Every monetary amount is always stored with its currency.
+
+In the DB: order_items has unit_price_snapshot_amount AND
+unit_price_snapshot_currency as SEPARATE columns. Never put an amount
+in a JSONB field without the currency alongside it.
+
+## 5.4 — Currency detection is server-authoritative at checkout.
+
+Edge middleware sets a currency cookie (LKR/SGD/USD) from geo-IP.
+That cookie is for DISPLAY only. At POST /checkout/start and
+POST /payments/intent, the API re-derives currency from country_code.
+Never trust the cookie for financial operations.
+
+## 5.5 — Tax rates by market (stored on every order).
+
+  LKR (Sri Lanka)     : VAT 18% — tax-inclusive display. tax_rate_snapshot = 0.1800
+  SGD (Singapore)     : GST  9% — legally required on receipt. tax_rate_snapshot = 0.0900
+  USD (Rest of World) : No tax collected. tax_rate_snapshot = 0.0000
+
+Generate a GST-compliant invoice PDF for every SGD order.
+
+
+# =============================================================================
+# 6) INVENTORY RULES (CRITICAL — READ EVERY LINE)
+# =============================================================================
+
+## 6.1 — NEVER use read-then-write for inventory.
+
+FORBIDDEN pattern:
+  const stock = await getVariantStock(variantId)   // read
+  if (stock.available >= qty) {                     // check
+    await holdVariantStock(variantId, qty)          // write — RACE CONDITION
+  }
+
+Two concurrent requests for the last unit both pass the check before either
+write lands. This causes silent overselling.
+
+## 6.2 — The ONLY correct inventory hold pattern.
+
+  Step 1: Acquire Redis lock BEFORE touching the database.
+  Step 2: Atomic SQL UPDATE with WHERE available_qty >= qty.
+  Step 3: Check rows affected. 0 rows = insufficient stock → throw AppError.
+  Step 4: Release Redis lock in finally block (always — even on error).
+
+  const success = await withInventoryLock(variantId, async () => {
+    const result = await db.execute(sql`
+      UPDATE inventory.variant_stock
+      SET held_qty   = held_qty + ${qty},
+          updated_at = now()
+      WHERE variant_id    = ${variantId}
+        AND available_qty >= ${qty}
+      RETURNING variant_id
+    `)
+    return result.rows.length > 0
+  })
+  if (!success) throw new AppError('INSUFFICIENT_STOCK', 409)
+
+Use db.execute(sql`...`) here — NOT the Drizzle query builder.
+The exact SQL matters. Do not abstract it.
+
+## 6.3 — available_qty is a GENERATED column. Never write to it.
+
+  available_qty = in_stock_qty - held_qty  (GENERATED ALWAYS AS STORED)
+
+Never include available_qty in INSERT or UPDATE statements.
+The database computes it automatically.
+
+## 6.4 — Inventory unit status transitions (valid only).
+
+  IN_STOCK  → HELD          checkout hold
+  HELD      → IN_STOCK      reservation expired
+  HELD      → SOLD          order confirmed
+  SOLD      → RETURNED      return processed
+  IN_STOCK  → DAMAGED       admin damage report
+  IN_STOCK  → ADJUSTED_OUT  admin stock adjustment
+
+When an order is confirmed (one db.transaction()):
+  1. Set inventory_units.status = 'SOLD'
+  2. Decrement variant_stock.in_stock_qty by qty
+  3. Decrement variant_stock.held_qty by qty
+  4. INSERT inventory_movements (reason='SALE', reference_type='order')
+
+## 6.5 — Soft-delete only. Never hard-delete.
+
+  catalog.products, inventory.product_variants, iam.admins — all have deleted_at.
+  All queries: WHERE deleted_at IS NULL.
+  Hard DELETE breaks historical order_items that reference the entity.
+
+
+# =============================================================================
+# 7) TWO-WINDOW RESERVATION RULES (CRITICAL)
+# =============================================================================
+
+## 7.1 — Reservation lifecycle (exact column values at each step).
+
+  POST /checkout/start  → INSERT reservation:
+                            status               = 'HELD'
+                            expires_at           = now() + INTERVAL '30 minutes'
+                            payment_submitted_at = NULL
+                            grace_expires_at     = NULL
+
+  POST /payments/intent → UPDATE reservation:
+                            payment_submitted_at = now()
+                            grace_expires_at     = now() + INTERVAL '10 minutes'
+                          (both columns in the SAME UPDATE statement)
+
+  Stripe webhook arrives → UPDATE reservation SET status = 'CONSUMED'
+
+## 7.2 — The expiry worker query. Copy this exactly. Do not simplify.
+
+  UPDATE cart.reservations
+  SET    worker_lock_id = $uuid
+  WHERE  status         = 'HELD'
+    AND  expires_at     < now()
+    AND  (payment_submitted_at IS NULL OR grace_expires_at < now())
+    AND  worker_lock_id IS NULL
+  RETURNING *
+
+The condition (payment_submitted_at IS NULL OR grace_expires_at < now())
+protects in-flight payments. Removing it releases holds while the customer's
+card is being charged. This is a silent oversell scenario.
+
+## 7.3 — Crash-safe expiry worker.
+
+After claiming (worker_lock_id set), the worker must set:
+  processed_at    = now()   atomically with status = 'EXPIRED'
+  hold_released_at = now()  after held_qty has been decremented
+
+On worker restart: rows with worker_lock_id IS NOT NULL and
+processed_at IS NULL were claimed but not finished. Re-process them.
+
+## 7.4 — payment_submitted_at and grace_expires_at always set together.
+
+DB enforces: CONSTRAINT chk_grace_set_together.
+Always set both in the same UPDATE. Never set one without the other.
+
+
+# =============================================================================
+# 8) PAYMENT AND WEBHOOK RULES (CRITICAL)
+# =============================================================================
+
+## 8.1 — Stripe HMAC verification is ALWAYS the very first thing.
+
+  const sig = req.headers['stripe-signature']
+  try {
+    stripe.webhooks.constructEvent(req.rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET)
+  } catch {
+    return res.status(401).send('Invalid signature')
+  }
+  // Only continue after this passes.
+
+req.rawBody must be the raw Buffer — not parsed JSON.
+Configure the route to skip body-parser, or save raw body in middleware.
+Never skip this check for any reason.
+
+## 8.2 — Three-layer idempotency for payment webhooks (all three required).
+
+  Layer 1 — Redis (fastest):
+    const cached = await redis.get(`webhook:${event.id}`)
+    if (cached) return res.status(200).send('already processed')
+
+  Layer 2 — DB unique constraint:
+    INSERT INTO payments.payment_transactions (provider_charge_id, ...)
+    ON CONFLICT (provider_charge_id) DO NOTHING
+    RETURNING id
+    // 0 rows returned = duplicate → return 200 immediately
+
+  Layer 3 — Cache after successful processing:
+    await redis.set(`webhook:${event.id}`, '1', { EX: 86400 })  // 24h TTL
+
+Stripe retries webhooks on non-200 responses. Missing any layer risks
+duplicate orders. All three layers are mandatory.
+
+## 8.3 — Order creation is one db.transaction().
+
+  await db.transaction(async (tx) => {
+    // a. Consume reservation (verify status still 'HELD' — 0 rows = return 200)
+    // b. INSERT orders.orders
+    // c. INSERT orders.order_items (with all snapshot columns)
+    // d. UPDATE inventory_units SET status = 'SOLD'
+    // e. UPDATE variant_stock — decrement both in_stock_qty AND held_qty
+    // f. INSERT inventory_movements (reason='SALE')
+    // g. UPDATE payment_transactions SET status = 'SUCCEEDED'
+  })
+  // Then: cache event ID in Redis (Layer 3 above)
+
+If anything throws, the transaction rolls back entirely. No partial state.
+
+
+# =============================================================================
+# 9) DATABASE LAYER RULES
+# =============================================================================
+
+## 9.1 — Three-layer architecture. No SQL in route handlers.
+
+  Route handler  → validates input (Zod), calls service, returns response
+  Service        → orchestrates, applies business rules, throws AppError
+  Query function → executes DB queries, returns typed results
+
+Never write db.execute() or db.query.* inside a route handler file.
+All query functions live in packages/db/src/queries/<module>.ts.
+
+## 9.2 — When to use db.execute(sql`...`) vs Drizzle query builder.
+
+  Use db.execute(sql`...`) for:
+    - Inventory hold/release (atomic UPDATE ... RETURNING)
+    - Any query where correctness depends on the exact SQL
+    - The reservation expiry worker claim
+    - Complex transactions needing precise control
+
+  Use Drizzle query builder (db.query.*, db.select().from()) for:
+    - Standard reads (products, orders, cart)
+    - Simple inserts and updates
+    - Anything where Drizzle type safety is the main benefit
+
+## 9.3 — Transactions use db.transaction(). Never manual BEGIN/COMMIT.
+
+  return await db.transaction(async (tx) => {
+    // use tx.execute(), tx.insert(), tx.update()
+    // throw → automatic rollback
+    // return → automatic commit
+  })
+
+## 9.4 — Append-only tables. Never UPDATE or DELETE these rows.
+
+  loyalty.loyalty_ledger    balance is cached sum of ledger rows
+  orders.order_events       full order timeline
+  returns.return_events     full return timeline
+
+The ledger is authoritative. If loyalty_accounts.balance disagrees with
+SUM(points) FROM loyalty_ledger WHERE user_id = X, recalculate the cache.
+
+## 9.5 — Drizzle schema column names match PostgreSQL schema exactly.
+
+  camelCase property → snake_case column:
+    firstName: text('first_name').notNull()
+    heldQty:   integer('held_qty').notNull()
+
+Never rename columns or add columns absent from modett_schema.sql.
+
+## 9.6 — All 12 PostgreSQL schemas must be declared in Drizzle.
+
+  const inventorySchema = pgSchema('inventory')
+  export const variantStock = inventorySchema.table('variant_stock', { ... })
+
+  Schemas: iam, catalog, inventory, cart, orders, payments, returns,
+           reviews, loyalty, messaging, shipping, analytics
+
+Never put Modett tables in the public schema.
+
+## 9.7 — Connection pool is a process-level singleton. Max 20 connections.
+
+  // packages/db/src/client.ts — created once at process startup
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 })
+
+Never create a new Pool per request. 20 is the Railway hobby-tier limit.
+
+## 9.8 — analytics.events requires a created_at range filter on every query.
+
+The table is PARTITION BY RANGE (created_at) with monthly child tables.
+Unfiltered queries scan all partitions and are extremely expensive.
+Dashboard queries use analytics.analytics_aggregates (pre-aggregated by worker).
+
+## 9.9 — Zod schemas live in packages/shared/src/schemas/<domain>.schema.ts.
+
+API and web import from packages/shared. Do not duplicate Zod schemas.
+Validate all external input (request bodies, webhook payloads) at the
+boundary before it touches any service or query function.
+
+
+# =============================================================================
+# 10) API DESIGN RULES
+# =============================================================================
+
+## 10.1 — All responses follow this exact shape. No exceptions.
+
+  Success : { data: T }
+  Error   : { error: { code: string; message: string } }
+
+Never return raw DB error messages. Never return stack traces.
+
+## 10.2 — Rate limiting (Redis sliding window, applied per route).
+
+  POST /auth/login, /auth/signup   10 requests / 15 min / IP
+  POST /notify-me                   3 requests / 1 hr  / session
+  POST /newsletter/subscribe        5 requests / 1 hr  / IP
+  POST /returns                     5 requests / 1 day / user
+  POST /admin/invites/accept        5 requests / 1 hr  / IP
+  POST /webhooks/stripe           500 requests / 1 min / IP
+
+## 10.3 — Auth middleware names and responsibilities.
+
+  requireAuth()   validates customer session in Redis, attaches req.user
+  requireAdmin()  validates admin session in Redis, enforces 15-min idle TTL,
+                  attaches req.admin, returns 401 if expired
+  requireOwner()  requireAdmin() + checks req.admin.role === 'OWNER'
+
+Admin session timeout is enforced server-side via Redis TTL.
+Not a JWT expiry. Not a frontend timer. TTL resets on every authenticated request.
+
+## 10.4 — Return eligibility is always validated server-side.
+
+Before creating a return_request, verify ALL of:
+  1. order.fulfillment_state === 'DELIVERED'
+  2. now() < eligible_until
+  3. No active return for same order_item_id (WHERE request_status != 'REJECTED')
+  4. Requested qty <= original order_item.qty
+
+## 10.5 — return_request_items.request_status synced in same transaction.
+
+  await db.transaction(async (tx) => {
+    await tx.update(returnRequests).set({ status: newStatus }).where(eq(...))
+    await tx.update(returnRequestItems).set({ requestStatus: newStatus }).where(eq(...))
+  })
+
+The partial unique index uix_return_items_active uses request_status as a plain
+column — it cannot use a subquery. Always keep them in sync.
+
+
+# =============================================================================
+# 11) FRONTEND RULES (apps/web)
+# =============================================================================
+
+## 11.1 — Rendering strategy.
+
+  Server Components (default, no 'use client'):
+    page-level data fetching, product listings, order history
+  Client Components ('use client'):
+    variant selector, cart sidebar, checkout form,
+    CountdownTimer, Toast, anything using useState / useEffect
+
+Minimize 'use client' surface. Lean on Server Components and server actions.
+Use the preload pattern to avoid request waterfalls.
+
+## 11.2 — Server Actions use next-safe-action.
+
+Expected errors are return values, not thrown exceptions:
+  return { error: { code: 'OUT_OF_STOCK', message: 'This item is no longer available' } }
+
+Unexpected errors use error boundaries + Sentry logging.
+
+## 11.3 — All fetch calls go through apps/web/src/lib/api.ts.
+
+Create a typed fetch wrapper that:
+  - Prepends NEXT_PUBLIC_API_URL to all paths
+  - Attaches session cookie automatically
+  - Parses { data: T } | { error: ... } response shapes
+  - Throws typed errors on error responses
+
+Never call fetch() directly in page or component files.
+
+## 11.4 — Build UI primitives before any page.
+
+These must exist in packages/ui/src/components/ before any page is built:
+
+  Button          variants: primary | secondary | ghost | destructive
+                  states:   default | loading | disabled
+  Input           label above, error message below, error border state
+  Badge           variants: in-stock | low-stock | out-of-stock | sale
+  SizeButton      states: available | selected | oos (disabled + greyed)
+  ColourSwatch    circular. states: available | selected | disabled
+  PriceDisplay    accepts Money type only. NEVER a raw number.
+  CountdownTimer  props: expiresAt (ISO string). Yellow at 5 min, red at 1 min.
+  Spinner         full-page and inline variants
+  Toast           variants: success | error | warning | info
+
+Storefront pages use these primitives.
+Admin portal uses shadcn/ui components. Do not mix them in the same layout.
+
+## 11.5 — PriceDisplay accepts Money type only.
+
+  // Correct
+  <PriceDisplay money={{ amount: "1250.00", currency: "LKR" }} />
+
+  // Wrong — never do this
+  <PriceDisplay amount={1250} />
+
+## 11.6 — CountdownTimer is hidden the moment payment is submitted.
+
+Show the timer (using expires_at from POST /checkout/start) on the payment step.
+When the user submits payment (POST /payments/intent called):
+  - Hide the timer immediately
+  - Show Spinner + "Processing payment — please do not close this page."
+
+Never show "0:00" while a card charge is in flight.
+The 10-minute grace period handles the backend. The UX must not alarm the user.
+
+## 11.7 — Product Detail Page variant selector behaviour.
+
+  - No colour or size pre-selected on page load.
+  - "Add to Cart" disabled until BOTH colour and size are selected.
+  - Size buttons are disabled (not hidden) when available_qty = 0 for selected colour.
+  - Show "Only N left" badge when available_qty <= low_stock_threshold.
+  - Show "Notify Me When Available" when all sizes for a colour are OOS.
+  - Changing colour resets size selection to unselected state.
+
+## 11.8 — Images use Next/Image.
+
+  - Format: WebP / AVIF
+  - Provide sizes prop
+  - Lazy load below the fold
+
+## 11.9 — Design system from Figma tokens.
+
+  Build tokens first: packages/ui/src/tokens/ (radius, spacing, typography, shadows)
+  Use CVA for variants: packages/ui/src/components/<Component>.tsx
+  Motion: subtle transitions only (opacity / translate). Respect prefers-reduced-motion.
+
+## 11.10 — Admin portal session check on every page.
+
+Every /admin/* page validates admin session server-side before rendering.
+  Unauthenticated  → redirect to /admin/login
+  Insufficient role → render 403, do not redirect
+
+
+# =============================================================================
+# 12) WORKER RULES
+# =============================================================================
+
+## 12.1 — Scheduled job registry.
+
+  reservationExpiry.ts     every 1 min    two-window expiry (critical)
+  inventoryReconcile.ts    daily          compare units vs aggregate, alert on drift
+  loyaltyTierRecompute.ts  weekly         rolling 12-month window, handle downgrades
+  loyaltyExpiry.ts         daily          expire points after 12 months inactivity
+  expiryWarning.ts         daily          warn users 30 days before expiry
+  analyticsAggregate.ts    hourly         pre-aggregate events into analytics_aggregates
+  cartCleanup.ts           daily          mark expired carts ABANDONED
+  partitionCreate.ts       monthly (25th) create next month's analytics.events partition
+
+## 12.2 — Worker jobs must be idempotent.
+
+If a job runs twice (crash + restart), it must produce the same result.
+Use worker_lock_id for reservation expiry.
+Use time-gated WHERE conditions for all other jobs.
+
+## 12.3 — Reconciliation job never auto-corrects drift.
+
+Log discrepancies to inventory_reconciliation_log. Alert admin dashboard.
+A human corrects manually via the admin portal. Never silently adjust stock.
+
+
+# =============================================================================
+# 13) CODE STYLE CONVENTIONS
+# =============================================================================
+
+## 13.1 — TypeScript.
+
+  - TypeScript everywhere — no JavaScript files in src/
+  - Prefer interfaces over types for object shapes
+  - No classes — functional style only
+  - Use function keyword for named pure functions
+  - Omit semicolons (Prettier handles this)
+  - Named exports only for components and utilities
+
+## 13.2 — Naming.
+
+  Booleans     : isLoading, hasError, shouldRender (auxiliary verbs)
+  Variables    : descriptive, no abbreviations
+  TS files     : camelCase.ts
+  React files  : PascalCase.tsx
+  DB schema    : module name (inventory.ts, orders.ts)
+  Directories  : lowercase-with-dashes
+
+## 13.3 — Conditionals.
+
+  Guard clauses + early returns.
+  Avoid else where a guard clause works.
+  Single-line: if (hasError) return null
+
+## 13.4 — File layout (within each file).
+
+  1. Exported component / exported functions
+  2. Subcomponents
+  3. Helper functions
+  4. Static content / constants
+  5. Types and interfaces (at the bottom)
+
+## 13.5 — TypeScript compiler strictness.
+
+  "strict": true
+  "noUncheckedIndexedAccess": true
+  "exactOptionalPropertyTypes": true
+
+No any types. No as unknown as X casts.
+Zod for runtime validation at all API boundaries.
+
+## 13.6 — Primary keys are always UUID.
+
+  Application code  : crypto.randomUUID()
+  PostgreSQL DEFAULT: gen_random_uuid()
+  Never use integer serial PKs.
+
+## 13.7 — AppError for all expected errors.
+
+  throw new AppError('INSUFFICIENT_STOCK',        409)
+  throw new AppError('RESERVATION_NOT_HELD',       409)
+  throw new AppError('RETURN_WINDOW_EXPIRED',      422)
+  throw new AppError('DUPLICATE_RETURN',           409)
+  throw new AppError('WEBHOOK_INVALID_SIGNATURE',  401)
+  throw new AppError('LOCK_NOT_ACQUIRED',          409)
+
+Route handler catches AppError:
+  res.status(err.statusCode).json({ error: { code: err.code, message: err.message } })
+
+Unexpected errors → global handler → Sentry → 500 with generic message.
+
+
+# =============================================================================
+# 14) OBSERVABILITY AND SECURITY
+# =============================================================================
+
+## 14.1 — Sentry on both api and web.
+
+Include request ID / trace ID in every logged error when available.
+Never log secrets, tokens, raw card numbers, or full webhook payloads without masking.
+User-facing error messages: short, actionable, no internal detail.
+
+## 14.2 — Environment variables validated with Zod at process startup.
+
+  // apps/api/src/env.ts
+  const env = z.object({
+    DATABASE_URL:           z.string().url(),
+    REDIS_URL:              z.string().url(),
+    STRIPE_SECRET_KEY:      z.string().startsWith('sk_'),
+    STRIPE_WEBHOOK_SECRET:  z.string().startsWith('whsec_'),
+    ...
+  }).parse(process.env)
+
+Never hardcode secrets. Never commit .env files.
+
+## 14.3 — CSRF and input hygiene.
+
+  CSRF protections where applicable (Server Actions use built-in Next.js CSRF token).
+  Sanitize all user-generated content before storage and display.
+  Principle of least privilege for database roles.
+
+
+# =============================================================================
+# 15) TESTING STANDARDS
+# =============================================================================
+
+Unit tests:
+  - All utilities in packages/shared
+  - All Zod validation schemas
+  - All Decimal.js monetary calculations
+
+Integration tests (required before shipping):
+  - Concurrent checkout (two requests for last unit — exactly one must succeed)
+  - Duplicate Stripe webhook (second call must be 200 with no second order)
+  - Reservation expiry during payment grace period (hold must survive)
+  - Return on undelivered order (must return 422)
+  - Cart → checkout → order creation happy path
+  - Stripe webhook → order payment update
+
+E2E tests (Playwright):
+  - Browse products → add to cart → checkout → confirmation
+  - Auth flow: signup, login, logout
+
+## PR / change checklist (run through before marking done):
+
+  Does UI match Figma interactions and spacing?
+  Are components split into small, reusable parts?
+  Are server actions typed and validated with Zod?
+  Are errors modeled and user-friendly (no stack traces)?
+  Are Web Vitals protected (avoid unnecessary client-side JS)?
+  Is keyboard navigation and ARIA coverage present?
+  Are env vars validated and no secrets exposed?
+  Are all new DB columns covered by a migration?
+  Do integration tests still pass?
+
+
+# =============================================================================
+# 16) DATABASE AND MIGRATIONS
+# =============================================================================
+
+Use drizzle-kit for all schema changes.
+Never change a production schema without a migration file.
+Never modify modett_schema.sql directly after initial migration — add new migration files.
+
+Always add indexes for:
+  - Product slug lookups
+  - Order lookup by customer
+  - Cart session / customer references
+  (See existing indexes in 0001_initial.sql as reference.)
+
+
+# =============================================================================
+# 17) THINGS CURSOR MUST NEVER DO
+# =============================================================================
+
+NEVER simplify the reservation expiry condition.
+  Wrong : WHERE status='HELD' AND expires_at < now()
+  Right : WHERE status='HELD' AND expires_at < now()
+            AND (payment_submitted_at IS NULL OR grace_expires_at < now())
+
+NEVER use read-then-write for inventory stock checks.
+  The atomic UPDATE ... WHERE available_qty >= qty ... RETURNING pattern is mandatory.
+
+NEVER process a Stripe webhook without verifying HMAC signature first.
+
+NEVER create a second order on duplicate webhook delivery.
+  Three-layer idempotency is mandatory: Redis check → DB conflict → cache event ID.
+
+NEVER hard-delete products, variants, or admins.
+  Use deleted_at. All queries: WHERE deleted_at IS NULL.
+
+NEVER store a monetary amount without its currency.
+  order_items has unit_price_snapshot_amount AND unit_price_snapshot_currency.
+
+NEVER import from packages/db inside apps/web.
+
+NEVER put DATABASE_URL or REDIS_URL in Vercel environment variables.
+
+NEVER write SQL in a route handler file.
+  Route handler → service → query function is the only valid path.
+
+NEVER UPDATE rows in loyalty_ledger, order_events, or return_events.
+  These are append-only audit tables.
+
+NEVER query analytics.events without a created_at date range filter.
+  It is partitioned. Unfiltered queries are extremely expensive.
+
+NEVER use JavaScript number type for monetary values.
+  String in JSON / TypeScript. Decimal.js for arithmetic.
+
+NEVER set grace_expires_at without payment_submitted_at in the same UPDATE.
+  DB constraint chk_grace_set_together enforces this at the DB level too.
+
+NEVER create a new pg Pool per request.
+  One pool per process, created at startup, max: 20 connections.
+
+NEVER show the checkout countdown timer reaching zero during payment processing.
+  Hide the timer when POST /payments/intent is called. Show Spinner instead.
+
+NEVER use any type, as unknown as X, or suppress TypeScript errors with @ts-ignore.
+
+NEVER log secrets, raw webhook payloads, or full card details anywhere.
+
+NEVER auto-correct inventory drift in the reconciliation job.
+  Log to inventory_reconciliation_log and alert. Humans correct manually.
