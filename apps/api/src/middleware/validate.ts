@@ -5,11 +5,11 @@
  */
 
 import type { Request, Response, NextFunction } from 'express'
-import type { z, ZodSchema } from 'zod'
+import type { z, ZodTypeAny } from 'zod'
 
-export type ValidatedBody<T> = Request & { body: z.infer<T> }
+export type ValidatedBody<T extends ZodTypeAny> = Request & { body: z.infer<T> }
 
-export function validate<T extends ZodSchema>(schema: T) {
+export function validate<T extends ZodTypeAny>(schema: T) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const result = schema.safeParse(req.body)
     if (result.success) {

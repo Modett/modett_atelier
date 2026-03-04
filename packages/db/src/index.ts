@@ -7,8 +7,10 @@
  *   const [user] = await db.select().from(users).where(eq(users.email, '...'))
  */
 
-export { db, type Database } from './client'
-export { redis } from './redis'
+export { db, type Database, type TransactionClient } from './client'
+export { redis, withInventoryLock } from './redis'
+export { LockNotAcquiredError } from './errors'
 export * from './schema/index'
-export * from './types'
 export * from './queries/iam'
+export * from './queries/catalog'
+export * from './queries/inventory'

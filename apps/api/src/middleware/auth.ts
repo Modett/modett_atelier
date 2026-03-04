@@ -3,7 +3,7 @@
  * Reads 'sid' cookie, validates session via Redis/DB, attaches user/admin.
  */
 
-import type { Request, Response, NextFunction } from 'express'
+import type { Request, Response, NextFunction, RequestHandler } from 'express'
 import { getSession, refreshSession, getUserById, getAdminByUserId } from '@modett/db'
 import { redis } from '@modett/db'
 import { AppError } from '../lib/errors'
@@ -20,6 +20,13 @@ export type AdminRequest = Request & {
   user: { id: string; [k: string]: unknown }
   admin: { id: string; role: string; [k: string]: unknown }
   sessionId: string
+}
+
+/** Wraps an AdminRequest handler so it can be passed to router.get/post etc. (avoids Request vs AdminRequest variance). */
+export function withAdmin(
+  handler: (req: AdminRequest, res: Response) => void | Promise<void>,
+): RequestHandler {
+  return handler as unknown as RequestHandler
 }
 
 export function requireAuth(

@@ -5,7 +5,7 @@
  */
 
 import { drizzle } from 'drizzle-orm/node-postgres'
-import pg from 'pg'
+import * as pg from 'pg'
 import * as schema from './schema/index'
 
 const connectionString = process.env.DATABASE_URL
@@ -18,3 +18,6 @@ const pool = new pg.Pool({ connectionString })
 export const db = drizzle(pool, { schema })
 
 export type Database = typeof db
+
+/** Type of the client passed to db.transaction(callback) — use for query functions that accept tx. */
+export type TransactionClient = Parameters<Parameters<typeof db.transaction>[0]>[0]

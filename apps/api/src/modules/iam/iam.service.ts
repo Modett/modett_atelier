@@ -4,7 +4,7 @@
  */
 
 import * as crypto from 'node:crypto'
-import bcrypt from 'bcryptjs'
+import * as bcrypt from 'bcryptjs'
 import { AppError } from '../../lib/errors'
 import {
   getUserByEmail,

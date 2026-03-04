@@ -12,6 +12,7 @@ import {
   unique,
   check,
 } from 'drizzle-orm/pg-core'
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { products } from './catalog.schema'
 import { admins } from './iam.schema'
@@ -130,3 +131,18 @@ export const inventoryReconciliationLog = inventory.table(
     resolved_note: text('resolved_note'),
   },
 )
+
+// Inferred types (prompt: ProductVariant, NewProductVariant, etc.)
+export type ProductVariant = InferSelectModel<typeof productVariants>
+export type NewProductVariant = InferInsertModel<typeof productVariants>
+export type VariantStock = InferSelectModel<typeof variantStock>
+export type InventoryUnit = InferSelectModel<typeof inventoryUnits>
+export type NewInventoryUnit = InferInsertModel<typeof inventoryUnits>
+export type InventoryMovement = InferSelectModel<typeof inventoryMovements>
+export type NewInventoryMovement = InferInsertModel<typeof inventoryMovements>
+export type ReconciliationLog = InferSelectModel<
+  typeof inventoryReconciliationLog
+>
+export type NewReconciliationLog = InferInsertModel<
+  typeof inventoryReconciliationLog
+>
