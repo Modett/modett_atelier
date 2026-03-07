@@ -3,6 +3,8 @@ import swaggerJsdoc from 'swagger-jsdoc'
 import * as swaggerUi from 'swagger-ui-express'
 import type { Express } from 'express'
 
+const apiPort = process.env.PORT || '3001'
+
 const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
@@ -13,7 +15,7 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: 'http://localhost:3001/api',
+        url: `http://localhost:${apiPort}/api`,
         description: 'Local development',
       },
     ],
@@ -266,18 +268,32 @@ const options: swaggerJsdoc.Options = {
         name: 'Admin Bestsellers',
         description: 'Bestseller list management',
       },
+      { name: 'Shipping', description: 'Storefront shipping methods' },
+      { name: 'Shipping Admin', description: 'Admin shipping zones and methods' },
+      { name: 'Returns', description: 'Customer return requests' },
+      { name: 'Admin Returns', description: 'Admin return review and transitions' },
     ],
   },
   apis: [
     path.join(process.cwd(), 'src/modules/iam/iam.routes.ts'),
     path.join(process.cwd(), 'src/modules/catalog/catalog.routes.ts'),
+    path.join(process.cwd(), 'src/modules/cart/cart.routes.ts'),
+    path.join(process.cwd(), 'src/modules/checkout/checkout.routes.ts'),
+    path.join(process.cwd(), 'src/modules/payments/payments.routes.ts'),
+    path.join(process.cwd(), 'src/modules/orders/orders.routes.ts'),
+    path.join(process.cwd(), 'src/modules/shipping/shipping.routes.ts'),
+    path.join(process.cwd(), 'src/modules/returns/returns.routes.ts'),
+    path.join(process.cwd(), 'src/modules/reviews/reviews.routes.ts'),
+    path.join(process.cwd(), 'src/modules/loyalty/loyalty.routes.ts'),
+    path.join(process.cwd(), 'src/modules/messaging/messaging.routes.ts'),
   ],
 }
 
 export const swaggerSpec = swaggerJsdoc(options)
 
 export function setupSwagger(app: Express): void {
-  if (process.env.NODE_ENV === 'production') return
+  // Swagger disabled in production by default; set SWAGGER_ENABLED=1 to enable
+  if (process.env.NODE_ENV === 'production' && process.env.SWAGGER_ENABLED !== '1') return
 
   const serveHandlers = Array.isArray(swaggerUi.serve)
     ? swaggerUi.serve
@@ -300,5 +316,5 @@ export function setupSwagger(app: Express): void {
     res.json(swaggerSpec)
   })
 
-  console.log('Swagger UI available at http://localhost:3001/docs')
+  console.log(`Swagger UI available at http://localhost:${apiPort}/docs`)
 }

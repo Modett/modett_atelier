@@ -43,6 +43,7 @@ const zod_1 = require("zod");
 const validate_1 = require("../../middleware/validate");
 const rateLimit_1 = require("../../middleware/rateLimit");
 const auth_1 = require("../../middleware/auth");
+const cart_1 = require("../cart");
 const iamService = __importStar(require("./iam.service"));
 const router = (0, express_1.Router)();
 // Cookie helpers
@@ -148,6 +149,24 @@ router.post('/auth/login', rateLimit_1.rateLimitAuth, (0, validate_1.validate)(l
     const { user, sessionId } = await iamService.login(body);
     const maxAge = body.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
     res.cookie('sid', sessionId, { ...CUSTOMER_COOKIE_OPTIONS, maxAge });
+    try {
+        const mergeResult = await (0, cart_1.mergeCartsOnLogin)({
+            userId: user.id,
+            guestSessionId: req.cookies?.cid ?? '',
+        });
+        if (mergeResult) {
+            res.cookie('cid', mergeResult.sessionId, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 21 * 24 * 60 * 60 * 1000,
+                path: '/',
+            });
+        }
+    }
+    catch (err) {
+        console.error('Cart merge on login failed', err);
+    }
     res.status(200).json({ data: { user } });
 });
 /**

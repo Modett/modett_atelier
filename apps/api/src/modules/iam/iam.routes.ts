@@ -14,6 +14,7 @@ import {
   rateLimitAcceptInvite,
 } from '../../middleware/rateLimit'
 import { requireAuth, requireAdmin, requireOwner } from '../../middleware/auth'
+import { mergeCartsOnLogin } from '../cart'
 import * as iamService from './iam.service'
 
 const router = Router()
@@ -142,6 +143,23 @@ router.post(
     const { user, sessionId } = await iamService.login(body)
     const maxAge = body.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
     res.cookie('sid', sessionId, { ...CUSTOMER_COOKIE_OPTIONS, maxAge })
+    try {
+      const mergeResult = await mergeCartsOnLogin({
+        userId: user.id,
+        guestSessionId: req.cookies?.cid ?? '',
+      })
+      if (mergeResult) {
+        res.cookie('cid', mergeResult.sessionId, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 21 * 24 * 60 * 60 * 1000,
+          path: '/',
+        })
+      }
+    } catch (err) {
+      console.error('Cart merge on login failed', err)
+    }
     res.status(200).json({ data: { user } })
   },
 )

@@ -1,0 +1,10 @@
+{
+  "framework":      "nextjs",
+  "buildCommand":   "cd ../.. && pnpm --filter @modett/web build",
+  "installCommand": "cd ../.. && pnpm install",
+  "outputDirectory":".next",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@modett_api_url",
+    "NEXT_PUBLIC_SITE_URL": "@modett_site_url"
+  }
+}

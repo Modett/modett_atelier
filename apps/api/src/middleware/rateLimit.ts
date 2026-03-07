@@ -86,3 +86,19 @@ export const rateLimitAcceptInvite = rateLimit({
   max: 5,
   key: (req) => req.ip ?? 'unknown',
 })
+
+// Checkout start: 5 / 10 min / IP (prevent reservation flooding)
+export const rateLimitCheckoutStart = rateLimit({
+  name: 'checkout:start',
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  key: (req) => req.ip ?? 'unknown',
+})
+
+// Payment intent: 3 / 5 min / IP (prevent grace window abuse)
+export const rateLimitPaymentIntent = rateLimit({
+  name: 'checkout:payment',
+  windowMs: 5 * 60 * 1000,
+  max: 3,
+  key: (req) => req.ip ?? 'unknown',
+})

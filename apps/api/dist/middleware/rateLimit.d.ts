@@ -20,4 +20,6 @@ export declare const rateLimitAuth: (req: Request, res: Response, next: NextFunc
 export declare const rateLimitAdminAuth: (req: Request, res: Response, next: NextFunction) => Promise<void>;
 export declare const rateLimitAdminInvites: (req: Request, res: Response, next: NextFunction) => Promise<void>;
 export declare const rateLimitAcceptInvite: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+export declare const rateLimitCheckoutStart: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+export declare const rateLimitPaymentIntent: (req: Request, res: Response, next: NextFunction) => Promise<void>;
 //# sourceMappingURL=rateLimit.d.ts.map

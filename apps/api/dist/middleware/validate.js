@@ -1,11 +1,12 @@
 "use strict";
 /**
  * Zod validation middleware.
- * Validates request body against a schema and replaces req.body with the parsed value.
+ * Validates request body or query against a schema.
  * On validation error returns 400 { error: { code: 'VALIDATION_ERROR', message, details } }.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validate = validate;
+exports.validateQuery = validateQuery;
 function validate(schema) {
     return (req, res, next) => {
         const result = schema.safeParse(req.body);
@@ -20,6 +21,25 @@ function validate(schema) {
             error: {
                 code: 'VALIDATION_ERROR',
                 message: 'Invalid request body',
+                details: details.fieldErrors,
+            },
+        });
+    };
+}
+function validateQuery(schema) {
+    return (req, res, next) => {
+        const result = schema.safeParse(req.query);
+        if (result.success) {
+            ;
+            req.validatedQuery = result.data;
+            next();
+            return;
+        }
+        const details = result.error.flatten();
+        res.status(400).json({
+            error: {
+                code: 'VALIDATION_ERROR',
+                message: 'Invalid query parameters',
                 details: details.fieldErrors,
             },
         });

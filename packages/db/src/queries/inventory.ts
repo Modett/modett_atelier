@@ -7,12 +7,14 @@
 import { eq, and, isNull, desc, sql } from 'drizzle-orm'
 import { db, type Database, type TransactionClient } from '../client'
 import {
+  productVariants,
   variantStock,
   inventoryUnits,
   inventoryMovements,
   inventoryReconciliationLog,
 } from '../schema/inventory.schema'
 import type {
+  ProductVariant,
   VariantStock,
   InventoryUnit,
   InventoryMovement,
@@ -34,6 +36,20 @@ export interface VariantAvailabilityRow {
 }
 
 // —— READ QUERIES ——
+
+export async function getProductVariantById({
+  variantId,
+}: {
+  variantId: string
+}): Promise<ProductVariant | null> {
+  const rows = await db
+    .select()
+    .from(productVariants)
+    .where(
+      and(eq(productVariants.id, variantId), isNull(productVariants.deleted_at)),
+    )
+  return rows[0] ?? null
+}
 
 export async function getVariantStock({
   variantId,

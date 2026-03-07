@@ -5,6 +5,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.withAdmin = withAdmin;
+exports.optionalAuth = optionalAuth;
 exports.requireAuth = requireAuth;
 exports.requireAdmin = requireAdmin;
 exports.requireOwner = requireOwner;
@@ -16,6 +17,36 @@ const ADMIN_SESSION_TTL = 900; // 15 min in seconds
 /** Wraps an AdminRequest handler so it can be passed to router.get/post etc. (avoids Request vs AdminRequest variance). */
 function withAdmin(handler) {
     return handler;
+}
+/**
+ * Optional auth — for cart routes. If 'sid' cookie present and valid CUSTOMER session,
+ * sets req.user. If missing or invalid, continues without error (guest cart).
+ * Admin sessions are ignored (no req.user).
+ */
+function optionalAuth(req, res, next) {
+    const sid = req.cookies?.sid;
+    if (!sid) {
+        next();
+        return;
+    }
+    (0, db_1.getSession)({ sessionId: sid })
+        .then((session) => {
+        if (!session || session.kind !== 'CUSTOMER') {
+            next();
+            return;
+        }
+        return (0, db_1.getUserById)({ id: session.userId }).then((user) => {
+            if (!user || user.deletedAt) {
+                next();
+                return;
+            }
+            ;
+            req.user = user;
+            req.sessionId = sid;
+            next();
+        });
+    })
+        .catch(() => next());
 }
 function requireAuth(req, res, next) {
     const sid = req.cookies?.sid;

@@ -5,6 +5,15 @@ import { setupSwagger } from './docs/swagger'
 import { iamRoutes } from './modules/iam'
 import { catalogRoutes } from './modules/catalog'
 import { inventoryRoutes } from './modules/inventory'
+import { cartRoutes } from './modules/cart'
+import { checkoutRoutes } from './modules/checkout'
+import { paymentsRoutes } from './modules/payments'
+import { ordersRoutes } from './modules/orders'
+import { shippingRoutes } from './modules/shipping'
+import { returnsRoutes } from './modules/returns'
+import { reviewsRoutes } from './modules/reviews'
+import { loyaltyRoutes } from './modules/loyalty'
+import { messagingRoutes } from './modules/messaging'
 
 export const app: Express = express()
 
@@ -14,6 +23,15 @@ app.use(cookieParser())
 app.use('/api', iamRoutes)
 app.use('/api', catalogRoutes)
 app.use('/api', inventoryRoutes)
+app.use('/api', cartRoutes)
+app.use('/api', checkoutRoutes)
+app.use('/api', paymentsRoutes)
+app.use('/api', ordersRoutes)
+app.use('/api', shippingRoutes)
+app.use('/api', returnsRoutes)
+app.use('/api', reviewsRoutes)
+app.use('/api', loyaltyRoutes)
+app.use('/api', messagingRoutes)
 setupSwagger(app)
 
 // Global error handler — catches all AppError throws from routes

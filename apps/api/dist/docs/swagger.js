@@ -41,6 +41,7 @@ exports.setupSwagger = setupSwagger;
 const path_1 = __importDefault(require("path"));
 const swagger_jsdoc_1 = __importDefault(require("swagger-jsdoc"));
 const swaggerUi = __importStar(require("swagger-ui-express"));
+const apiPort = process.env.PORT || '3001';
 const options = {
     definition: {
         openapi: '3.0.0',
@@ -51,7 +52,7 @@ const options = {
         },
         servers: [
             {
-                url: 'http://localhost:3001/api',
+                url: `http://localhost:${apiPort}/api`,
                 description: 'Local development',
             },
         ],
@@ -301,16 +302,30 @@ const options = {
                 name: 'Admin Bestsellers',
                 description: 'Bestseller list management',
             },
+            { name: 'Shipping', description: 'Storefront shipping methods' },
+            { name: 'Shipping Admin', description: 'Admin shipping zones and methods' },
+            { name: 'Returns', description: 'Customer return requests' },
+            { name: 'Admin Returns', description: 'Admin return review and transitions' },
         ],
     },
     apis: [
         path_1.default.join(process.cwd(), 'src/modules/iam/iam.routes.ts'),
         path_1.default.join(process.cwd(), 'src/modules/catalog/catalog.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/cart/cart.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/checkout/checkout.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/payments/payments.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/orders/orders.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/shipping/shipping.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/returns/returns.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/reviews/reviews.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/loyalty/loyalty.routes.ts'),
+        path_1.default.join(process.cwd(), 'src/modules/messaging/messaging.routes.ts'),
     ],
 };
 exports.swaggerSpec = (0, swagger_jsdoc_1.default)(options);
 function setupSwagger(app) {
-    if (process.env.NODE_ENV === 'production')
+    // Swagger disabled in production by default; set SWAGGER_ENABLED=1 to enable
+    if (process.env.NODE_ENV === 'production' && process.env.SWAGGER_ENABLED !== '1')
         return;
     const serveHandlers = Array.isArray(swaggerUi.serve)
         ? swaggerUi.serve
@@ -327,6 +342,6 @@ function setupSwagger(app) {
     app.get('/docs/spec.json', (req, res) => {
         res.json(exports.swaggerSpec);
     });
-    console.log('Swagger UI available at http://localhost:3001/docs');
+    console.log(`Swagger UI available at http://localhost:${apiPort}/docs`);
 }
 //# sourceMappingURL=swagger.js.map

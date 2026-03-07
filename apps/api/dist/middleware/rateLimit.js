@@ -5,7 +5,7 @@
  * Applied per route. Requires redis from @modett/db.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.rateLimitAcceptInvite = exports.rateLimitAdminInvites = exports.rateLimitAdminAuth = exports.rateLimitAuth = exports.rateLimitSignup = void 0;
+exports.rateLimitPaymentIntent = exports.rateLimitCheckoutStart = exports.rateLimitAcceptInvite = exports.rateLimitAdminInvites = exports.rateLimitAdminAuth = exports.rateLimitAuth = exports.rateLimitSignup = void 0;
 exports.rateLimit = rateLimit;
 const db_1 = require("@modett/db");
 function slidingWindowKey(name, id) {
@@ -69,6 +69,20 @@ exports.rateLimitAcceptInvite = rateLimit({
     name: 'admin-invites-accept',
     windowMs: 60 * 60 * 1000,
     max: 5,
+    key: (req) => req.ip ?? 'unknown',
+});
+// Checkout start: 5 / 10 min / IP (prevent reservation flooding)
+exports.rateLimitCheckoutStart = rateLimit({
+    name: 'checkout:start',
+    windowMs: 10 * 60 * 1000,
+    max: 5,
+    key: (req) => req.ip ?? 'unknown',
+});
+// Payment intent: 3 / 5 min / IP (prevent grace window abuse)
+exports.rateLimitPaymentIntent = rateLimit({
+    name: 'checkout:payment',
+    windowMs: 5 * 60 * 1000,
+    max: 3,
     key: (req) => req.ip ?? 'unknown',
 });
 //# sourceMappingURL=rateLimit.js.map

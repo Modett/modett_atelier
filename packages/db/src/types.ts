@@ -63,7 +63,7 @@ import {
   loyaltyLedger,
   loyaltyRules,
   loyaltyGrants,
-} from './schema/loyalty.schema'
+} from './schema/loyalty'
 import {
   inboxMessages,
   notificationPreferences,

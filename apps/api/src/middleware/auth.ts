@@ -29,6 +29,40 @@ export function withAdmin(
   return handler as unknown as RequestHandler
 }
 
+/**
+ * Optional auth — for cart routes. If 'sid' cookie present and valid CUSTOMER session,
+ * sets req.user. If missing or invalid, continues without error (guest cart).
+ * Admin sessions are ignored (no req.user).
+ */
+export function optionalAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const sid = req.cookies?.sid
+  if (!sid) {
+    next()
+    return
+  }
+  getSession({ sessionId: sid })
+    .then((session) => {
+      if (!session || session.kind !== 'CUSTOMER') {
+        next()
+        return
+      }
+      return getUserById({ id: session.userId }).then((user) => {
+        if (!user || user.deletedAt) {
+          next()
+          return
+        }
+        ;(req as AuthRequest).user = user
+        ;(req as AuthRequest).sessionId = sid
+        next()
+      })
+    })
+    .catch(() => next())
+}
+
 export function requireAuth(
   req: Request,
   res: Response,

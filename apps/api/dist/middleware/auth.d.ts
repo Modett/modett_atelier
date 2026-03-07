@@ -24,6 +24,12 @@ export type AdminRequest = Request & {
 };
 /** Wraps an AdminRequest handler so it can be passed to router.get/post etc. (avoids Request vs AdminRequest variance). */
 export declare function withAdmin(handler: (req: AdminRequest, res: Response) => void | Promise<void>): RequestHandler;
+/**
+ * Optional auth — for cart routes. If 'sid' cookie present and valid CUSTOMER session,
+ * sets req.user. If missing or invalid, continues without error (guest cart).
+ * Admin sessions are ignored (no req.user).
+ */
+export declare function optionalAuth(req: Request, res: Response, next: NextFunction): void;
 export declare function requireAuth(req: Request, res: Response, next: NextFunction): void;
 export declare function requireAdmin(req: Request, res: Response, next: NextFunction): void;
 export declare function requireOwner(req: Request, res: Response, next: NextFunction): void;

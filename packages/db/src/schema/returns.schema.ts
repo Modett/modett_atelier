@@ -11,6 +11,7 @@ import {
   timestamp,
   jsonb,
 } from 'drizzle-orm/pg-core'
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
 import { ordersTable } from './orders.schema'
 import { orderItems } from './orders.schema'
 import { admins } from './iam.schema'
@@ -80,3 +81,10 @@ export const returnEvents = returns.table('return_events', {
     .notNull()
     .defaultNow(),
 })
+
+export type ReturnRequest = InferSelectModel<typeof returnRequests>
+export type NewReturnRequest = InferInsertModel<typeof returnRequests>
+export type ReturnRequestItem = InferSelectModel<typeof returnRequestItems>
+export type NewReturnRequestItem = InferInsertModel<typeof returnRequestItems>
+export type ReturnEvent = InferSelectModel<typeof returnEvents>
+export type NewReturnEvent = InferInsertModel<typeof returnEvents>

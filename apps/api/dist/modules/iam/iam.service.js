@@ -60,6 +60,8 @@ const crypto = __importStar(require("node:crypto"));
 const bcrypt = __importStar(require("bcryptjs"));
 const errors_1 = require("../../lib/errors");
 const db_1 = require("@modett/db");
+const loyalty_1 = require("../loyalty");
+const messaging_1 = require("../messaging");
 const BCRYPT_ROUNDS = 12;
 const DUMMY_HASH = '$2a$12$dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.u';
 function sanitiseUser(user) {
@@ -80,6 +82,8 @@ async function signup({ firstName, lastName, email, password, newsletterOptIn, }
         passwordHash,
         newsletterOptIn,
     });
+    (0, loyalty_1.createLoyaltyAccount)({ userId: user.id }).catch((err) => console.error('[iam] loyalty account creation failed:', err));
+    (0, messaging_1.createNotificationPreferences)({ userId: user.id }).catch((err) => console.error('[iam] notification prefs creation failed:', err));
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const session = await (0, db_1.createSession)({
         userId: user.id,

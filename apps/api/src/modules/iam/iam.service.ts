@@ -34,6 +34,8 @@ import {
   deleteSavedPaymentMethod,
 } from '@modett/db'
 import type { User, Admin, SavedAddress, SavedPaymentMethod } from '@modett/db'
+import { createLoyaltyAccount } from '../loyalty'
+import { createNotificationPreferences } from '../messaging'
 
 const BCRYPT_ROUNDS = 12
 const DUMMY_HASH =
@@ -72,6 +74,12 @@ export async function signup({
     passwordHash,
     newsletterOptIn,
   })
+  createLoyaltyAccount({ userId: user.id }).catch((err) =>
+    console.error('[iam] loyalty account creation failed:', err),
+  )
+  createNotificationPreferences({ userId: user.id }).catch((err) =>
+    console.error('[iam] notification prefs creation failed:', err),
+  )
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   const session = await createSession({
     userId: user.id,
