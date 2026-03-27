@@ -1,6 +1,7 @@
 /**
  * Orders schema — promo_codes, orders, order_items, addresses, contacts, events, unit_allocations
  * Mirrors packages/db/migrations/0001_initial.sql
+ * Checkout module spec: fulfillment_state and return_state enums aligned with Section 1.
  */
 
 import {
@@ -9,11 +10,13 @@ import {
   text,
   boolean,
   integer,
+  numeric,
   timestamp,
   jsonb,
   unique,
   check,
 } from 'drizzle-orm/pg-core'
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { users, admins } from './iam.schema'
 import { productVariants } from './inventory.schema'
@@ -35,18 +38,16 @@ export const paymentStateEnum = orders.enum('payment_state', [
 ])
 export const fulfillmentStateEnum = orders.enum('fulfillment_state', [
   'NOT_STARTED',
-  'PACKED',
-  'SHIPPED',
-  'OUT_FOR_DELIVERY',
-  'DELIVERED',
+  'IN_PROGRESS',
+  'PARTIALLY_FULFILLED',
+  'FULFILLED',
+  'CANCELLED',
 ])
 export const returnStateEnum = orders.enum('return_state', [
   'NONE',
   'REQUESTED',
-  'PENDING_REVIEW',
-  'APPROVED',
-  'FULFILLED',
-  'REJECTED',
+  'PARTIAL',
+  'RETURNED',
 ])
 export const addressKindEnum = orders.enum('address_kind', [
   'SHIPPING',
@@ -95,12 +96,29 @@ export const ordersTable = orders.table(
     return_state: returnStateEnum('return_state').notNull().default('NONE'),
     currency: currencyCodeEnum('currency').notNull(),
     country_code: text('country_code').notNull(),
-    subtotal: text('subtotal').notNull(),
-    discount_amount: text('discount_amount').notNull().default('0'),
-    shipping_cost: text('shipping_cost').notNull().default('0'),
-    tax_amount: text('tax_amount').notNull().default('0'),
-    tax_rate_snapshot: text('tax_rate_snapshot').notNull().default('0'),
-    total: text('total').notNull(),
+    subtotal: numeric('subtotal', { precision: 12, scale: 2 }).notNull(),
+    discount_amount: numeric('discount_amount', {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default('0'),
+    shipping_cost: numeric('shipping_cost', {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default('0'),
+    tax_amount: numeric('tax_amount', { precision: 12, scale: 2 })
+      .notNull()
+      .default('0'),
+    tax_rate_snapshot: numeric('tax_rate_snapshot', {
+      precision: 5,
+      scale: 4,
+    })
+      .notNull()
+      .default('0'),
+    total: numeric('total', { precision: 12, scale: 2 }).notNull(),
     shipping_method_id: uuid('shipping_method_id').references(
       () => shippingMethods.id,
       { onDelete: 'set null' },
@@ -123,6 +141,11 @@ export const ordersTable = orders.table(
       'chk_order_identity',
       sql`(${t.user_id} IS NOT NULL OR ${t.guest_email} IS NOT NULL)`,
     ),
+    check('chk_orders_subtotal_non_neg', sql`${t.subtotal} >= 0`),
+    check('chk_orders_discount_non_neg', sql`${t.discount_amount} >= 0`),
+    check('chk_orders_shipping_non_neg', sql`${t.shipping_cost} >= 0`),
+    check('chk_orders_tax_non_neg', sql`${t.tax_amount} >= 0`),
+    check('chk_orders_total_non_neg', sql`${t.total} >= 0`),
   ],
 )
 
@@ -149,25 +172,34 @@ export const promoRedemptions = orders.table(
   ],
 )
 
-export const orderItems = orders.table('order_items', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  order_id: uuid('order_id')
-    .notNull()
-    .references(() => ordersTable.id, { onDelete: 'cascade' }),
-  variant_id: uuid('variant_id').references(() => productVariants.id, {
-    onDelete: 'set null',
-  }),
-  qty: integer('qty').notNull(),
-  unit_price_snapshot_amount: text('unit_price_snapshot_amount').notNull(),
-  unit_price_snapshot_currency: currencyCodeEnum(
-    'unit_price_snapshot_currency',
-  ).notNull(),
-  tax_amount: text('tax_amount').notNull().default('0'),
-  product_snapshot_json: jsonb('product_snapshot_json').notNull(),
-  created_at: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-})
+export const orderItems = orders.table(
+  'order_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    order_id: uuid('order_id')
+      .notNull()
+      .references(() => ordersTable.id, { onDelete: 'cascade' }),
+    variant_id: uuid('variant_id').references(() => productVariants.id, {
+      onDelete: 'set null',
+    }),
+    qty: integer('qty').notNull(),
+    unit_price_snapshot_amount: numeric('unit_price_snapshot_amount', {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+    unit_price_snapshot_currency: currencyCodeEnum(
+      'unit_price_snapshot_currency',
+    ).notNull(),
+    tax_amount: numeric('tax_amount', { precision: 12, scale: 2 })
+      .notNull()
+      .default('0'),
+    product_snapshot_json: jsonb('product_snapshot_json').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [check('chk_order_items_qty_positive', sql`${t.qty} > 0`)],
+)
 
 export const orderAddresses = orders.table(
   'order_addresses',
@@ -224,3 +256,18 @@ export const orderUnitAllocations = orders.table('order_unit_allocations', {
     .notNull()
     .defaultNow(),
 })
+
+// Checkout module: alias and inferred types (Section 1)
+export { ordersTable as orders }
+export type Order = InferSelectModel<typeof ordersTable>
+export type NewOrder = InferInsertModel<typeof ordersTable>
+export type OrderItem = InferSelectModel<typeof orderItems>
+export type NewOrderItem = InferInsertModel<typeof orderItems>
+export type OrderAddress = InferSelectModel<typeof orderAddresses>
+export type NewOrderAddress = InferInsertModel<typeof orderAddresses>
+export type OrderContact = InferSelectModel<typeof orderContacts>
+export type NewOrderContact = InferInsertModel<typeof orderContacts>
+export type OrderEvent = InferSelectModel<typeof orderEvents>
+export type NewOrderEvent = InferInsertModel<typeof orderEvents>
+export type PromoCode = InferSelectModel<typeof promoCodes>
+export type NewPromoCode = InferInsertModel<typeof promoCodes>

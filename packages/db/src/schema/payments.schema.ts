@@ -3,7 +3,15 @@
  * Mirrors packages/db/migrations/0001_initial.sql
  */
 
-import { pgSchema, uuid, text, timestamp, jsonb } from 'drizzle-orm/pg-core'
+import {
+  pgSchema,
+  uuid,
+  text,
+  timestamp,
+  jsonb,
+  numeric,
+} from 'drizzle-orm/pg-core'
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
 import { ordersTable } from './orders.schema'
 import { currencyCodeEnum } from './orders.schema'
 
@@ -24,7 +32,7 @@ export const paymentIntents = payments.table('payment_intents', {
     .references(() => ordersTable.id),
   provider: text('provider').notNull(),
   provider_intent_id: text('provider_intent_id').notNull().unique(),
-  amount: text('amount').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   currency: currencyCodeEnum('currency').notNull(),
   status: paymentStatusEnum('status').notNull().default('PENDING'),
   created_at: timestamp('created_at', { withTimezone: true })
@@ -43,10 +51,15 @@ export const paymentTransactions = payments.table('payment_transactions', {
   provider: text('provider').notNull(),
   provider_charge_id: text('provider_charge_id').notNull().unique(),
   status: paymentStatusEnum('status').notNull(),
-  amount: text('amount').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   currency: currencyCodeEnum('currency').notNull(),
   raw_payload_json: jsonb('raw_payload_json').notNull(),
   received_at: timestamp('received_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
 })
+
+export type PaymentIntent = InferSelectModel<typeof paymentIntents>
+export type NewPaymentIntent = InferInsertModel<typeof paymentIntents>
+export type PaymentTransaction = InferSelectModel<typeof paymentTransactions>
+export type NewPaymentTransaction = InferInsertModel<typeof paymentTransactions>

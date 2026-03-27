@@ -1,0 +1,20 @@
+{
+	"scripts": {
+		"build": "pnpm --filter @modett/types build && pnpm --filter @modett/db build && pnpm --filter @modett/api build",
+		"start": "pnpm --filter @modett/api start",
+		"migrate": "pnpm --filter @modett/db migrate",
+		"type-check": "pnpm --filter @modett/api type-check"
+	},
+	"dependencies": {
+		"bcryptjs": "^3.0.3",
+		"cookie-parser": "^1.4.7",
+		"express": "^5.2.1",
+		"ioredis": "^5.9.3",
+		"zod": "^4.3.6"
+	},
+	"devDependencies": {
+		"@types/bcryptjs": "^3.0.0",
+		"@types/cookie-parser": "^1.4.10",
+		"@types/express": "^5.0.6"
+	}
+}

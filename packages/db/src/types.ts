@@ -32,7 +32,7 @@ import {
   inventoryReconciliationLog,
 } from './schema/inventory.schema'
 import { carts, cartItems, reservations, reservationItems } from './schema/cart.schema'
-import { shippingZones, shippingMethods } from './schema/shipping.schema'
+import { shippingZones, shippingMethods, shippingSettings } from './schema/shipping.schema'
 import {
   promoCodes,
   ordersTable,
@@ -63,7 +63,7 @@ import {
   loyaltyLedger,
   loyaltyRules,
   loyaltyGrants,
-} from './schema/loyalty.schema'
+} from './schema/loyalty'
 import {
   inboxMessages,
   notificationPreferences,
@@ -144,6 +144,8 @@ export type ShippingZone = InferSelectModel<typeof shippingZones>
 export type ShippingZoneInsert = InferInsertModel<typeof shippingZones>
 export type ShippingMethod = InferSelectModel<typeof shippingMethods>
 export type ShippingMethodInsert = InferInsertModel<typeof shippingMethods>
+export type ShippingSettings = InferSelectModel<typeof shippingSettings>
+export type ShippingSettingsInsert = InferInsertModel<typeof shippingSettings>
 
 // Orders
 export type PromoCode = InferSelectModel<typeof promoCodes>

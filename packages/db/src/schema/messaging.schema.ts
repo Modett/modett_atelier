@@ -8,12 +8,15 @@ import {
   uuid,
   text,
   boolean,
-  integer,
   smallint,
   timestamp,
   jsonb,
+  numeric,
   unique,
+  check,
 } from 'drizzle-orm/pg-core'
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import { users } from './iam.schema'
 import { admins } from './iam.schema'
 import { productVariants } from './inventory.schema'
@@ -28,6 +31,7 @@ export const channelEnum = messaging.enum('channel', [
 ])
 export const outboxStatusEnum = messaging.enum('outbox_status', [
   'PENDING',
+  'SENDING', // worker-only intermediate state; not returned by API
   'SENT',
   'FAILED',
 ])
@@ -122,7 +126,7 @@ export const backInStockSubscriptions = messaging.table(
       .defaultNow(),
     notified_at: timestamp('notified_at', { withTimezone: true }),
   },
-  (t) => ({ uq: [t.user_id, t.variant_id] }),
+  (t) => [unique('uq_bis_user_variant').on(t.user_id, t.variant_id)],
 )
 
 export const priceDropSubscriptions = messaging.table(
@@ -135,7 +139,7 @@ export const priceDropSubscriptions = messaging.table(
     variant_id: uuid('variant_id')
       .notNull()
       .references(() => productVariants.id, { onDelete: 'cascade' }),
-    target_price: text('target_price'),
+    target_price: numeric('target_price', { precision: 12, scale: 2 }),
     channels_json: jsonb('channels_json').notNull().default(['EMAIL']),
     created_at: timestamp('created_at', { withTimezone: true })
       .notNull()
@@ -143,6 +147,7 @@ export const priceDropSubscriptions = messaging.table(
   },
   (t) => [
     unique('uq_price_drop_user_variant').on(t.user_id, t.variant_id),
+    check('chk_price_drop_target_positive', sql`(${t.target_price} IS NULL OR ${t.target_price} > 0)`),
   ],
 )
 
@@ -190,3 +195,23 @@ export const notifyMeEvents = messaging.table('notify_me_events', {
     .notNull()
     .defaultNow(),
 })
+
+// Inferred types
+export type InboxMessage = InferSelectModel<typeof inboxMessages>
+export type NewInboxMessage = InferInsertModel<typeof inboxMessages>
+export type NotificationPreferences = InferSelectModel<typeof notificationPreferences>
+export type NewNotificationPreferences = InferInsertModel<typeof notificationPreferences>
+export type NotificationOutboxRow = InferSelectModel<typeof notificationOutbox>
+export type NewNotificationOutboxRow = InferInsertModel<typeof notificationOutbox>
+export type EmailDeliveryLogRow = InferSelectModel<typeof emailDeliveryLog>
+export type NewEmailDeliveryLogRow = InferInsertModel<typeof emailDeliveryLog>
+export type BackInStockSubscription = InferSelectModel<typeof backInStockSubscriptions>
+export type NewBackInStockSubscription = InferInsertModel<typeof backInStockSubscriptions>
+export type PriceDropSubscription = InferSelectModel<typeof priceDropSubscriptions>
+export type NewPriceDropSubscription = InferInsertModel<typeof priceDropSubscriptions>
+export type Campaign = InferSelectModel<typeof campaigns>
+export type NewCampaign = InferInsertModel<typeof campaigns>
+export type CampaignDelivery = InferSelectModel<typeof campaignDeliveries>
+export type NewCampaignDelivery = InferInsertModel<typeof campaignDeliveries>
+export type NotifyMeEvent = InferSelectModel<typeof notifyMeEvents>
+export type NewNotifyMeEvent = InferInsertModel<typeof notifyMeEvents>

@@ -12,6 +12,7 @@ import {
   unique,
   check,
 } from 'drizzle-orm/pg-core'
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { users } from './iam.schema'
 import { productVariants } from './inventory.schema'
@@ -34,7 +35,9 @@ export const carts = cart.table('carts', {
   user_id: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   session_id: text('session_id').notNull(),
   status: cartStatusEnum('status').notNull().default('ACTIVE'),
-  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
+  expires_at: timestamp('expires_at', { withTimezone: true })
+    .notNull()
+    .default(sql`now() + interval '21 days'`),
   created_at: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -58,7 +61,10 @@ export const cartItems = cart.table(
       .notNull()
       .defaultNow(),
   },
-  (t) => [unique('uq_cart_items_cart_variant').on(t.cart_id, t.variant_id)],
+  (t) => [
+    unique('uq_cart_items_cart_variant').on(t.cart_id, t.variant_id),
+    check('chk_cart_items_qty_positive', sql`${t.qty} > 0`),
+  ],
 )
 
 export const reservations = cart.table(
@@ -92,13 +98,27 @@ export const reservations = cart.table(
   ],
 )
 
-export const reservationItems = cart.table('reservation_items', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  reservation_id: uuid('reservation_id')
-    .notNull()
-    .references(() => reservations.id, { onDelete: 'cascade' }),
-  variant_id: uuid('variant_id')
-    .notNull()
-    .references(() => productVariants.id),
-  qty: integer('qty').notNull(),
-})
+export const reservationItems = cart.table(
+  'reservation_items',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    reservation_id: uuid('reservation_id')
+      .notNull()
+      .references(() => reservations.id, { onDelete: 'cascade' }),
+    variant_id: uuid('variant_id')
+      .notNull()
+      .references(() => productVariants.id),
+    qty: integer('qty').notNull(),
+  },
+  (t) => [check('chk_reservation_items_qty_positive', sql`${t.qty} > 0`)],
+)
+
+// Inferred types
+export type Cart = InferSelectModel<typeof carts>
+export type NewCart = InferInsertModel<typeof carts>
+export type CartItem = InferSelectModel<typeof cartItems>
+export type NewCartItem = InferInsertModel<typeof cartItems>
+export type Reservation = InferSelectModel<typeof reservations>
+export type NewReservation = InferInsertModel<typeof reservations>
+export type ReservationItem = InferSelectModel<typeof reservationItems>
+export type NewReservationItem = InferInsertModel<typeof reservationItems>
