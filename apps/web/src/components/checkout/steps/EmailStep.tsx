@@ -8,7 +8,6 @@ import { api } from '@/lib/api'
 import { useCheckoutStore } from '@/store/checkout.store'
 import { useSession, useInvalidateSession } from '@/hooks/useSession'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useCart } from '@/hooks/useCart'
 import type { ApiError, User } from '@/types'
 
 const emailSchema = z.string().email()
@@ -20,8 +19,6 @@ export function EmailStep() {
   const { user, isLoggedIn } = useSession()
   const invalidateSession = useInvalidateSession()
   const currency = useCurrency()
-  const { summary } = useCart()
-
   const [email, setEmail] = useState(useCheckoutStore.getState().email ?? '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
