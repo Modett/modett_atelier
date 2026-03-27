@@ -5,7 +5,7 @@ nixPkgs = ["nodejs_20", "pnpm"]
 cmd = "pnpm install --frozen-lockfile"
 
 [phases.build]
-cmd = "pnpm --filter @modett/db build && pnpm --filter @modett/api build"
+cmd = "pnpm --filter @modett/types build && pnpm --filter @modett/db build && pnpm --filter @modett/api build"
 
 [start]
 cmd = "node apps/api/dist/server.js"
