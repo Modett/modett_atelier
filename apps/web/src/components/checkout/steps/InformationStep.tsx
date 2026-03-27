@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useCheckoutStore, type TitleOption, type ShippingAddress } from '@/store/checkout.store'
 import { useSession } from '@/hooks/useSession'
-import { useCountry, getCountryFromCookie } from '@/hooks/useCountry'
+import { getCountryFromCookie } from '@/hooks/useCountry'
 import type { ApiError } from '@/types'
 
 const TITLE_OPTIONS: TitleOption[] = ['Mr', 'Ms', 'Miss', 'Mrs']
