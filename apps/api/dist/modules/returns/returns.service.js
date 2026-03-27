@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Returns service — eligibility check, customer submit/list/detail,
- * admin list/detail and status transitions. RORO. Throws AppError.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.checkReturnEligibility = checkReturnEligibility;
 exports.createReturn = createReturn;
@@ -16,7 +12,6 @@ exports.adminReject = adminReject;
 exports.adminFulfil = adminFulfil;
 const errors_1 = require("../../lib/errors");
 const db_1 = require("@modett/db");
-// —— Eligibility (no writes) ——
 async function checkReturnEligibility({ orderId, requestedItems, }) {
     const order = await (0, db_1.getOrderById)({ id: orderId });
     if (!order)
@@ -61,13 +56,10 @@ async function checkReturnEligibility({ orderId, requestedItems, }) {
     }
     return { eligibleUntil, deliveredAt };
 }
-// —— Customer ——
 async function createReturn({ orderId, userId, type, reason, policyVersion, items, }) {
     const order = await (0, db_1.getOrderById)({ id: orderId });
-    if (!order)
+    if (!order || order.user_id !== userId) {
         throw new errors_1.AppError('ORDER_NOT_FOUND', 404);
-    if (order.user_id !== userId) {
-        throw new errors_1.AppError('ORDER_ACCESS_DENIED', 403);
     }
     if (type === 'EXCHANGE') {
         for (const item of items) {
@@ -122,7 +114,6 @@ async function getMyReturnDetail({ returnRequestId, userId, }) {
         events: eventsForCustomer,
     };
 }
-// —— Admin ——
 async function adminListReturns({ page = 1, limit = 50, status, type, }) {
     const result = await (0, db_1.listReturnRequestsAdmin)({ page, limit, status, type });
     return {
@@ -199,4 +190,3 @@ async function adminFulfil({ returnRequestId, adminId, adminNote, }) {
         eventType: 'RETURN_FULFILLED',
     });
 }
-//# sourceMappingURL=returns.service.js.map

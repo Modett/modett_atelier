@@ -1,6 +1,16 @@
 /**
  * Payments service — createPaymentSession, handleWebhook, getPaymentStatus.
- * PAYable IPG; two-layer idempotency; atomic order confirmation.
+ *
+ * Payment flow (PAYable CDN SDK v3):
+ *   POST /payments/session → server generates checkValue, returns snake_case params to frontend
+ *   Frontend CDN SDK (window.payable.startPayment) → opens PAYable popup
+ *   PAYable webhook → POST /payments/webhook → confirms order atomically
+ *
+ * Security rules (non-negotiable):
+ *   - checkValue generated server-side; merchantToken never leaves the server
+ *   - Webhook: checkValue ALWAYS verified as the FIRST operation
+ *   - Idempotency: Layer-1 Redis read → Layer-2 DB unique constraint → Layer-3 Redis write
+ *   - Amount: always derived from order.total (server-authoritative), never from frontend
  */
 
 import Decimal from 'decimal.js'
@@ -21,6 +31,7 @@ import {
   getOrderById,
   getOrderItems,
   appendOrderEvent,
+  stampPaymentSubmitted,
 } from '@modett/db'
 import { earnPointsForOrder } from '../loyalty'
 
@@ -30,13 +41,19 @@ function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string })?.code === '23505'
 }
 
-// —— createPaymentSession ——
+// PAYable ONLY accepts LKR — convert other currencies
+const TO_LKR: Record<string, number> = {
+  LKR: 1,
+  SGD: 230,
+  USD: 310,
+}
+
+// ——— createPaymentSession ———
 
 export interface CreatePaymentSessionParams {
   orderId: string
   reservationId: string
   cartId: string
-  amount: string
   currency: CurrencyCode
   customerFirstName: string
   customerLastName: string
@@ -51,31 +68,39 @@ export interface CreatePaymentSessionParams {
   }
 }
 
+/** Snake_case params passed directly to window.payable.startPayment() on the frontend. */
+export interface PayableSDKParams {
+  merchant_key: string
+  check_value: string
+  invoice_id: string
+  amount: string
+  currency_code: string
+  payment_type: string
+  order_description: string
+  notify_url: string
+  return_url: string
+  cancel_url: string
+  logo_url: string
+  customer_first_name: string
+  customer_last_name: string
+  customer_email: string
+  customer_mobile_phone: string
+  customer_phone: string
+  billing_address_street: string
+  billing_address_city: string
+  billing_address_province: string
+  billing_address_country: string
+  billing_address_postcode: string
+  custom_1: string
+  custom_2: string
+}
+
 export interface CreatePaymentSessionResult {
   intentId: string
-  payhereParams: {
-    notify_url: string
-    return_url: string
-    cancel_url: string
-    merchant_key: string
-    check_value: string
-    amount: string
-    invoice_id: string
-    order_description: string
-    currency_code: string
-    customer_first_name: string
-    customer_last_name: string
-    customer_email: string
-    customer_mobile_phone: string
-    customer_phone: string
-    billing_address_street: string
-    billing_address_city: string
-    billing_address_province: string
-    billing_address_country: string
-    billing_address_postcode: string
-    custom_1: string
-  }
+  orderId: string
+  orderRef: string
   sandboxMode: boolean
+  paymentParams: PayableSDKParams
 }
 
 export async function createPaymentSession(
@@ -85,8 +110,6 @@ export async function createPaymentSession(
     orderId,
     reservationId,
     cartId,
-    amount,
-    currency,
     customerFirstName,
     customerLastName,
     customerEmail,
@@ -94,47 +117,73 @@ export async function createPaymentSession(
     billingAddress,
   } = params
 
+  const order = await getOrderById({ id: orderId })
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
+  if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
+
+  // Server-authoritative amount from DB (includes subtotal + shipping + tax)
+  const originalAmount = new Decimal(String(order.total))
+
+  // PAYable only accepts LKR — convert from order currency
+  const lkrAmount = order.currency === 'LKR'
+    ? originalAmount.toFixed(2)
+    : originalAmount.mul(TO_LKR[order.currency] ?? 1).toDecimalPlaces(2).toFixed(2)
+
+  // PAYable invoiceId ≤ 20 chars — orderRef is "MOD-YYYYNNNNN" = 13 chars
+  const invoiceRef = order.order_ref
+
+  const checkValue = generateCheckValue({
+    invoiceId: invoiceRef,
+    amount: lkrAmount,
+    currencyCode: 'LKR',
+  })
+
+  const webhookUrl =
+    process.env.PAYABLE_WEBHOOK_URL ??
+    `${payableConfig.apiUrl}/api/payments/webhook`
+
+  const paymentParams: PayableSDKParams = {
+    merchant_key: payableConfig.merchantKey,
+    check_value: checkValue,
+    invoice_id: invoiceRef,
+    amount: lkrAmount,
+    currency_code: 'LKR',
+    payment_type: 'ONE_TIME_PAYMENT',
+    order_description: 'Modett Order',
+    notify_url: webhookUrl,
+    return_url: `${payableConfig.frontendUrl}/checkout/confirm/${orderId}`,
+    cancel_url: `${payableConfig.frontendUrl}/checkout`,
+    logo_url: payableConfig.logoUrl,
+    customer_first_name: customerFirstName,
+    customer_last_name: customerLastName,
+    customer_email: customerEmail,
+    customer_mobile_phone: customerMobilePhone,
+    customer_phone: customerMobilePhone,
+    billing_address_street: billingAddress.street,
+    billing_address_city: billingAddress.city,
+    billing_address_province: billingAddress.province || billingAddress.city,
+    billing_address_country: 'LKA',
+    billing_address_postcode: billingAddress.postcode || '0000',
+    custom_1: orderId,
+    custom_2: reservationId,
+  }
+
+  // If a PENDING intent already exists, return cached params (same checkValue)
   const existing = await getPaymentIntentByOrderId({ orderId })
   if (existing && existing.status === 'PENDING') {
-    const checkValue = generateCheckValue({
-      invoiceId: orderId,
-      amount: new Decimal(amount).toFixed(2),
-      currencyCode: currency,
-    })
     return {
       intentId: existing.id,
-      payhereParams: {
-        notify_url: `${process.env.API_URL}/api/payments/webhook`,
-        return_url: `${process.env.FRONTEND_URL}/checkout/confirmation`,
-        cancel_url: `${process.env.FRONTEND_URL}/checkout/cancelled`,
-        merchant_key: payableConfig.merchantKey,
-        check_value: checkValue,
-        amount: new Decimal(amount).toFixed(2),
-        invoice_id: orderId,
-        order_description: 'Modett Order',
-        currency_code: currency,
-        customer_first_name: customerFirstName,
-        customer_last_name: customerLastName,
-        customer_email: customerEmail,
-        customer_mobile_phone: customerMobilePhone,
-        customer_phone: customerMobilePhone,
-        billing_address_street: billingAddress.street,
-        billing_address_city: billingAddress.city,
-        billing_address_province: billingAddress.province,
-        billing_address_country: billingAddress.country,
-        billing_address_postcode: billingAddress.postcode,
-        custom_1: orderId,
-      },
+      orderId,
+      orderRef: order.order_ref,
       sandboxMode: payableConfig.sandboxMode,
+      paymentParams,
     }
   }
 
-  const checkValue = generateCheckValue({
-    invoiceId: orderId,
-    amount: new Decimal(amount).toFixed(2),
-    currencyCode: currency,
-  })
+  // Stamp payment_submitted_at — starts the 10-min grace window for the expiry worker
+  await stampPaymentSubmitted({ reservationId })
 
+  // Cache reservation context for the webhook handler
   await redis.set(
     `checkout:context:${orderId}`,
     JSON.stringify({ reservationId, cartId }),
@@ -142,42 +191,24 @@ export async function createPaymentSession(
     3600,
   )
 
+  // Create payment intent record (providerIntentId = orderRef before we get PAYable's ID)
   const paymentIntent = await createPaymentIntent({
     orderId,
-    providerIntentId: orderId,
-    amount: new Decimal(amount).toFixed(2),
-    currency,
+    providerIntentId: invoiceRef,
+    amount: lkrAmount,
+    currency: 'LKR' as CurrencyCode,
   })
 
   return {
     intentId: paymentIntent.id,
-    payhereParams: {
-      notify_url: `${process.env.API_URL}/api/payments/webhook`,
-      return_url: `${process.env.FRONTEND_URL}/checkout/confirmation`,
-      cancel_url: `${process.env.FRONTEND_URL}/checkout/cancelled`,
-      merchant_key: payableConfig.merchantKey,
-      check_value: checkValue,
-      amount: new Decimal(amount).toFixed(2),
-      invoice_id: orderId,
-      order_description: 'Modett Order',
-      currency_code: currency,
-      customer_first_name: customerFirstName,
-      customer_last_name: customerLastName,
-      customer_email: customerEmail,
-      customer_mobile_phone: customerMobilePhone,
-      customer_phone: customerMobilePhone,
-      billing_address_street: billingAddress.street,
-      billing_address_city: billingAddress.city,
-      billing_address_province: billingAddress.province,
-      billing_address_country: billingAddress.country,
-      billing_address_postcode: billingAddress.postcode,
-      custom_1: orderId,
-    },
+    orderId,
+    orderRef: order.order_ref,
     sandboxMode: payableConfig.sandboxMode,
+    paymentParams,
   }
 }
 
-// —— handleWebhook ——
+// ——— handleWebhook ———
 
 export type HandleWebhookResult =
   | { status: 'already_processed' }
@@ -192,65 +223,86 @@ export async function handleWebhook({
 }: {
   payload: PayableWebhookPayload
 }): Promise<HandleWebhookResult> {
-  // STEP 1 — Verify checkValue first
+  // Rule 8.1: checkValue MUST be the VERY FIRST check — no exceptions
+  if (!payload.checkValue) {
+    throw new AppError('WEBHOOK_INVALID_CHECKVALUE', 400)
+  }
   const valid = verifyCallbackCheckValue(payload)
   if (!valid) {
-    throw new AppError('INVALID_WEBHOOK_SIGNATURE', 400)
+    throw new AppError('WEBHOOK_INVALID_CHECKVALUE', 400)
   }
 
-  // STEP 2 — Redis idempotency (Layer 1)
-  const redisKey = `payment:event:${payload.payableTransactionId}`
+  const txId = payload.payableTransactionId
+  // custom1 carries the full UUID orderId (invoiceNo is the orderRef ≤ 20 chars)
+  const orderId = payload.custom1 ?? payload.invoiceNo
+
+  if (!txId || !orderId) {
+    console.error('[webhook] Missing transactionId or orderId in payload')
+    return { status: 'unknown_status' }
+  }
+
+  // Layer 1 idempotency — fast Redis read
+  const redisKey = `payment:event:${txId}`
   const hit = await redis.get(redisKey)
   if (hit) return { status: 'already_processed' }
 
-  // STEP 3 — Set Redis key BEFORE DB write
-  await redis.set(redisKey, '1', 'EX', 86400)
+  const statusCode = Number(payload.statusCode)
+  const isFailure = statusCode === 2
+  const isSuccess = statusCode === 1
 
-  // STEP 4 — Parse status
-  if (payload.statusCode === 2) {
-    // FAILURE
+  if (isFailure) {
     try {
       await createPaymentTransaction({
-        orderId: payload.invoiceNo,
-        providerChargeId: payload.payableTransactionId,
+        orderId,
+        providerChargeId: txId,
         status: 'FAILED',
-        amount: payload.payableAmount,
-        currency: payload.payableCurrency as CurrencyCode,
+        amount: payload.payableAmount ?? '0',
+        currency: (payload.payableCurrency as CurrencyCode) ?? 'LKR',
         rawPayloadJson: payload as unknown as Record<string, unknown>,
       })
     } catch (err) {
       if (isUniqueViolation(err)) return { status: 'already_processed' }
       throw err
     }
+
+    // Layer 3 idempotency — cache after successful DB write
+    await redis.set(redisKey, '1', 'EX', 86400).catch(() => {})
+
+    await updatePaymentIntentStatus({
+      orderId,
+      newStatus: 'FAILED',
+    }).catch((err) => console.error('[webhook] intent update failed:', err))
+
     await appendOrderEvent({
-      orderId: payload.invoiceNo,
+      orderId,
       eventType: 'PAYMENT_FAILED',
       payloadJson: {
-        payableTransactionId: payload.payableTransactionId,
+        payableTransactionId: txId,
         statusMessage: payload.statusMessage,
       },
-    }).catch((err) =>
-      console.error('[webhook] appendOrderEvent failed:', err),
-    )
+    }).catch((err) => console.error('[webhook] appendOrderEvent failed:', err))
+
     return { status: 'recorded_failure' }
   }
 
-  if (payload.statusCode !== 1) {
+  if (!isSuccess) {
+    // Unknown status codes: log and return 200 to PAYable (per rule 8.4)
+    console.warn('[webhook] Unknown statusCode:', payload.statusCode, payload.statusMessage)
     return { status: 'unknown_status' }
   }
 
-  // STEP 5 — Load order and items
-  const order = await getOrderById({ id: payload.invoiceNo })
+  // SUCCESS path
+  const order = await getOrderById({ id: orderId })
   if (!order) {
-    console.error(`[webhook] Order not found: ${payload.invoiceNo}`)
+    console.error(`[webhook] Order not found: ${orderId}`)
     return { status: 'order_not_found' }
   }
+
   const orderItems = await getOrderItems({ orderId: order.id })
 
-  // STEP 6 — Load checkout context from Redis
-  const contextRaw = await redis.get(`checkout:context:${payload.invoiceNo}`)
+  const contextRaw = await redis.get(`checkout:context:${orderId}`)
   if (!contextRaw) {
-    console.error(`[webhook] Context missing for order: ${payload.invoiceNo}`)
+    console.error(`[webhook] Context missing for order: ${orderId}`)
     return { status: 'context_missing' }
   }
   const { reservationId, cartId } = JSON.parse(contextRaw) as {
@@ -258,15 +310,15 @@ export async function handleWebhook({
     cartId: string
   }
 
-  // STEP 7 — Confirmation transaction (DB Layer 2 idempotency)
+  // Layer 2 idempotency — DB unique constraint on provider_charge_id
   try {
     await confirmOrderTransaction({
-      orderId: payload.invoiceNo,
+      orderId,
       reservationId,
       cartId,
-      providerChargeId: payload.payableTransactionId,
-      amount: payload.payableAmount,
-      currency: payload.payableCurrency as CurrencyCode,
+      providerChargeId: txId,
+      amount: payload.payableAmount ?? String(order.total),
+      currency: (payload.payableCurrency as CurrencyCode) ?? order.currency,
       rawPayloadJson: payload as unknown as Record<string, unknown>,
       items: orderItems
         .filter((i) => i.variant_id != null)
@@ -277,20 +329,24 @@ export async function handleWebhook({
     throw err
   }
 
-  // STEP 8 — Post-transaction side effects
-  await updatePaymentIntentStatus({
-    orderId: payload.invoiceNo,
-    newStatus: 'SUCCEEDED',
-  }).catch((err) =>
-    console.error('[webhook] intent update failed:', err),
-  )
-  await redis.del(`checkout:context:${payload.invoiceNo}`).catch(() => {})
+  // Layer 3 idempotency — cache after successful DB transaction
+  await redis.set(redisKey, '1', 'EX', 86400).catch(() => {})
 
+  await updatePaymentIntentStatus({
+    orderId,
+    newStatus: 'SUCCEEDED',
+  }).catch((err) => console.error('[webhook] intent update failed:', err))
+
+  // Clean up session caches
+  await redis.del(`checkout:context:${orderId}`).catch(() => {})
+  await redis.del(`payable:session:${orderId}`).catch(() => {})
+
+  // Post-confirmation side effects (best-effort — never fail the webhook)
   if (order.user_id) {
     const { notifyOrderReceipt } = await import('../messaging')
     await notifyOrderReceipt({
       userId: order.user_id,
-      orderId: payload.invoiceNo,
+      orderId,
       orderRef: order.order_ref,
       totalAmount: String(order.total),
       currency: order.currency,
@@ -298,16 +354,14 @@ export async function handleWebhook({
 
     earnPointsForOrder({
       userId: order.user_id,
-      orderId: payload.invoiceNo,
-    }).catch((err) =>
-      console.error('[payments] earn points failed:', err),
-    )
+      orderId,
+    }).catch((err) => console.error('[payments] earn points failed:', err))
   }
 
   return { status: 'confirmed' }
 }
 
-// —— getPaymentStatus ——
+// ——— getPaymentStatus ———
 
 export interface GetPaymentStatusResult {
   orderId: string
@@ -339,9 +393,7 @@ export async function getPaymentStatus({
   } else if (guestEmail != null) {
     const orderGuest = order.guest_email?.trim().toLowerCase() ?? ''
     const requestedGuest = guestEmail.trim().toLowerCase()
-    if (orderGuest !== requestedGuest) {
-      throw new AppError('ORDER_ACCESS_DENIED', 403)
-    }
+    if (orderGuest !== requestedGuest) throw new AppError('ORDER_ACCESS_DENIED', 403)
   } else {
     throw new AppError('ORDER_ACCESS_DENIED', 403)
   }

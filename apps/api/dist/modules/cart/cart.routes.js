@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Cart route handlers — GET/POST/PATCH/DELETE cart and items.
- * optionalAuth + resolveCartIdentity on all routes. Success: { data: T }.
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -48,7 +44,7 @@ const validate_1 = require("../../middleware/validate");
 const auth_1 = require("../../middleware/auth");
 const cartService = __importStar(require("./cart.service"));
 const router = (0, express_1.Router)();
-const CID_MAX_AGE_MS = 21 * 24 * 60 * 60 * 1000; // 21 days
+const CID_MAX_AGE_MS = 21 * 24 * 60 * 60 * 1000;
 function cartReq(req) {
     return req;
 }
@@ -79,7 +75,6 @@ const addToCartBodySchema = zod_1.z.object({
 const updateQtyBodySchema = zod_1.z.object({
     qty: zod_1.z.number().int().min(1).max(10),
 });
-// GET /cart
 router.get('/cart', auth_1.optionalAuth, resolveCartIdentity, async (req, res) => {
     const r = cartReq(req);
     const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR';
@@ -97,16 +92,17 @@ router.get('/cart', auth_1.optionalAuth, resolveCartIdentity, async (req, res) =
         },
     });
 });
-// POST /cart/items
 router.post('/cart/items', auth_1.optionalAuth, resolveCartIdentity, (0, validate_1.validate)(addToCartBodySchema), async (req, res) => {
     const r = cartReq(req);
     const body = req
         .body;
+    const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR';
     const result = await cartService.addToCart({
         userId: r.cartUserId,
         sessionId: r.cartSession,
         variantId: body.variantId,
         qty: body.qty,
+        currency,
     });
     setCidCookie(res, result.sessionId);
     res.status(200).json({
@@ -117,17 +113,18 @@ router.post('/cart/items', auth_1.optionalAuth, resolveCartIdentity, (0, validat
         },
     });
 });
-// PATCH /cart/items/:variantId
 router.patch('/cart/items/:variantId', auth_1.optionalAuth, resolveCartIdentity, (0, validate_1.validate)(updateQtyBodySchema), async (req, res) => {
     const r = cartReq(req);
     const variantId = req.params.variantId;
     const body = req
         .body;
+    const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR';
     const result = await cartService.updateCartItemQty({
         userId: r.cartUserId,
         sessionId: r.cartSession,
         variantId,
         qty: body.qty,
+        currency,
     });
     setCidCookie(res, result.sessionId);
     res.status(200).json({
@@ -138,14 +135,15 @@ router.patch('/cart/items/:variantId', auth_1.optionalAuth, resolveCartIdentity,
         },
     });
 });
-// DELETE /cart/items/:variantId
 router.delete('/cart/items/:variantId', auth_1.optionalAuth, resolveCartIdentity, async (req, res) => {
     const r = cartReq(req);
     const variantId = req.params.variantId;
+    const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR';
     const result = await cartService.removeFromCart({
         userId: r.cartUserId,
         sessionId: r.cartSession,
         variantId,
+        currency,
     });
     setCidCookie(res, result.sessionId);
     res.status(200).json({
@@ -156,12 +154,13 @@ router.delete('/cart/items/:variantId', auth_1.optionalAuth, resolveCartIdentity
         },
     });
 });
-// DELETE /cart
 router.delete('/cart', auth_1.optionalAuth, resolveCartIdentity, async (req, res) => {
     const r = cartReq(req);
+    const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR';
     const result = await cartService.clearCart({
         userId: r.cartUserId,
         sessionId: r.cartSession,
+        currency,
     });
     setCidCookie(res, result.sessionId);
     res.status(200).json({
@@ -173,4 +172,3 @@ router.delete('/cart', auth_1.optionalAuth, resolveCartIdentity, async (req, res
     });
 });
 exports.cartRoutes = router;
-//# sourceMappingURL=cart.routes.js.map

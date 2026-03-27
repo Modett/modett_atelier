@@ -7,4 +7,6 @@ export {
   getMethodsForCheckout,
   getMethodForOrder,
   resolveShippingCost,
+  resolveShippingCostWithThreshold,
+  getShippingEstimate,
 } from './shipping.service'

@@ -1,7 +1,4 @@
 "use strict";
-/**
- * Loyalty module — routes and exports for IAM/Payments wiring.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.redeemPointsForOrder = exports.earnPointsForOrder = exports.createLoyaltyAccount = exports.loyaltyRoutes = void 0;
 var loyalty_routes_1 = require("./loyalty.routes");
@@ -11,4 +8,3 @@ Object.defineProperty(exports, "createLoyaltyAccount", { enumerable: true, get: 
 var loyalty_service_1 = require("./loyalty.service");
 Object.defineProperty(exports, "earnPointsForOrder", { enumerable: true, get: function () { return loyalty_service_1.earnPointsForOrder; } });
 Object.defineProperty(exports, "redeemPointsForOrder", { enumerable: true, get: function () { return loyalty_service_1.redeemPointsForOrder; } });
-//# sourceMappingURL=index.js.map

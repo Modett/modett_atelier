@@ -2,8 +2,9 @@
  * Messaging schema — inbox, outbox, campaigns, subscriptions, delivery log
  * Mirrors packages/db/migrations/0001_initial.sql
  */
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 export declare const channelEnum: import("drizzle-orm/pg-core").PgEnum<["EMAIL", "SMS", "WHATSAPP", "PUSH"]>;
-export declare const outboxStatusEnum: import("drizzle-orm/pg-core").PgEnum<["PENDING", "SENT", "FAILED"]>;
+export declare const outboxStatusEnum: import("drizzle-orm/pg-core").PgEnum<["PENDING", "SENDING", "SENT", "FAILED"]>;
 export declare const campaignStatusEnum: import("drizzle-orm/pg-core").PgEnum<["DRAFT", "SCHEDULED", "SENT", "CANCELLED"]>;
 export declare const deliveryStatusEnum: import("drizzle-orm/pg-core").PgEnum<["QUEUED", "SENT", "FAILED", "BOUNCED"]>;
 export declare const inboxMessages: import("drizzle-orm/pg-core").PgTableWithColumns<{
@@ -403,14 +404,14 @@ export declare const notificationOutbox: import("drizzle-orm/pg-core").PgTableWi
             tableName: "notification_outbox";
             dataType: "string";
             columnType: "PgEnumColumn";
-            data: "FAILED" | "PENDING" | "SENT";
+            data: "FAILED" | "PENDING" | "SENDING" | "SENT";
             driverParam: string;
             notNull: true;
             hasDefault: true;
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: ["PENDING", "SENT", "FAILED"];
+            enumValues: ["PENDING", "SENDING", "SENT", "FAILED"];
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -763,7 +764,7 @@ export declare const priceDropSubscriptions: import("drizzle-orm/pg-core").PgTab
             name: "target_price";
             tableName: "price_drop_subscriptions";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: false;
@@ -771,7 +772,7 @@ export declare const priceDropSubscriptions: import("drizzle-orm/pg-core").PgTab
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -1208,4 +1209,22 @@ export declare const notifyMeEvents: import("drizzle-orm/pg-core").PgTableWithCo
     };
     dialect: "pg";
 }>;
+export type InboxMessage = InferSelectModel<typeof inboxMessages>;
+export type NewInboxMessage = InferInsertModel<typeof inboxMessages>;
+export type NotificationPreferences = InferSelectModel<typeof notificationPreferences>;
+export type NewNotificationPreferences = InferInsertModel<typeof notificationPreferences>;
+export type NotificationOutboxRow = InferSelectModel<typeof notificationOutbox>;
+export type NewNotificationOutboxRow = InferInsertModel<typeof notificationOutbox>;
+export type EmailDeliveryLogRow = InferSelectModel<typeof emailDeliveryLog>;
+export type NewEmailDeliveryLogRow = InferInsertModel<typeof emailDeliveryLog>;
+export type BackInStockSubscription = InferSelectModel<typeof backInStockSubscriptions>;
+export type NewBackInStockSubscription = InferInsertModel<typeof backInStockSubscriptions>;
+export type PriceDropSubscription = InferSelectModel<typeof priceDropSubscriptions>;
+export type NewPriceDropSubscription = InferInsertModel<typeof priceDropSubscriptions>;
+export type Campaign = InferSelectModel<typeof campaigns>;
+export type NewCampaign = InferInsertModel<typeof campaigns>;
+export type CampaignDelivery = InferSelectModel<typeof campaignDeliveries>;
+export type NewCampaignDelivery = InferInsertModel<typeof campaignDeliveries>;
+export type NotifyMeEvent = InferSelectModel<typeof notifyMeEvents>;
+export type NewNotifyMeEvent = InferInsertModel<typeof notifyMeEvents>;
 //# sourceMappingURL=messaging.schema.d.ts.map

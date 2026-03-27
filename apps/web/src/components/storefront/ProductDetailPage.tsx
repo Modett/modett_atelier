@@ -1,0 +1,150 @@
+'use client'
+
+import { useState, useRef } from 'react'
+import { notFound } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import { useProduct } from '@/hooks/useProduct'
+import { ProductBreadcrumb } from './ProductBreadcrumb'
+import { ProductImageGallery } from './ProductImageGallery'
+import { ProductInfoPanel } from './ProductInfoPanel'
+import { WearItWith } from './WearItWith'
+import { YouMayAlsoLike } from './YouMayAlsoLike'
+import { ProductDetailSkeleton } from './ProductDetailSkeleton'
+import type { ProductVariant } from '@/types'
+
+interface ProductDetailPageProps {
+  slug: string
+}
+
+export function ProductDetailPage({ slug }: ProductDetailPageProps) {
+  const { data: product, isLoading, error } = useProduct(slug)
+
+  const [selectedColour, setSelectedColour] = useState<string | null>(null)
+  const [selectedSize, setSelectedSize]     = useState<string | null>(null)
+  const [justAdded, setJustAdded]           = useState(false)
+  const [isFullImageMode, setIsFullImageMode]       = useState(false)
+  const [fullImageStartIndex, setFullImageStartIndex] = useState(0)
+  const galleryRef = useRef<HTMLDivElement>(null)
+
+  function handleColourChange(colour: string) {
+    setSelectedColour(colour)
+    setSelectedSize(null)
+  }
+
+  function handleImageClick(index: number) {
+    setFullImageStartIndex(index)
+    setIsFullImageMode(true)
+  }
+
+  function handleExitFullImageMode() {
+    setIsFullImageMode(false)
+    galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  if (isLoading) return <ProductDetailSkeleton />
+  if (error || !product) return notFound()
+
+  const variantsByColour = groupVariantsByColour(product.variants)
+  const sizesForColour = selectedColour
+    ? (variantsByColour[selectedColour] ?? [])
+    : []
+
+  const selectedVariant =
+    selectedColour && selectedSize
+      ? (product.variants.find(
+          (v) => v.color === selectedColour && v.size === selectedSize,
+        ) ?? null)
+      : null
+
+  const allOOSForColour = selectedColour
+    ? sizesForColour.every((v) => v.stockStatus === 'OUT_OF_STOCK')
+    : false
+
+  return (
+    <div className="min-h-screen bg-background" ref={galleryRef}>
+      <ProductBreadcrumb product={product} />
+
+      {/* Main content — layout switches between normal and full-image mode */}
+      <div
+        className={cn(
+          'transition-all duration-300 ease-out',
+          isFullImageMode
+            ? 'max-w-none px-0'
+            : 'max-w-page mx-auto px-4 md:px-0 pb-12 md:pb-16 lg:pb-20',
+        )}
+      >
+        <div
+          className={cn(
+            isFullImageMode
+              ? 'block'
+              : 'md:grid md:grid-cols-[60%_40%] md:gap-x-8 lg:gap-x-12 md:items-start',
+          )}
+        >
+          {/* Image gallery — always shown */}
+          <div
+            className={cn(
+              isFullImageMode
+                ? 'w-full'
+                : 'pt-4 md:pt-6 pb-8 md:pb-12 md:pl-8 lg:pl-10 xl:pl-12',
+            )}
+          >
+            <ProductImageGallery
+              images={product.images}
+              productName={product.displayName}
+              isFullImageMode={isFullImageMode}
+              fullImageStartIndex={fullImageStartIndex}
+              onImageClick={handleImageClick}
+              onExitFullImageMode={handleExitFullImageMode}
+            />
+          </div>
+
+          {/* Product info panel — hidden in full image mode */}
+          <div
+            className={cn(
+              // No max-h / overflow here — info + accordions scroll with the main page only
+              'md:pr-8 lg:pr-10 xl:pr-12 md:pl-2 md:sticky md:top-16 md:self-start',
+              isFullImageMode ? 'hidden' : 'block',
+            )}
+          >
+            <ProductInfoPanel
+              product={product}
+              selectedColour={selectedColour}
+              selectedSize={selectedSize}
+              selectedVariant={selectedVariant}
+              sizesForColour={sizesForColour}
+              allOOSForColour={allOOSForColour}
+              justAdded={justAdded}
+              onColourChange={handleColourChange}
+              onSizeChange={setSelectedSize}
+              onJustAdded={() => {
+                setJustAdded(true)
+                setTimeout(() => setJustAdded(false), 1500)
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Sections hidden in full image mode */}
+      {!isFullImageMode && product.relations && product.relations.length > 0 && (
+        <WearItWith relations={product.relations} />
+      )}
+      {!isFullImageMode && (
+        <YouMayAlsoLike
+          currentProductId={product.id}
+          categoryId={product.categoryId}
+        />
+      )}
+    </div>
+  )
+}
+
+function groupVariantsByColour(
+  variants: ProductVariant[],
+): Record<string, ProductVariant[]> {
+  return variants.reduce<Record<string, ProductVariant[]>>((acc, variant) => {
+    if (!acc[variant.color]) acc[variant.color] = []
+    acc[variant.color]!.push(variant)
+    return acc
+  }, {})
+}

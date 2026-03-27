@@ -11,7 +11,7 @@ export const colors = {
     graphite:       '#232D35',
   },
   semantic: {
-    background:      '#F8F5F2',
+    background:      '#E5E0D6',
     surface:         '#F8F5F2',
     surfaceRaised:   '#E5E0D6',
     text:            '#232D35',

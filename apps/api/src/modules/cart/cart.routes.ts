@@ -92,11 +92,13 @@ router.post(
     const r = cartReq(req)
     const body = (req as Request & { body: z.infer<typeof addToCartBodySchema> })
       .body
+    const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR'
     const result = await cartService.addToCart({
       userId: r.cartUserId,
       sessionId: r.cartSession,
       variantId: body.variantId,
       qty: body.qty,
+      currency,
     })
     setCidCookie(res, result.sessionId)
     res.status(200).json({
@@ -120,11 +122,13 @@ router.patch(
     const variantId = req.params.variantId as string
     const body = (req as Request & { body: z.infer<typeof updateQtyBodySchema> })
       .body
+    const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR'
     const result = await cartService.updateCartItemQty({
       userId: r.cartUserId,
       sessionId: r.cartSession,
       variantId,
       qty: body.qty,
+      currency,
     })
     setCidCookie(res, result.sessionId)
     res.status(200).json({
@@ -145,10 +149,12 @@ router.delete(
   async (req, res) => {
     const r = cartReq(req)
     const variantId = req.params.variantId as string
+    const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR'
     const result = await cartService.removeFromCart({
       userId: r.cartUserId,
       sessionId: r.cartSession,
       variantId,
+      currency,
     })
     setCidCookie(res, result.sessionId)
     res.status(200).json({
@@ -164,9 +170,11 @@ router.delete(
 // DELETE /cart
 router.delete('/cart', optionalAuth, resolveCartIdentity, async (req, res) => {
   const r = cartReq(req)
+  const currency = currencySchema.safeParse(req.query.currency).data ?? 'LKR'
   const result = await cartService.clearCart({
     userId: r.cartUserId,
     sessionId: r.cartSession,
+    currency,
   })
   setCidCookie(res, result.sessionId)
   res.status(200).json({

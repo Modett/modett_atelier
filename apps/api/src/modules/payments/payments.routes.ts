@@ -1,6 +1,13 @@
 /**
- * Payments route handlers — session, webhook, status.
- * Success: { data: T }. Webhook returns { Status: 200 } for PAYable.
+ * Payments route handlers — session (JSDK params), webhook, status.
+ *
+ * POST /payments/session  → returns paymentParams for PAYable CDN SDK
+ * POST /payments/webhook  → PAYable server callback; must always return { Status: 200 }
+ *                           EXCEPT when checkValue is invalid (HTTP 400)
+ * GET  /payments/status/:orderId → poll payment/order state after redirect
+ *
+ * All success responses: { data: T }
+ * Webhook response: { Status: 200 } (PAYable requirement)
  */
 
 import type { Request, Response, IRouter } from 'express'
@@ -17,34 +24,32 @@ const sessionBodySchema = z.object({
   orderId: z.string().uuid(),
   reservationId: z.string().uuid(),
   cartId: z.string().uuid(),
-  amount: z.string(),
   currency: z.enum(['LKR', 'SGD', 'USD']),
   customerFirstName: z.string().min(1),
   customerLastName: z.string().min(1),
   customerEmail: z.string().email(),
-  customerMobilePhone: z.string().min(7).max(20),
+  customerMobilePhone: z.string().min(7).max(15),
   billingAddress: z.object({
-    street: z.string(),
-    city: z.string(),
-    province: z.string(),
-    country: z.string().length(3),
-    postcode: z.string(),
+    street: z.string().min(1),
+    city: z.string().min(1),
+    province: z.string().default(''),
+    country: z.string().min(2).max(3),
+    postcode: z.string().default(''),
   }),
 })
 
 // POST /payments/session
+// Returns snake_case payment params for PAYable CDN SDK (window.payable.startPayment)
 router.post(
   '/payments/session',
   optionalAuth,
   validate(sessionBodySchema),
   async (req, res: Response) => {
-    const body = (req as Request & { body: z.infer<typeof sessionBodySchema> })
-      .body
+    const body = (req as Request & { body: z.infer<typeof sessionBodySchema> }).body
     const result = await paymentsService.createPaymentSession({
       orderId: body.orderId,
       reservationId: body.reservationId,
       cartId: body.cartId,
-      amount: body.amount,
       currency: body.currency,
       customerFirstName: body.customerFirstName,
       customerLastName: body.customerLastName,
@@ -56,9 +61,20 @@ router.post(
   },
 )
 
-// POST /payments/webhook — no auth; PAYable sends JSON body
+// POST /payments/webhook — no auth; PAYable server-to-server callback
+// Rule 8.2: ALWAYS respond { Status: 200 }, EXCEPT on invalid checkValue (HTTP 400)
 router.post('/payments/webhook', async (req: Request, res: Response) => {
-  await paymentsService.handleWebhook({ payload: req.body })
+  try {
+    await paymentsService.handleWebhook({ payload: req.body })
+  } catch (err) {
+    const code = (err as { code?: string })?.code
+    const statusCode = (err as { statusCode?: number })?.statusCode
+    if (code === 'WEBHOOK_INVALID_CHECKVALUE' || statusCode === 400) {
+      return res.status(400).send()
+    }
+    console.error('[webhook] Unhandled error:', err)
+    // Still return 200 to PAYable for non-checkValue errors (rule 8.2)
+  }
   res.status(200).json({ Status: 200 })
 })
 

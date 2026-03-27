@@ -6,12 +6,13 @@
   --color-warm-taupe:      #BBA496;
   --color-brushed-gold:    #C1AB85;
   --color-terracotta-clay: #C78869;
-  --color-rich-umber:       #765C4D;
+  --color-rich-umber:      #765C4D;
   --color-slate-blue:      #3E5460;
   --color-graphite:        #232D35;
 
   /* ── Semantic tokens ──────────────────────────────── */
-  --color-background:       var(--color-warm-white);
+  --color-background:       var(--color-alabaster);
+  --color-foreground:       var(--color-graphite);
   --color-surface:          var(--color-warm-white);
   --color-surface-raised:   var(--color-alabaster);
   --color-text:             var(--color-graphite);
@@ -24,6 +25,10 @@
   --color-editorial:        var(--color-terracotta-clay);
   --color-deep:             var(--color-slate-blue);
   --color-umber:            var(--color-rich-umber);
+
+  /* ── Hero overlay tokens ──────────────────────────── */
+  --color-hero-text:   #F8F5F2;
+  --color-hero-border: rgba(248, 245, 242, 0.25);
 
   /* ── Typography ───────────────────────────────────── */
   --font-display: 'Playfair Display', Georgia, serif;

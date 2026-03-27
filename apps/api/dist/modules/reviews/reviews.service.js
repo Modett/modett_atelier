@@ -1,13 +1,10 @@
 "use strict";
-/**
- * Reviews service — token-gated submission, product/user lists, admin moderation.
- * Orchestrates query layer; throws AppError for expected failures.
- */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.submitReview = submitReview;
+exports.submitReviewWithPhotos = submitReviewWithPhotos;
 exports.getProductReviews = getProductReviews;
 exports.getMyReviews = getMyReviews;
 exports.getReviewTokenStatus = getReviewTokenStatus;
@@ -22,6 +19,8 @@ const node_crypto_1 = __importDefault(require("node:crypto"));
 const db_1 = require("@modett/db");
 const db_2 = require("@modett/db");
 const errors_1 = require("../../lib/errors");
+const storage_1 = require("../../infrastructure/storage");
+const storage_2 = require("../../infrastructure/storage");
 const messaging_1 = require("../messaging");
 function hashToken(plain) {
     return node_crypto_1.default.createHash('sha256').update(plain).digest('hex');
@@ -33,7 +32,6 @@ function isOrderOperationError(err) {
         typeof err.code === 'string' &&
         typeof err.statusCode === 'number');
 }
-// —— Customer ——
 async function submitReview({ userId, plainToken, orderItemId, rating, body, mediaUrls, }) {
     const tokenHash = hashToken(plainToken);
     const orderItem = await (0, db_2.getOrderItemForReview)({ orderItemId });
@@ -53,6 +51,18 @@ async function submitReview({ userId, plainToken, orderItemId, rating, body, med
     if (mediaUrls && mediaUrls.length > 5) {
         throw new errors_1.AppError('TOO_MANY_MEDIA', 400);
     }
+    return submitReviewInternal({
+        orderItem,
+        userId,
+        plainToken,
+        orderItemId,
+        rating,
+        body,
+        mediaUrls,
+    });
+}
+async function submitReviewInternal({ orderItem, userId, plainToken, orderItemId, rating, body, mediaUrls, }) {
+    const tokenHash = hashToken(plainToken);
     try {
         return await (0, db_2.createReview)({
             userId,
@@ -72,6 +82,49 @@ async function submitReview({ userId, plainToken, orderItemId, rating, body, med
         }
         throw err;
     }
+}
+async function submitReviewWithPhotos({ userId, plainToken, orderItemId, rating, body, files, }) {
+    if (files.length > 3) {
+        throw new errors_1.AppError('TOO_MANY_MEDIA', 400);
+    }
+    const orderItem = await (0, db_2.getOrderItemForReview)({ orderItemId });
+    if (!orderItem) {
+        throw new errors_1.AppError('ORDER_ITEM_NOT_FOUND', 404);
+    }
+    const order = await (0, db_1.getOrderById)({ id: orderItem.orderId });
+    if (!order) {
+        throw new errors_1.AppError('REVIEW_TOKEN_INVALID', 401);
+    }
+    if (order.user_id !== userId) {
+        throw new errors_1.AppError('REVIEW_TOKEN_INVALID', 401);
+    }
+    if (rating < 1 || rating > 5) {
+        throw new errors_1.AppError('INVALID_RATING', 400);
+    }
+    const batchId = node_crypto_1.default.randomUUID();
+    const storage = (0, storage_1.getStorageService)();
+    const mediaUrls = [];
+    for (let i = 0; i < files.length; i++) {
+        try {
+            const result = await storage.uploadFile('reviews', `${batchId}/photo-${node_crypto_1.default.randomUUID()}`, files[i].buffer, files[i].mimetype);
+            mediaUrls.push(result.url);
+        }
+        catch (err) {
+            if (err instanceof storage_2.StorageError) {
+                throw new errors_1.AppError('STORAGE_ERROR', 500, err.message);
+            }
+            throw err;
+        }
+    }
+    return submitReviewInternal({
+        orderItem,
+        userId,
+        plainToken,
+        orderItemId,
+        rating,
+        body,
+        mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+    });
 }
 async function getProductReviews({ productId, page = 1, limit = 20, }) {
     const { reviews, meta } = await (0, db_2.getReviewsForProduct)({
@@ -134,7 +187,6 @@ async function getReviewTokenStatus({ userId, orderItemId, }) {
         hasReview,
     };
 }
-// —— Admin (token generation after delivery) ——
 async function generateTokensAfterDelivery({ orderId, }) {
     const order = await (0, db_1.getOrderById)({ id: orderId });
     if (!order) {
@@ -160,7 +212,6 @@ async function generateTokensAfterDelivery({ orderId, }) {
     }
     return tokens;
 }
-// —— Admin (moderation) ——
 async function adminGetProductReviews({ productId, page = 1, limit = 50, }) {
     const { reviews, meta } = await (0, db_2.getReviewsForProduct)({
         productId,
@@ -226,4 +277,3 @@ async function adminListFlaggedReviews({ page = 1, limit = 50, }) {
         total: meta.total,
     };
 }
-//# sourceMappingURL=reviews.service.js.map

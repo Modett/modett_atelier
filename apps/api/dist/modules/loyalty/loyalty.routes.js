@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Loyalty route handlers — customer account/ledger/preview; admin user/rules.
- * Success: { data: T }. No try/catch — errors propagate to global handler.
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -44,7 +40,6 @@ const auth_1 = require("../../middleware/auth");
 const validate_1 = require("../../middleware/validate");
 const loyaltyService = __importStar(require("./loyalty.service"));
 const router = (0, express_1.Router)();
-// —— Customer routes (requireAuth) ——
 router.get('/loyalty/account', auth_1.requireAuth, async (req, res) => {
     const authReq = req;
     const result = await loyaltyService.getMyLoyaltyAccount({
@@ -86,7 +81,6 @@ router.post('/loyalty/redeem/preview', auth_1.requireAuth, (0, validate_1.valida
     });
     res.status(200).json({ data: result });
 });
-// —— Admin routes (requireAdmin) ——
 router.get('/admin/loyalty/users/:userId', auth_1.requireAdmin, async (req, res) => {
     const userId = req.params.userId;
     const result = await loyaltyService.adminGetUserLoyalty({ userId });
@@ -183,4 +177,3 @@ router.patch('/admin/loyalty/rules', auth_1.requireAdmin, (0, validate_1.validat
     res.status(200).json({ data: result });
 });
 exports.loyaltyRoutes = router;
-//# sourceMappingURL=loyalty.routes.js.map

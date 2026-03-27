@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { requireAuth, requireAdmin } from '../../middleware/auth'
 import type { AuthRequest, AdminRequest } from '../../middleware/auth'
 import { validate, validateQuery } from '../../middleware/validate'
+import { reviewPhotoUpload } from '../../infrastructure/upload/multer.config'
 import * as reviewsService from './reviews.service'
 
 const router: IRouter = Router()
@@ -63,14 +64,79 @@ const submitReviewBodySchema = z.object({
   mediaUrls: z.array(z.string().url()).max(5).optional(),
 })
 
+const submitReviewMultipartSchema = z.object({
+  token: z.string().uuid(),
+  orderItemId: z.string().uuid(),
+  rating: z.coerce.number().int().min(1).max(5),
+  body: z.string().max(2000).optional(),
+})
+
 router.post(
   '/reviews',
   requireAuth,
-  validate(submitReviewBodySchema),
+  (req: Request, res: Response, next: () => void) => {
+    const contentType = req.headers['content-type'] ?? ''
+    if (contentType.includes('multipart/form-data')) {
+      const multerHandler = reviewPhotoUpload.fields([
+        { name: 'token', maxCount: 1 },
+        { name: 'orderItemId', maxCount: 1 },
+        { name: 'rating', maxCount: 1 },
+        { name: 'body', maxCount: 1 },
+        { name: 'photos', maxCount: 3 },
+      ])
+      return multerHandler(
+        req as unknown as Parameters<typeof multerHandler>[0],
+        res as unknown as Parameters<typeof multerHandler>[1],
+        (err: unknown) => {
+          if (err) {
+            const message = err instanceof Error ? err.message : 'Upload failed'
+            return res.status(400).json({
+              error: { code: 'UPLOAD_ERROR', message },
+            })
+          }
+          next()
+        },
+      )
+    }
+    next()
+  },
   async (req: Request, res: Response) => {
     const authReq = req as AuthRequest
-    const body = (req as Request & { body: z.infer<typeof submitReviewBodySchema> })
-      .body
+    const contentType = req.headers['content-type'] ?? ''
+    if (contentType.includes('multipart/form-data')) {
+      const parsed = submitReviewMultipartSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid form fields',
+            details: parsed.error.flatten().fieldErrors,
+          },
+        })
+      }
+      const body = parsed.data
+      const files = (req as Request & { files?: { photos?: Express.Multer.File[] } }).files?.photos ?? []
+      const review = await reviewsService.submitReviewWithPhotos({
+        userId: authReq.user.id,
+        plainToken: body.token,
+        orderItemId: body.orderItemId,
+        rating: body.rating,
+        body: body.body,
+        files: files.map((f) => ({ buffer: f.buffer, mimetype: f.mimetype })),
+      })
+      return res.status(201).json({ data: { review } })
+    }
+    const parsed = submitReviewBodySchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid request body',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const body = parsed.data
     const review = await reviewsService.submitReview({
       userId: authReq.user.id,
       plainToken: body.token,

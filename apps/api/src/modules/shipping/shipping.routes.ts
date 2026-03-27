@@ -6,7 +6,7 @@
 import { Router, type Request, type IRouter } from 'express'
 import { z } from 'zod'
 import { validate, validateQuery } from '../../middleware/validate'
-import { requireAdmin } from '../../middleware/auth'
+import { requireAdmin, type AdminRequest } from '../../middleware/auth'
 import * as shippingService from './shipping.service'
 
 const router = Router()
@@ -16,6 +16,7 @@ const router = Router()
 const shippingMethodsQuerySchema = z.object({
   countryCode: z.string().length(2).toUpperCase(),
   currency: z.enum(['LKR', 'SGD', 'USD']).default('LKR'),
+  subtotal: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Must be a decimal number').optional(),
 })
 
 /**
@@ -46,8 +47,61 @@ router.get(
     const methods = await shippingService.getMethodsForCheckout({
       countryCode: query.countryCode,
       currency: query.currency,
+      subtotal: query.subtotal ?? null,
     })
     res.status(200).json({ data: { methods } })
+  },
+)
+
+// —— Shipping estimate (public) ——
+
+const shippingEstimateQuerySchema = z.object({
+  countryCode: z.string().length(2).toUpperCase(),
+  currency: z.enum(['LKR', 'SGD', 'USD']).default('LKR'),
+  subtotal: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Must be a decimal number'),
+})
+
+router.get(
+  '/shipping/estimate',
+  validateQuery(shippingEstimateQuerySchema),
+  async (req, res) => {
+    const query = (req as Request & { validatedQuery: z.infer<typeof shippingEstimateQuerySchema> })
+      .validatedQuery
+    const result = await shippingService.getShippingEstimate({
+      countryCode: query.countryCode,
+      currency: query.currency,
+      subtotal: query.subtotal,
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+// —— Admin shipping settings ——
+
+router.get('/admin/shipping/settings', requireAdmin, async (_req, res) => {
+  const settings = await shippingService.adminGetShippingSettings()
+  res.status(200).json({ data: { settings } })
+})
+
+const updateShippingSettingsBodySchema = z.object({
+  freeThresholdLkr: z.number().min(0).nullable().optional(),
+  freeThresholdSgd: z.number().min(0).nullable().optional(),
+  freeThresholdUsd: z.number().min(0).nullable().optional(),
+  freeShippingLabel: z.string().min(1).max(100).optional(),
+})
+
+router.patch(
+  '/admin/shipping/settings',
+  requireAdmin,
+  validate(updateShippingSettingsBodySchema),
+  async (req, res) => {
+    const body = (req as Request & { body: z.infer<typeof updateShippingSettingsBodySchema> }).body
+    const admin = (req as AdminRequest).admin
+    const settings = await shippingService.adminUpdateShippingSettings({
+      ...body,
+      adminId: admin.id,
+    })
+    res.status(200).json({ data: { settings } })
   },
 )
 

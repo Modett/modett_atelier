@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Auth middleware — requireAuth (customer), requireAdmin, requireOwner.
- * Reads 'sid' cookie, validates session via Redis/DB, attaches user/admin.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.withAdmin = withAdmin;
 exports.optionalAuth = optionalAuth;
@@ -13,16 +9,10 @@ const db_1 = require("@modett/db");
 const db_2 = require("@modett/db");
 const errors_1 = require("../lib/errors");
 const SESSION_KEY_PREFIX = 'session:';
-const ADMIN_SESSION_TTL = 900; // 15 min in seconds
-/** Wraps an AdminRequest handler so it can be passed to router.get/post etc. (avoids Request vs AdminRequest variance). */
+const ADMIN_SESSION_TTL = 900;
 function withAdmin(handler) {
     return handler;
 }
-/**
- * Optional auth — for cart routes. If 'sid' cookie present and valid CUSTOMER session,
- * sets req.user. If missing or invalid, continues without error (guest cart).
- * Admin sessions are ignored (no req.user).
- */
 function optionalAuth(req, res, next) {
     const sid = req.cookies?.sid;
     if (!sid) {
@@ -139,4 +129,3 @@ function requireOwner(req, res, next) {
         next();
     });
 }
-//# sourceMappingURL=auth.js.map

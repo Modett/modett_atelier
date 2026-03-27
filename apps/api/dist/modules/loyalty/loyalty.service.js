@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Loyalty service — earn/redeem, tier, admin grants/adjust/reconcile, rules.
- * RORO. Maps db-layer errors to AppError. Uses Decimal.js for money/points.
- */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -37,7 +33,6 @@ function toAppError(err) {
     }
     throw err;
 }
-// —— Earn calculation (local) ——
 function calculateEarnedPoints({ subtotal, currency, tier, rules, isSaleOrder, }) {
     if (isSaleOrder && rules.no_stack_with_sale)
         return 0;
@@ -51,7 +46,6 @@ function calculateEarnedPoints({ subtotal, currency, tier, rules, isSaleOrder, }
     const earnedPoints = Math.floor(basePoints * multiplier);
     return Math.max(0, earnedPoints);
 }
-// —— Redemption calculation (local) ——
 function calculateRedemptionDiscount({ pointsToRedeem, subtotal, currency, rules, }) {
     if (pointsToRedeem < rules.min_redeem) {
         throw new errors_1.AppError('BELOW_MINIMUM_REDEEM', 400, `Minimum redeem is ${rules.min_redeem}, requested ${pointsToRedeem}`);
@@ -74,7 +68,6 @@ function calculateRedemptionDiscount({ pointsToRedeem, subtotal, currency, rules
         pointsActuallyUsed,
     };
 }
-// —— Customer ——
 async function getMyLoyaltyAccount({ userId, }) {
     try {
         const account = await (0, db_1.getLoyaltyAccountOrThrow)({ userId });
@@ -140,7 +133,6 @@ async function previewRedemption({ userId, pointsToRedeem, subtotal, currency, }
         toAppError(err);
     }
 }
-// —— Order-linked (called by Payments / checkout) ——
 async function earnPointsForOrder({ userId, orderId, }) {
     try {
         const order = await (0, db_2.getOrderById)({ id: orderId });
@@ -224,7 +216,6 @@ async function redeemPointsForOrder({ userId, orderId, pointsToRedeem, subtotal,
         toAppError(err);
     }
 }
-// —— Admin ——
 async function adminGetUserLoyalty({ userId }) {
     try {
         const account = await (0, db_1.getLoyaltyAccountOrThrow)({ userId });
@@ -315,4 +306,3 @@ async function adminReEvaluateTier({ userId }) {
         toAppError(err);
     }
 }
-//# sourceMappingURL=loyalty.service.js.map

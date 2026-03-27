@@ -4,7 +4,7 @@ import type { Config } from 'tailwindcss'
  * MODETT DESIGN SYSTEM — TAILWIND CONFIG
  * ─────────────────────────────────────────────────────────
  * Brand: Elegance, Amplified.
- * Palette: warm neutral (F8F5F2) + graphite (232D35)
+ * Palette: alabaster (E5E0D6) + graphite (232D35)
  *
  * TOKEN RULES:
  *   1. Use semantic tokens in all components (never primitive.*)
@@ -56,8 +56,8 @@ const config: Config = {
           'graphite':        '#232D35',
         },
         // ── Semantic tokens (use these in components) ──────
-        background:         '#F8F5F2',
-        foreground:         '#F8F5F2',
+        background:         '#E5E0D6',
+        foreground:         '#232D35',
         surface:            '#F8F5F2',
         'surface-raised':   '#E5E0D6',
         text:               '#232D35',
@@ -72,6 +72,7 @@ const config: Config = {
         deep:               '#3E5460',
         sage:               '#C1D2CC',
         umber:              '#765C4D',
+        'hero-border':      'rgba(248, 245, 242, 0.25)',
       },
 
       fontFamily: {
@@ -80,14 +81,14 @@ const config: Config = {
       },
 
       fontSize: {
-        'display':   ['6rem',    { lineHeight: '1.2', letterSpacing: '-0.02em' }],
-        'h1':        ['6rem',    { lineHeight: '1.2', letterSpacing: '-0.02em' }],
+        'display':   ['6rem',    { lineHeight: '1.0', letterSpacing: '-0.02em' }],
+        'h1':        ['6rem',    { lineHeight: '1.0', letterSpacing: '-0.02em' }],
         'h2':        ['3rem',    { lineHeight: '1.2', letterSpacing: '-0.01em' }],
         'h3':        ['2.5rem',  { lineHeight: '1.2', letterSpacing: '-0.01em' }],
         'h4':        ['2rem',    { lineHeight: '1.3', letterSpacing: '0' }],
         'h5':        ['1.5rem',  { lineHeight: '1.4', letterSpacing: '0' }],
         'h6':        ['1.25rem', { lineHeight: '1.4', letterSpacing: '0' }],
-        'h1-mobile': ['2.5rem',   { lineHeight: '1.2', letterSpacing: '-0.02em' }],
+        'h1-mobile': ['2.5rem',   { lineHeight: '1.0', letterSpacing: '-0.02em' }],
         'h2-mobile': ['2.25rem',  { lineHeight: '1.2', letterSpacing: '-0.01em' }],
         'h3-mobile': ['2rem',     { lineHeight: '1.2', letterSpacing: '-0.01em' }],
         'h4-mobile': ['1.5rem',   { lineHeight: '1.4', letterSpacing: '0' }],
@@ -114,7 +115,7 @@ const config: Config = {
       },
 
       lineHeight: {
-        tight:   '1.2',
+        tight:   '1.0',
         snug:    '1.3',
         normal:  '1.4',
         relaxed: '1.5',
@@ -139,6 +140,7 @@ const config: Config = {
         '26': '6.5rem',
         '30': '7.5rem',
         '34': '8.5rem',
+        'safe-6': 'max(1.5rem, env(safe-area-inset-bottom))',
       },
 
       maxWidth: {

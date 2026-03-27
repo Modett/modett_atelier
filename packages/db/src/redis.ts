@@ -8,12 +8,30 @@ import { randomUUID } from 'crypto'
 import Redis from 'ioredis'
 import { LockNotAcquiredError } from './errors'
 
-const connectionString = process.env.REDIS_URL
-if (!connectionString) {
+const REDIS_URL = process.env.REDIS_URL
+if (!REDIS_URL) {
   throw new Error('REDIS_URL is required')
 }
 
-export const redis = new Redis(connectionString, { maxRetriesPerRequest: 3 })
+export const redis = new Redis(REDIS_URL, {
+  tls: REDIS_URL.startsWith('rediss://')
+    ? { rejectUnauthorized: false }
+    : undefined,
+  maxRetriesPerRequest: 3,
+  retryStrategy: (times) => {
+    if (times > 3) return null
+    return Math.min(times * 200, 2000)
+  },
+  lazyConnect: true,
+})
+
+redis.on('error', (err) => {
+  console.error('[Redis] Connection error:', err.message)
+})
+
+redis.on('connect', () => {
+  console.log('[Redis] Connected')
+})
 
 /**
  * Run a function while holding an inventory lock for the given variant.

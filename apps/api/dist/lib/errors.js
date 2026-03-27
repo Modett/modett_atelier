@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Application errors — expected errors with stable codes and status codes.
- * Route handlers catch AppError and return { error: { code, message } }.
- * Unexpected errors go to global handler → Sentry → 500.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppError = void 0;
 class AppError extends Error {
@@ -18,4 +13,3 @@ class AppError extends Error {
     }
 }
 exports.AppError = AppError;
-//# sourceMappingURL=errors.js.map

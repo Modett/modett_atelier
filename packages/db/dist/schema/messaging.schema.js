@@ -1,159 +1,165 @@
+"use strict";
 /**
  * Messaging schema — inbox, outbox, campaigns, subscriptions, delivery log
  * Mirrors packages/db/migrations/0001_initial.sql
  */
-import { pgSchema, uuid, text, boolean, smallint, timestamp, jsonb, unique, } from 'drizzle-orm/pg-core';
-import { users } from './iam.schema';
-import { admins } from './iam.schema';
-import { productVariants } from './inventory.schema';
-const messaging = pgSchema('messaging');
-export const channelEnum = messaging.enum('channel', [
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.notifyMeEvents = exports.campaignDeliveries = exports.campaigns = exports.priceDropSubscriptions = exports.backInStockSubscriptions = exports.emailDeliveryLog = exports.notificationOutbox = exports.notificationPreferences = exports.inboxMessages = exports.deliveryStatusEnum = exports.campaignStatusEnum = exports.outboxStatusEnum = exports.channelEnum = void 0;
+const pg_core_1 = require("drizzle-orm/pg-core");
+const drizzle_orm_1 = require("drizzle-orm");
+const iam_schema_1 = require("./iam.schema");
+const iam_schema_2 = require("./iam.schema");
+const inventory_schema_1 = require("./inventory.schema");
+const messaging = (0, pg_core_1.pgSchema)('messaging');
+exports.channelEnum = messaging.enum('channel', [
     'EMAIL',
     'SMS',
     'WHATSAPP',
     'PUSH',
 ]);
-export const outboxStatusEnum = messaging.enum('outbox_status', [
+exports.outboxStatusEnum = messaging.enum('outbox_status', [
     'PENDING',
+    'SENDING', // worker-only intermediate state; not returned by API
     'SENT',
     'FAILED',
 ]);
-export const campaignStatusEnum = messaging.enum('campaign_status', [
+exports.campaignStatusEnum = messaging.enum('campaign_status', [
     'DRAFT',
     'SCHEDULED',
     'SENT',
     'CANCELLED',
 ]);
-export const deliveryStatusEnum = messaging.enum('delivery_status', [
+exports.deliveryStatusEnum = messaging.enum('delivery_status', [
     'QUEUED',
     'SENT',
     'FAILED',
     'BOUNCED',
 ]);
-export const inboxMessages = messaging.table('inbox_messages', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    user_id: uuid('user_id')
+exports.inboxMessages = messaging.table('inbox_messages', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    user_id: (0, pg_core_1.uuid)('user_id')
         .notNull()
-        .references(() => users.id, { onDelete: 'cascade' }),
-    type: text('type').notNull(),
-    title: text('title').notNull(),
-    body: text('body').notNull(),
-    cta_label: text('cta_label'),
-    cta_url: text('cta_url'),
-    metadata_json: jsonb('metadata_json').notNull().default({}),
-    is_read: boolean('is_read').notNull().default(false),
-    created_at: timestamp('created_at', { withTimezone: true })
+        .references(() => iam_schema_1.users.id, { onDelete: 'cascade' }),
+    type: (0, pg_core_1.text)('type').notNull(),
+    title: (0, pg_core_1.text)('title').notNull(),
+    body: (0, pg_core_1.text)('body').notNull(),
+    cta_label: (0, pg_core_1.text)('cta_label'),
+    cta_url: (0, pg_core_1.text)('cta_url'),
+    metadata_json: (0, pg_core_1.jsonb)('metadata_json').notNull().default({}),
+    is_read: (0, pg_core_1.boolean)('is_read').notNull().default(false),
+    created_at: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });
-export const notificationPreferences = messaging.table('notification_preferences', {
-    user_id: uuid('user_id')
+exports.notificationPreferences = messaging.table('notification_preferences', {
+    user_id: (0, pg_core_1.uuid)('user_id')
         .primaryKey()
-        .references(() => users.id, { onDelete: 'cascade' }),
-    email_opt_in: boolean('email_opt_in').notNull().default(true),
-    sms_opt_in: boolean('sms_opt_in').notNull().default(false),
-    whatsapp_opt_in: boolean('whatsapp_opt_in').notNull().default(false),
-    push_opt_in: boolean('push_opt_in').notNull().default(false),
-    updated_at: timestamp('updated_at', { withTimezone: true })
+        .references(() => iam_schema_1.users.id, { onDelete: 'cascade' }),
+    email_opt_in: (0, pg_core_1.boolean)('email_opt_in').notNull().default(true),
+    sms_opt_in: (0, pg_core_1.boolean)('sms_opt_in').notNull().default(false),
+    whatsapp_opt_in: (0, pg_core_1.boolean)('whatsapp_opt_in').notNull().default(false),
+    push_opt_in: (0, pg_core_1.boolean)('push_opt_in').notNull().default(false),
+    updated_at: (0, pg_core_1.timestamp)('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });
-export const notificationOutbox = messaging.table('notification_outbox', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    user_id: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
-    channel: channelEnum('channel').notNull(),
-    template_key: text('template_key').notNull(),
-    payload_json: jsonb('payload_json').notNull(),
-    dedupe_key: text('dedupe_key').notNull().unique(),
-    status: outboxStatusEnum('status').notNull().default('PENDING'),
-    attempts: smallint('attempts').notNull().default(0),
-    created_at: timestamp('created_at', { withTimezone: true })
+exports.notificationOutbox = messaging.table('notification_outbox', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    user_id: (0, pg_core_1.uuid)('user_id').references(() => iam_schema_1.users.id, { onDelete: 'set null' }),
+    channel: (0, exports.channelEnum)('channel').notNull(),
+    template_key: (0, pg_core_1.text)('template_key').notNull(),
+    payload_json: (0, pg_core_1.jsonb)('payload_json').notNull(),
+    dedupe_key: (0, pg_core_1.text)('dedupe_key').notNull().unique(),
+    status: (0, exports.outboxStatusEnum)('status').notNull().default('PENDING'),
+    attempts: (0, pg_core_1.smallint)('attempts').notNull().default(0),
+    created_at: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
-    sent_at: timestamp('sent_at', { withTimezone: true }),
-    failed_at: timestamp('failed_at', { withTimezone: true }),
+    sent_at: (0, pg_core_1.timestamp)('sent_at', { withTimezone: true }),
+    failed_at: (0, pg_core_1.timestamp)('failed_at', { withTimezone: true }),
 });
-export const emailDeliveryLog = messaging.table('email_delivery_log', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    user_id: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
-    notification_outbox_id: uuid('notification_outbox_id')
+exports.emailDeliveryLog = messaging.table('email_delivery_log', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    user_id: (0, pg_core_1.uuid)('user_id').references(() => iam_schema_1.users.id, { onDelete: 'set null' }),
+    notification_outbox_id: (0, pg_core_1.uuid)('notification_outbox_id')
         .notNull()
-        .references(() => notificationOutbox.id),
-    provider_message_id: text('provider_message_id'),
-    status: deliveryStatusEnum('status').notNull(),
-    created_at: timestamp('created_at', { withTimezone: true })
+        .references(() => exports.notificationOutbox.id),
+    provider_message_id: (0, pg_core_1.text)('provider_message_id'),
+    status: (0, exports.deliveryStatusEnum)('status').notNull(),
+    created_at: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });
-export const backInStockSubscriptions = messaging.table('back_in_stock_subscriptions', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    user_id: uuid('user_id').references(() => users.id, {
+exports.backInStockSubscriptions = messaging.table('back_in_stock_subscriptions', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    user_id: (0, pg_core_1.uuid)('user_id').references(() => iam_schema_1.users.id, {
         onDelete: 'set null',
     }),
-    variant_id: uuid('variant_id')
+    variant_id: (0, pg_core_1.uuid)('variant_id')
         .notNull()
-        .references(() => productVariants.id, { onDelete: 'cascade' }),
-    channels_json: jsonb('channels_json').notNull().default(['EMAIL']),
-    created_at: timestamp('created_at', { withTimezone: true })
+        .references(() => inventory_schema_1.productVariants.id, { onDelete: 'cascade' }),
+    channels_json: (0, pg_core_1.jsonb)('channels_json').notNull().default(['EMAIL']),
+    created_at: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
-    notified_at: timestamp('notified_at', { withTimezone: true }),
-}, (t) => ({ uq: [t.user_id, t.variant_id] }));
-export const priceDropSubscriptions = messaging.table('price_drop_subscriptions', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    user_id: uuid('user_id').references(() => users.id, {
+    notified_at: (0, pg_core_1.timestamp)('notified_at', { withTimezone: true }),
+}, (t) => [(0, pg_core_1.unique)('uq_bis_user_variant').on(t.user_id, t.variant_id)]);
+exports.priceDropSubscriptions = messaging.table('price_drop_subscriptions', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    user_id: (0, pg_core_1.uuid)('user_id').references(() => iam_schema_1.users.id, {
         onDelete: 'set null',
     }),
-    variant_id: uuid('variant_id')
+    variant_id: (0, pg_core_1.uuid)('variant_id')
         .notNull()
-        .references(() => productVariants.id, { onDelete: 'cascade' }),
-    target_price: text('target_price'),
-    channels_json: jsonb('channels_json').notNull().default(['EMAIL']),
-    created_at: timestamp('created_at', { withTimezone: true })
+        .references(() => inventory_schema_1.productVariants.id, { onDelete: 'cascade' }),
+    target_price: (0, pg_core_1.numeric)('target_price', { precision: 12, scale: 2 }),
+    channels_json: (0, pg_core_1.jsonb)('channels_json').notNull().default(['EMAIL']),
+    created_at: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 }, (t) => [
-    unique('uq_price_drop_user_variant').on(t.user_id, t.variant_id),
+    (0, pg_core_1.unique)('uq_price_drop_user_variant').on(t.user_id, t.variant_id),
+    (0, pg_core_1.check)('chk_price_drop_target_positive', (0, drizzle_orm_1.sql) `(${t.target_price} IS NULL OR ${t.target_price} > 0)`),
 ]);
-export const campaigns = messaging.table('campaigns', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    name: text('name').notNull(),
-    content_json: jsonb('content_json').notNull(),
-    channels_json: jsonb('channels_json').notNull().default(['EMAIL']),
-    audience_filter_json: jsonb('audience_filter_json').notNull().default({}),
-    status: campaignStatusEnum('status').notNull().default('DRAFT'),
-    created_by_admin_id: uuid('created_by_admin_id').references(() => admins.id, {
+exports.campaigns = messaging.table('campaigns', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    name: (0, pg_core_1.text)('name').notNull(),
+    content_json: (0, pg_core_1.jsonb)('content_json').notNull(),
+    channels_json: (0, pg_core_1.jsonb)('channels_json').notNull().default(['EMAIL']),
+    audience_filter_json: (0, pg_core_1.jsonb)('audience_filter_json').notNull().default({}),
+    status: (0, exports.campaignStatusEnum)('status').notNull().default('DRAFT'),
+    created_by_admin_id: (0, pg_core_1.uuid)('created_by_admin_id').references(() => iam_schema_2.admins.id, {
         onDelete: 'set null',
     }),
-    scheduled_at: timestamp('scheduled_at', { withTimezone: true }),
-    sent_at: timestamp('sent_at', { withTimezone: true }),
-    created_at: timestamp('created_at', { withTimezone: true })
+    scheduled_at: (0, pg_core_1.timestamp)('scheduled_at', { withTimezone: true }),
+    sent_at: (0, pg_core_1.timestamp)('sent_at', { withTimezone: true }),
+    created_at: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
-    updated_at: timestamp('updated_at', { withTimezone: true })
-        .notNull()
-        .defaultNow(),
-});
-export const campaignDeliveries = messaging.table('campaign_deliveries', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    campaign_id: uuid('campaign_id')
-        .notNull()
-        .references(() => campaigns.id, { onDelete: 'cascade' }),
-    user_id: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
-    channel: channelEnum('channel').notNull(),
-    status: deliveryStatusEnum('status').notNull().default('QUEUED'),
-    created_at: timestamp('created_at', { withTimezone: true })
+    updated_at: (0, pg_core_1.timestamp)('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });
-export const notifyMeEvents = messaging.table('notify_me_events', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    variant_id: uuid('variant_id')
+exports.campaignDeliveries = messaging.table('campaign_deliveries', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    campaign_id: (0, pg_core_1.uuid)('campaign_id')
         .notNull()
-        .references(() => productVariants.id, { onDelete: 'cascade' }),
-    user_id: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
-    session_id: text('session_id').notNull(),
-    created_at: timestamp('created_at', { withTimezone: true })
+        .references(() => exports.campaigns.id, { onDelete: 'cascade' }),
+    user_id: (0, pg_core_1.uuid)('user_id').references(() => iam_schema_1.users.id, { onDelete: 'set null' }),
+    channel: (0, exports.channelEnum)('channel').notNull(),
+    status: (0, exports.deliveryStatusEnum)('status').notNull().default('QUEUED'),
+    created_at: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
+        .notNull()
+        .defaultNow(),
+});
+exports.notifyMeEvents = messaging.table('notify_me_events', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    variant_id: (0, pg_core_1.uuid)('variant_id')
+        .notNull()
+        .references(() => inventory_schema_1.productVariants.id, { onDelete: 'cascade' }),
+    user_id: (0, pg_core_1.uuid)('user_id').references(() => iam_schema_1.users.id, { onDelete: 'set null' }),
+    session_id: (0, pg_core_1.text)('session_id').notNull(),
+    created_at: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });

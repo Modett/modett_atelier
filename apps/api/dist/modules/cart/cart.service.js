@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Cart service — cart resolution, get cart with stock hints and prices,
- * add/update/remove/clear, login merge. RORO. Throws AppError for expected failures.
- */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -84,7 +80,7 @@ async function getCart({ userId, sessionId, currency, }) {
         sessionId: cart.session_id,
     };
 }
-async function addToCart({ userId, sessionId, variantId, qty, }) {
+async function addToCart({ userId, sessionId, variantId, qty, currency = 'LKR', }) {
     if (!Number.isInteger(qty) || qty < 1 || qty > 10) {
         throw new errors_1.AppError('VALIDATION_ERROR', 400, 'qty must be 1–10');
     }
@@ -102,13 +98,9 @@ async function addToCart({ userId, sessionId, variantId, qty, }) {
         throw new errors_1.AppError('MAX_QTY_PER_ITEM_EXCEEDED', 400);
     }
     await (0, db_1.upsertCartItem)({ cartId: cart.id, variantId, qty: newQty });
-    return getCart({
-        userId,
-        sessionId,
-        currency: 'LKR',
-    });
+    return getCart({ userId, sessionId, currency });
 }
-async function updateCartItemQty({ userId, sessionId, variantId, qty, }) {
+async function updateCartItemQty({ userId, sessionId, variantId, qty, currency = 'LKR', }) {
     if (!Number.isInteger(qty) || qty < 1 || qty > 10) {
         throw new errors_1.AppError('VALIDATION_ERROR', 400, 'qty must be 1–10');
     }
@@ -121,29 +113,17 @@ async function updateCartItemQty({ userId, sessionId, variantId, qty, }) {
         throw new errors_1.AppError('INSUFFICIENT_STOCK', 409);
     }
     await (0, db_1.upsertCartItem)({ cartId: cart.id, variantId, qty });
-    return getCart({
-        userId,
-        sessionId,
-        currency: 'LKR',
-    });
+    return getCart({ userId, sessionId, currency });
 }
-async function removeFromCart({ userId, sessionId, variantId, }) {
+async function removeFromCart({ userId, sessionId, variantId, currency = 'LKR', }) {
     const cart = await resolveCart({ userId, sessionId });
     await (0, db_1.removeCartItem)({ cartId: cart.id, variantId });
-    return getCart({
-        userId,
-        sessionId,
-        currency: 'LKR',
-    });
+    return getCart({ userId, sessionId, currency });
 }
-async function clearCart({ userId, sessionId, }) {
+async function clearCart({ userId, sessionId, currency = 'LKR', }) {
     const cart = await resolveCart({ userId, sessionId });
     await (0, db_1.clearCartItems)({ cartId: cart.id });
-    return getCart({
-        userId,
-        sessionId,
-        currency: 'LKR',
-    });
+    return getCart({ userId, sessionId, currency });
 }
 async function mergeCartsOnLogin({ userId, guestSessionId, }) {
     const guestCart = await (0, db_1.getActiveCartBySessionId)({
@@ -167,4 +147,3 @@ async function mergeCartsOnLogin({ userId, guestSessionId, }) {
         return null;
     return { mergedCartId: updated.id, sessionId: updated.session_id };
 }
-//# sourceMappingURL=cart.service.js.map

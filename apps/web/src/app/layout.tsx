@@ -2,12 +2,15 @@ import type { Metadata, Viewport } from 'next'
 import { Playfair_Display, Raleway } from 'next/font/google'
 import { Analytics }    from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import { QueryProvider } from '@/components/providers/QueryProvider'
+import { AuthProvider } from '@/components/providers/AuthProvider'
+import { ShoppingBagDrawer } from '@/components/storefront/ShoppingBagDrawer'
 import './globals.css'
 
 const playfairDisplay = Playfair_Display({
   subsets:  ['latin'],
   weight:   ['400', '700', '900'],
-  style:    ['normal', 'italic'],
+  style:    ['normal'],
   variable: '--font-display',
   display:  'swap',
 })
@@ -35,7 +38,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width:        'device-width',
   initialScale: 1,
-  themeColor:   '#F8F5F2',
+  themeColor:   '#F8F7F4',
 }
 
 export default function RootLayout({
@@ -48,8 +51,14 @@ export default function RootLayout({
       lang="en"
       className={`${playfairDisplay.variable} ${raleway.variable}`}
     >
-      <body>
-        {children}
+      <body className="bg-background text-ink antialiased">
+        <QueryProvider>
+          <AuthProvider>
+            {children}
+            {/* Global overlays — rendered at root level */}
+            <ShoppingBagDrawer />
+          </AuthProvider>
+        </QueryProvider>
         <Analytics />
         <SpeedInsights />
       </body>

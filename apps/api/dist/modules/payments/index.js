@@ -18,4 +18,3 @@ exports.paymentsRoutes = void 0;
 var payments_routes_1 = require("./payments.routes");
 Object.defineProperty(exports, "paymentsRoutes", { enumerable: true, get: function () { return payments_routes_1.paymentsRoutes; } });
 __exportStar(require("./payments.service"), exports);
-//# sourceMappingURL=index.js.map

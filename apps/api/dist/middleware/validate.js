@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Zod validation middleware.
- * Validates request body or query against a schema.
- * On validation error returns 400 { error: { code: 'VALIDATION_ERROR', message, details } }.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validate = validate;
 exports.validateQuery = validateQuery;
@@ -45,4 +40,3 @@ function validateQuery(schema) {
         });
     };
 }
-//# sourceMappingURL=validate.js.map

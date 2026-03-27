@@ -4,7 +4,7 @@
  * Atomic writes use db.execute(sql`...`); caller must hold lock where required.
  */
 import { type Database, type TransactionClient } from '../client';
-import type { VariantStock, InventoryUnit, InventoryMovement, ReconciliationLog } from '../schema/inventory.schema';
+import type { ProductVariant, VariantStock, InventoryUnit, InventoryMovement, ReconciliationLog } from '../schema/inventory.schema';
 export interface VariantAvailabilityRow {
     variantId: string;
     productId: string;
@@ -16,6 +16,9 @@ export interface VariantAvailabilityRow {
     lowStockThreshold: number;
     stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
 }
+export declare function getProductVariantById({ variantId, }: {
+    variantId: string;
+}): Promise<ProductVariant | null>;
 export declare function getVariantStock({ variantId, }: {
     variantId: string;
 }): Promise<VariantStock | null>;

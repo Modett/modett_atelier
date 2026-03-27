@@ -1,8 +1,22 @@
 import 'dotenv/config'
+import { validateEnv } from './lib/env'
+
+validateEnv()
+
 import { app } from './app'
 
-const PORT = process.env.PORT || 3001
+const PORT = parseInt(process.env.PORT ?? '3001', 10)
 
-app.listen(PORT, () => {
-  console.log(`API running on port ${PORT}`)
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✓ API running on port ${PORT}`)
+  console.log(`  Environment: ${process.env.NODE_ENV ?? 'development'}`)
+})
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received — closing server gracefully')
+  server.close(() => {
+    console.log('Server closed')
+    process.exit(0)
+  })
+  setTimeout(() => process.exit(1), 10_000)
 })

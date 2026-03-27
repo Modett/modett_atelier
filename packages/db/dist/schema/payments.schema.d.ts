@@ -2,6 +2,7 @@
  * Payments schema — payment_intents, payment_transactions
  * Mirrors packages/db/migrations/0001_initial.sql
  */
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 export declare const paymentStatusEnum: import("drizzle-orm/pg-core").PgEnum<["PENDING", "SUCCEEDED", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED"]>;
 export declare const paymentIntents: import("drizzle-orm/pg-core").PgTableWithColumns<{
     name: "payment_intents";
@@ -79,7 +80,7 @@ export declare const paymentIntents: import("drizzle-orm/pg-core").PgTableWithCo
             name: "amount";
             tableName: "payment_intents";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -87,7 +88,7 @@ export declare const paymentIntents: import("drizzle-orm/pg-core").PgTableWithCo
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -256,7 +257,7 @@ export declare const paymentTransactions: import("drizzle-orm/pg-core").PgTableW
             name: "amount";
             tableName: "payment_transactions";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -264,7 +265,7 @@ export declare const paymentTransactions: import("drizzle-orm/pg-core").PgTableW
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -323,4 +324,8 @@ export declare const paymentTransactions: import("drizzle-orm/pg-core").PgTableW
     };
     dialect: "pg";
 }>;
+export type PaymentIntent = InferSelectModel<typeof paymentIntents>;
+export type NewPaymentIntent = InferInsertModel<typeof paymentIntents>;
+export type PaymentTransaction = InferSelectModel<typeof paymentTransactions>;
+export type NewPaymentTransaction = InferInsertModel<typeof paymentTransactions>;
 //# sourceMappingURL=payments.schema.d.ts.map

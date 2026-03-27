@@ -1,11 +1,13 @@
 /**
  * Orders schema — promo_codes, orders, order_items, addresses, contacts, events, unit_allocations
  * Mirrors packages/db/migrations/0001_initial.sql
+ * Checkout module spec: fulfillment_state and return_state enums aligned with Section 1.
  */
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 export declare const orderStateEnum: import("drizzle-orm/pg-core").PgEnum<["DRAFT", "PLACED", "CANCELLED"]>;
 export declare const paymentStateEnum: import("drizzle-orm/pg-core").PgEnum<["UNPAID", "PAID", "FAILED", "REFUNDED", "PARTIALLY_REFUNDED"]>;
-export declare const fulfillmentStateEnum: import("drizzle-orm/pg-core").PgEnum<["NOT_STARTED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"]>;
-export declare const returnStateEnum: import("drizzle-orm/pg-core").PgEnum<["NONE", "REQUESTED", "PENDING_REVIEW", "APPROVED", "FULFILLED", "REJECTED"]>;
+export declare const fulfillmentStateEnum: import("drizzle-orm/pg-core").PgEnum<["NOT_STARTED", "IN_PROGRESS", "PARTIALLY_FULFILLED", "FULFILLED", "CANCELLED"]>;
+export declare const returnStateEnum: import("drizzle-orm/pg-core").PgEnum<["NONE", "REQUESTED", "PARTIAL", "RETURNED"]>;
 export declare const addressKindEnum: import("drizzle-orm/pg-core").PgEnum<["SHIPPING", "BILLING"]>;
 export declare const currencyCodeEnum: import("drizzle-orm/pg-core").PgEnum<["LKR", "SGD", "USD"]>;
 export declare const promoTypeEnum: import("drizzle-orm/pg-core").PgEnum<["PERCENT", "FIXED"]>;
@@ -331,14 +333,14 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             tableName: "orders";
             dataType: "string";
             columnType: "PgEnumColumn";
-            data: "NOT_STARTED" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED";
+            data: "CANCELLED" | "NOT_STARTED" | "IN_PROGRESS" | "PARTIALLY_FULFILLED" | "FULFILLED";
             driverParam: string;
             notNull: true;
             hasDefault: true;
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: ["NOT_STARTED", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
+            enumValues: ["NOT_STARTED", "IN_PROGRESS", "PARTIALLY_FULFILLED", "FULFILLED", "CANCELLED"];
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -348,14 +350,14 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             tableName: "orders";
             dataType: "string";
             columnType: "PgEnumColumn";
-            data: "NONE" | "REQUESTED" | "PENDING_REVIEW" | "APPROVED" | "FULFILLED" | "REJECTED";
+            data: "RETURNED" | "NONE" | "REQUESTED" | "PARTIAL";
             driverParam: string;
             notNull: true;
             hasDefault: true;
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: ["NONE", "REQUESTED", "PENDING_REVIEW", "APPROVED", "FULFILLED", "REJECTED"];
+            enumValues: ["NONE", "REQUESTED", "PARTIAL", "RETURNED"];
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -398,7 +400,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             name: "subtotal";
             tableName: "orders";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -406,7 +408,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -415,7 +417,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             name: "discount_amount";
             tableName: "orders";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -423,7 +425,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -432,7 +434,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             name: "shipping_cost";
             tableName: "orders";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -440,7 +442,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -449,7 +451,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             name: "tax_amount";
             tableName: "orders";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -457,7 +459,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -466,7 +468,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             name: "tax_rate_snapshot";
             tableName: "orders";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -474,7 +476,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -483,7 +485,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             name: "total";
             tableName: "orders";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -491,7 +493,7 @@ export declare const ordersTable: import("drizzle-orm/pg-core").PgTableWithColum
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -803,7 +805,7 @@ export declare const orderItems: import("drizzle-orm/pg-core").PgTableWithColumn
             name: "unit_price_snapshot_amount";
             tableName: "order_items";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -811,7 +813,7 @@ export declare const orderItems: import("drizzle-orm/pg-core").PgTableWithColumn
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -837,7 +839,7 @@ export declare const orderItems: import("drizzle-orm/pg-core").PgTableWithColumn
             name: "tax_amount";
             tableName: "order_items";
             dataType: "string";
-            columnType: "PgText";
+            columnType: "PgNumeric";
             data: string;
             driverParam: string;
             notNull: true;
@@ -845,7 +847,7 @@ export declare const orderItems: import("drizzle-orm/pg-core").PgTableWithColumn
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
-            enumValues: [string, ...string[]];
+            enumValues: undefined;
             baseColumn: never;
             identity: undefined;
             generated: undefined;
@@ -1306,4 +1308,17 @@ export declare const orderUnitAllocations: import("drizzle-orm/pg-core").PgTable
     };
     dialect: "pg";
 }>;
+export { ordersTable as orders };
+export type Order = InferSelectModel<typeof ordersTable>;
+export type NewOrder = InferInsertModel<typeof ordersTable>;
+export type OrderItem = InferSelectModel<typeof orderItems>;
+export type NewOrderItem = InferInsertModel<typeof orderItems>;
+export type OrderAddress = InferSelectModel<typeof orderAddresses>;
+export type NewOrderAddress = InferInsertModel<typeof orderAddresses>;
+export type OrderContact = InferSelectModel<typeof orderContacts>;
+export type NewOrderContact = InferInsertModel<typeof orderContacts>;
+export type OrderEvent = InferSelectModel<typeof orderEvents>;
+export type NewOrderEvent = InferInsertModel<typeof orderEvents>;
+export type PromoCode = InferSelectModel<typeof promoCodes>;
+export type NewPromoCode = InferInsertModel<typeof promoCodes>;
 //# sourceMappingURL=orders.schema.d.ts.map

@@ -22,8 +22,10 @@ import {
   updateMethod,
   setMethodActive,
   deleteMethod,
+  getShippingSettings,
+  updateShippingSettings,
 } from '@modett/db'
-import type { ShippingZone, ShippingMethod } from '@modett/db'
+import type { ShippingZone, ShippingMethod, ShippingSettings } from '@modett/db'
 
 type CurrencyCode = 'LKR' | 'SGD' | 'USD'
 
@@ -69,22 +71,48 @@ export interface ShippingMethodOption {
 export async function getMethodsForCheckout({
   countryCode,
   currency,
+  subtotal,
 }: {
   countryCode: string
   currency: CurrencyCode
+  subtotal?: string | null
 }): Promise<ShippingMethodOption[]> {
+  if (!subtotal) {
+    const methods = await getMethodsForCountry({ countryCode })
+    return methods.map((method) => {
+      const cost = resolveShippingCost({ method, currency })
+      return {
+        id: method.id,
+        name: method.name,
+        carrier: method.carrier ?? null,
+        estimatedDays: method.estimated_days ?? null,
+        rateType: method.rate_type,
+        cost,
+      }
+    })
+  }
+
+  const settings = await getShippingSettings()
   const methods = await getMethodsForCountry({ countryCode })
-  return methods.map((method) => {
-    const cost = resolveShippingCost({ method, currency })
-    return {
-      id: method.id,
-      name: method.name,
-      carrier: method.carrier ?? null,
-      estimatedDays: method.estimated_days ?? null,
-      rateType: method.rate_type,
-      cost,
-    }
-  })
+
+  return Promise.all(
+    methods.map(async (method) => {
+      const resolved = await resolveShippingCostWithThreshold({
+        method,
+        currency,
+        subtotal,
+        settings,
+      })
+      return {
+        id: method.id,
+        name: method.name,
+        carrier: method.carrier ?? null,
+        estimatedDays: method.estimated_days ?? null,
+        rateType: method.rate_type,
+        cost: resolved,
+      }
+    }),
+  )
 }
 
 export async function getMethodForOrder({
@@ -365,4 +393,185 @@ export async function adminDeactivateMethod({
 
 export async function adminDeleteMethod({ id }: { id: string }): Promise<void> {
   await deleteMethod({ id })
+}
+
+// —— Shipping cost with free threshold ——
+
+interface ResolvedShippingCost {
+  amount: string
+  currency: CurrencyCode
+  isFree: boolean
+  originalAmount: string | null
+  label: string
+}
+
+export async function resolveShippingCostWithThreshold({
+  method,
+  currency,
+  subtotal,
+  settings,
+}: {
+  method: ShippingMethod
+  currency: CurrencyCode
+  subtotal?: string | null
+  settings?: ShippingSettings | null
+}): Promise<ResolvedShippingCost> {
+  const rawCost = resolveShippingCost({ method, currency })
+  const label = settings?.freeShippingLabel ?? 'Free Shipping'
+
+  if (method.rate_type === 'FREE') {
+    return {
+      amount: '0.00',
+      currency,
+      isFree: true,
+      originalAmount: null,
+      label,
+    }
+  }
+
+  if (!subtotal || !rawCost) {
+    return {
+      amount: rawCost?.amount ?? '0.00',
+      currency,
+      isFree: false,
+      originalAmount: null,
+      label,
+    }
+  }
+
+  const threshold = settings
+    ? (currency === 'LKR'
+        ? settings.freeThresholdLkr
+        : currency === 'SGD'
+          ? settings.freeThresholdSgd
+          : settings.freeThresholdUsd)
+    : null
+
+  if (threshold !== null && threshold !== undefined) {
+    const subtotalDecimal = new Decimal(subtotal)
+    const thresholdDecimal = new Decimal(threshold)
+
+    if (subtotalDecimal.greaterThanOrEqualTo(thresholdDecimal)) {
+      return {
+        amount: '0.00',
+        currency,
+        isFree: true,
+        originalAmount: rawCost.amount,
+        label,
+      }
+    }
+  }
+
+  return {
+    amount: rawCost.amount,
+    currency,
+    isFree: false,
+    originalAmount: null,
+    label,
+  }
+}
+
+// —— Public: shipping estimate ——
+
+export async function getShippingEstimate({
+  countryCode,
+  currency,
+  subtotal,
+}: {
+  countryCode: string
+  currency: CurrencyCode
+  subtotal: string
+}) {
+  const settings = await getShippingSettings()
+  const methods = await getMethodsForCountry({ countryCode })
+
+  if (methods.length === 0) {
+    return {
+      available: false,
+      methods: [],
+      thresholdAmount: null,
+      thresholdCurrency: currency,
+      freeShippingLabel: settings?.freeShippingLabel ?? 'Free Shipping',
+      amountUntilFree: null,
+    }
+  }
+
+  const resolvedMethods = await Promise.all(
+    methods.map(async (method) => {
+      const resolved = await resolveShippingCostWithThreshold({
+        method,
+        currency,
+        subtotal,
+        settings,
+      })
+      return {
+        id: method.id,
+        name: method.name,
+        carrier: method.carrier ?? null,
+        estimatedDays: method.estimated_days ?? null,
+        rateType: method.rate_type,
+        cost: resolved,
+      }
+    }),
+  )
+
+  const threshold = settings
+    ? (currency === 'LKR'
+        ? settings.freeThresholdLkr
+        : currency === 'SGD'
+          ? settings.freeThresholdSgd
+          : settings.freeThresholdUsd)
+    : null
+
+  const anyFree = resolvedMethods.some((m) => m.cost.isFree)
+
+  return {
+    available: true,
+    methods: resolvedMethods,
+    thresholdAmount: threshold ? String(threshold) : null,
+    thresholdCurrency: currency,
+    freeShippingLabel: settings?.freeShippingLabel ?? 'Free Shipping',
+    amountUntilFree:
+      threshold && !anyFree
+        ? new Decimal(threshold).minus(subtotal).toFixed(2)
+        : null,
+  }
+}
+
+// —— Admin: shipping settings ——
+
+export async function adminGetShippingSettings() {
+  return getShippingSettings()
+}
+
+export async function adminUpdateShippingSettings({
+  freeThresholdLkr,
+  freeThresholdSgd,
+  freeThresholdUsd,
+  freeShippingLabel,
+  adminId,
+}: {
+  freeThresholdLkr?: number | null
+  freeThresholdSgd?: number | null
+  freeThresholdUsd?: number | null
+  freeShippingLabel?: string
+  adminId: string
+}) {
+  if (freeThresholdLkr !== null && freeThresholdLkr !== undefined && freeThresholdLkr < 0) {
+    throw new AppError('INVALID_THRESHOLD', 400)
+  }
+  if (freeThresholdSgd !== null && freeThresholdSgd !== undefined && freeThresholdSgd < 0) {
+    throw new AppError('INVALID_THRESHOLD', 400)
+  }
+  if (freeThresholdUsd !== null && freeThresholdUsd !== undefined && freeThresholdUsd < 0) {
+    throw new AppError('INVALID_THRESHOLD', 400)
+  }
+
+  return updateShippingSettings({
+    freeThresholdLkr,
+    freeThresholdSgd,
+    freeThresholdUsd,
+    freeShippingLabel,
+    adminId,
+  })
 }

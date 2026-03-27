@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Orders service — customer order history/detail, admin list/detail,
- * fulfillment transitions, cancel, shipping/address updates, scan-to-pack.
- * RORO. Throws AppError. OrderOperationError from db bubbles (has code + statusCode).
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getMyOrders = getMyOrders;
 exports.getMyOrderDetail = getMyOrderDetail;
@@ -22,7 +17,6 @@ const errors_1 = require("../../lib/errors");
 const db_1 = require("@modett/db");
 const reviews_1 = require("../reviews");
 const messaging_1 = require("../messaging");
-// —— Customer-facing ——
 async function getMyOrders({ userId, page = 1, limit = 20, }) {
     const { rows, meta } = await (0, db_1.listOrdersForUser)({ userId, page, limit });
     return { orders: rows, page: meta.page, limit: meta.limit, total: meta.total };
@@ -46,7 +40,6 @@ async function getMyOrderDetail({ orderId, userId, }) {
         allocations: allocationsSanitised,
     };
 }
-// —— Admin read ——
 async function adminListOrders({ page = 1, limit = 50, orderState, paymentState, fulfillmentState, search, }) {
     const { rows, meta } = await (0, db_1.listOrdersAdmin)({
         page,
@@ -71,7 +64,6 @@ async function adminGetOrderDetail({ orderId }) {
         allocations: full.allocations,
     };
 }
-// —— Fulfillment ——
 async function markOrderPacked({ orderId, adminId, note, }) {
     const order = await (0, db_1.getOrderById)({ id: orderId });
     if (!order)
@@ -164,7 +156,6 @@ async function updateShippingAddress({ orderId, kind, addressJson, countryCode, 
         adminId,
     });
 }
-// —— Scan-to-pack ——
 async function scanUnit({ barcodeValue, orderItemId, adminId, adminFullName, }) {
     const unit = await (0, db_1.getInventoryUnitByBarcode)({ barcodeValue });
     if (!unit)
@@ -241,4 +232,3 @@ async function getOrderPackingStatus({ orderId }) {
         items: itemStatuses,
     };
 }
-//# sourceMappingURL=orders.service.js.map

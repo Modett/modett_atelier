@@ -72,7 +72,6 @@ const options = {
                 },
             },
             schemas: {
-                // ---- Shared ----
                 Money: {
                     type: 'object',
                     required: ['amount', 'currency'],
@@ -113,7 +112,6 @@ const options = {
                         },
                     ],
                 },
-                // ---- IAM ----
                 User: {
                     type: 'object',
                     properties: {
@@ -185,7 +183,6 @@ const options = {
                         usedAt: { type: 'string', format: 'date-time', nullable: true },
                     },
                 },
-                // ---- Catalog ----
                 Category: {
                     type: 'object',
                     properties: {
@@ -324,7 +321,6 @@ const options = {
 };
 exports.swaggerSpec = (0, swagger_jsdoc_1.default)(options);
 function setupSwagger(app) {
-    // Swagger disabled in production by default; set SWAGGER_ENABLED=1 to enable
     if (process.env.NODE_ENV === 'production' && process.env.SWAGGER_ENABLED !== '1')
         return;
     const serveHandlers = Array.isArray(swaggerUi.serve)
@@ -344,4 +340,3 @@ function setupSwagger(app) {
     });
     console.log(`Swagger UI available at http://localhost:${apiPort}/docs`);
 }
-//# sourceMappingURL=swagger.js.map

@@ -1,11 +1,39 @@
+"use strict";
 /**
  * IAM query functions — users, sessions, admins, admin_invites, saved_addresses, saved_payment_methods.
  * No business logic. RORO signatures. Return null when not found.
  */
-import { eq, and, isNull, gt, desc } from 'drizzle-orm';
-import { db } from '../client';
-import { redis } from '../redis';
-import { users, admins, adminInvites, sessions, savedAddresses, savedPaymentMethods, } from '../schema/iam.schema';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getUserByEmail = getUserByEmail;
+exports.getUserById = getUserById;
+exports.createUser = createUser;
+exports.updateUser = updateUser;
+exports.createSession = createSession;
+exports.getSession = getSession;
+exports.refreshSession = refreshSession;
+exports.invalidateSession = invalidateSession;
+exports.getActiveSessionsByUserId = getActiveSessionsByUserId;
+exports.getAdminByUserId = getAdminByUserId;
+exports.getAdminById = getAdminById;
+exports.createAdmin = createAdmin;
+exports.updateAdminStatus = updateAdminStatus;
+exports.updateAdminRole = updateAdminRole;
+exports.listAdmins = listAdmins;
+exports.createAdminInvite = createAdminInvite;
+exports.getAdminInviteByTokenHash = getAdminInviteByTokenHash;
+exports.markAdminInviteUsed = markAdminInviteUsed;
+exports.acceptAdminInviteTransaction = acceptAdminInviteTransaction;
+exports.listSavedAddresses = listSavedAddresses;
+exports.createSavedAddress = createSavedAddress;
+exports.updateSavedAddress = updateSavedAddress;
+exports.deleteSavedAddress = deleteSavedAddress;
+exports.listSavedPaymentMethods = listSavedPaymentMethods;
+exports.createSavedPaymentMethod = createSavedPaymentMethod;
+exports.deleteSavedPaymentMethod = deleteSavedPaymentMethod;
+const drizzle_orm_1 = require("drizzle-orm");
+const client_1 = require("../client");
+const redis_1 = require("../redis");
+const iam_schema_1 = require("../schema/iam.schema");
 const SESSION_KEY_PREFIX = 'session:';
 const ADMIN_SESSION_TTL_SECONDS = 900; // 15 min
 function sessionKey(sessionId) {
@@ -17,23 +45,23 @@ function getTtlSeconds(expiresAt) {
     return Math.max(0, delta);
 }
 // —— User queries ——
-export async function getUserByEmail({ email, }) {
-    const rows = await db
+async function getUserByEmail({ email, }) {
+    const rows = await client_1.db
         .select()
-        .from(users)
-        .where(and(eq(users.email, email), isNull(users.deletedAt)));
+        .from(iam_schema_1.users)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.users.email, email), (0, drizzle_orm_1.isNull)(iam_schema_1.users.deletedAt)));
     return rows[0] ?? null;
 }
-export async function getUserById({ id }) {
-    const rows = await db
+async function getUserById({ id }) {
+    const rows = await client_1.db
         .select()
-        .from(users)
-        .where(and(eq(users.id, id), isNull(users.deletedAt)));
+        .from(iam_schema_1.users)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.users.id, id), (0, drizzle_orm_1.isNull)(iam_schema_1.users.deletedAt)));
     return rows[0] ?? null;
 }
-export async function createUser({ firstName, lastName, email, passwordHash, newsletterOptIn, }) {
-    const [row] = await db
-        .insert(users)
+async function createUser({ firstName, lastName, email, passwordHash, newsletterOptIn, }) {
+    const [row] = await client_1.db
+        .insert(iam_schema_1.users)
         .values({
         firstName,
         lastName,
@@ -47,18 +75,18 @@ export async function createUser({ firstName, lastName, email, passwordHash, new
         throw new Error('createUser: no row returned');
     return row;
 }
-export async function updateUser({ id, data, }) {
-    const [row] = await db
-        .update(users)
+async function updateUser({ id, data, }) {
+    const [row] = await client_1.db
+        .update(iam_schema_1.users)
         .set({ ...data, updatedAt: new Date() })
-        .where(eq(users.id, id))
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.users.id, id))
         .returning();
     return row ?? null;
 }
 // —— Session queries ——
-export async function createSession({ userId, kind, expiresAt, rememberMeUntil, }) {
-    const [row] = await db
-        .insert(sessions)
+async function createSession({ userId, kind, expiresAt, rememberMeUntil, }) {
+    const [row] = await client_1.db
+        .insert(iam_schema_1.sessions)
         .values({
         userId,
         kind,
@@ -70,111 +98,111 @@ export async function createSession({ userId, kind, expiresAt, rememberMeUntil, 
         throw new Error('createSession: no row returned');
     const key = sessionKey(row.id);
     const ttl = kind === 'ADMIN' ? ADMIN_SESSION_TTL_SECONDS : getTtlSeconds(expiresAt);
-    await redis.set(key, row.userId, 'EX', ttl);
+    await redis_1.redis.set(key, row.userId, 'EX', ttl);
     return row;
 }
-export async function getSession({ sessionId, }) {
+async function getSession({ sessionId, }) {
     const key = sessionKey(sessionId);
-    const cached = await redis.get(key);
+    const cached = await redis_1.redis.get(key);
     if (cached !== null) {
-        const rows = await db
+        const rows = await client_1.db
             .select()
-            .from(sessions)
-            .where(and(eq(sessions.id, sessionId), isNull(sessions.invalidatedAt), gt(sessions.expiresAt, new Date())));
+            .from(iam_schema_1.sessions)
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.sessions.id, sessionId), (0, drizzle_orm_1.isNull)(iam_schema_1.sessions.invalidatedAt), (0, drizzle_orm_1.gt)(iam_schema_1.sessions.expiresAt, new Date())));
         const session = rows[0] ?? null;
         if (session)
             return session;
-        await redis.del(key);
+        await redis_1.redis.del(key);
         return null;
     }
-    const rows = await db
+    const rows = await client_1.db
         .select()
-        .from(sessions)
-        .where(and(eq(sessions.id, sessionId), isNull(sessions.invalidatedAt), gt(sessions.expiresAt, new Date())));
+        .from(iam_schema_1.sessions)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.sessions.id, sessionId), (0, drizzle_orm_1.isNull)(iam_schema_1.sessions.invalidatedAt), (0, drizzle_orm_1.gt)(iam_schema_1.sessions.expiresAt, new Date())));
     const session = rows[0] ?? null;
     if (!session)
         return null;
     const ttl = session.kind === 'ADMIN'
         ? ADMIN_SESSION_TTL_SECONDS
         : getTtlSeconds(session.expiresAt);
-    await redis.set(key, session.userId, 'EX', ttl);
+    await redis_1.redis.set(key, session.userId, 'EX', ttl);
     return session;
 }
-export async function refreshSession({ sessionId, }) {
+async function refreshSession({ sessionId, }) {
     const key = sessionKey(sessionId);
-    const rows = await db
+    const rows = await client_1.db
         .select()
-        .from(sessions)
-        .where(eq(sessions.id, sessionId));
+        .from(iam_schema_1.sessions)
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.sessions.id, sessionId));
     const session = rows[0];
     if (session?.kind === 'ADMIN') {
-        await redis.expire(key, ADMIN_SESSION_TTL_SECONDS);
+        await redis_1.redis.expire(key, ADMIN_SESSION_TTL_SECONDS);
     }
-    await db
-        .update(sessions)
+    await client_1.db
+        .update(iam_schema_1.sessions)
         .set({ lastSeenAt: new Date() })
-        .where(eq(sessions.id, sessionId));
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.sessions.id, sessionId));
 }
-export async function invalidateSession({ sessionId, }) {
+async function invalidateSession({ sessionId, }) {
     const key = sessionKey(sessionId);
-    await redis.del(key);
-    await db
-        .update(sessions)
+    await redis_1.redis.del(key);
+    await client_1.db
+        .update(iam_schema_1.sessions)
         .set({ invalidatedAt: new Date() })
-        .where(eq(sessions.id, sessionId));
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.sessions.id, sessionId));
 }
-export async function getActiveSessionsByUserId({ userId, }) {
-    const rows = await db
+async function getActiveSessionsByUserId({ userId, }) {
+    const rows = await client_1.db
         .select()
-        .from(sessions)
-        .where(and(eq(sessions.userId, userId), isNull(sessions.invalidatedAt)));
+        .from(iam_schema_1.sessions)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.sessions.userId, userId), (0, drizzle_orm_1.isNull)(iam_schema_1.sessions.invalidatedAt)));
     return rows;
 }
 // —— Admin queries ——
-export async function getAdminByUserId({ userId, }) {
-    const rows = await db
+async function getAdminByUserId({ userId, }) {
+    const rows = await client_1.db
         .select()
-        .from(admins)
-        .where(eq(admins.userId, userId));
+        .from(iam_schema_1.admins)
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.admins.userId, userId));
     return rows[0] ?? null;
 }
-export async function getAdminById({ id }) {
-    const rows = await db.select().from(admins).where(eq(admins.id, id));
+async function getAdminById({ id }) {
+    const rows = await client_1.db.select().from(iam_schema_1.admins).where((0, drizzle_orm_1.eq)(iam_schema_1.admins.id, id));
     return rows[0] ?? null;
 }
-export async function createAdmin({ userId, role, }) {
-    const [row] = await db.insert(admins).values({ userId, role }).returning();
+async function createAdmin({ userId, role, }) {
+    const [row] = await client_1.db.insert(iam_schema_1.admins).values({ userId, role }).returning();
     if (!row)
         throw new Error('createAdmin: no row returned');
     return row;
 }
-export async function updateAdminStatus({ id, status, }) {
-    const [row] = await db
-        .update(admins)
+async function updateAdminStatus({ id, status, }) {
+    const [row] = await client_1.db
+        .update(iam_schema_1.admins)
         .set({ status, updatedAt: new Date() })
-        .where(eq(admins.id, id))
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.admins.id, id))
         .returning();
     return row ?? null;
 }
-export async function updateAdminRole({ id, role, }) {
-    const [row] = await db
-        .update(admins)
+async function updateAdminRole({ id, role, }) {
+    const [row] = await client_1.db
+        .update(iam_schema_1.admins)
         .set({ role, updatedAt: new Date() })
-        .where(eq(admins.id, id))
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.admins.id, id))
         .returning();
     return row ?? null;
 }
-export async function listAdmins() {
-    const rows = await db
+async function listAdmins() {
+    const rows = await client_1.db
         .select()
-        .from(admins)
-        .innerJoin(users, eq(users.id, admins.userId));
+        .from(iam_schema_1.admins)
+        .innerJoin(iam_schema_1.users, (0, drizzle_orm_1.eq)(iam_schema_1.users.id, iam_schema_1.admins.userId));
     return rows.map((r) => ({ ...r.admins, user: r.users }));
 }
 // —— Admin invite queries ——
-export async function createAdminInvite({ email, tokenHash, expiresAt, createdByAdminId, }) {
-    const [row] = await db
-        .insert(adminInvites)
+async function createAdminInvite({ email, tokenHash, expiresAt, createdByAdminId, }) {
+    const [row] = await client_1.db
+        .insert(iam_schema_1.adminInvites)
         .values({
         email,
         tokenHash,
@@ -186,29 +214,29 @@ export async function createAdminInvite({ email, tokenHash, expiresAt, createdBy
         throw new Error('createAdminInvite: no row returned');
     return row;
 }
-export async function getAdminInviteByTokenHash({ tokenHash, }) {
-    const rows = await db
+async function getAdminInviteByTokenHash({ tokenHash, }) {
+    const rows = await client_1.db
         .select()
-        .from(adminInvites)
-        .where(and(eq(adminInvites.tokenHash, tokenHash), isNull(adminInvites.usedAt), gt(adminInvites.expiresAt, new Date())));
+        .from(iam_schema_1.adminInvites)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.adminInvites.tokenHash, tokenHash), (0, drizzle_orm_1.isNull)(iam_schema_1.adminInvites.usedAt), (0, drizzle_orm_1.gt)(iam_schema_1.adminInvites.expiresAt, new Date())));
     return rows[0] ?? null;
 }
-export async function markAdminInviteUsed({ id }) {
-    await db
-        .update(adminInvites)
+async function markAdminInviteUsed({ id }) {
+    await client_1.db
+        .update(iam_schema_1.adminInvites)
         .set({ usedAt: new Date() })
-        .where(eq(adminInvites.id, id));
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.adminInvites.id, id));
 }
-export async function acceptAdminInviteTransaction({ inviteId, email, firstName, lastName, passwordHash, }) {
-    return await db.transaction(async (tx) => {
+async function acceptAdminInviteTransaction({ inviteId, email, firstName, lastName, passwordHash, }) {
+    return await client_1.db.transaction(async (tx) => {
         let user = await tx
             .select()
-            .from(users)
-            .where(and(eq(users.email, email), isNull(users.deletedAt)))
+            .from(iam_schema_1.users)
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.users.email, email), (0, drizzle_orm_1.isNull)(iam_schema_1.users.deletedAt)))
             .then((rows) => rows[0] ?? null);
         if (!user) {
             const [inserted] = await tx
-                .insert(users)
+                .insert(iam_schema_1.users)
                 .values({ firstName, lastName, email, passwordHash })
                 .returning();
             if (!inserted)
@@ -217,12 +245,12 @@ export async function acceptAdminInviteTransaction({ inviteId, email, firstName,
         }
         let admin = await tx
             .select()
-            .from(admins)
-            .where(eq(admins.userId, user.id))
+            .from(iam_schema_1.admins)
+            .where((0, drizzle_orm_1.eq)(iam_schema_1.admins.userId, user.id))
             .then((rows) => rows[0] ?? null);
         if (!admin) {
             const [inserted] = await tx
-                .insert(admins)
+                .insert(iam_schema_1.admins)
                 .values({ userId: user.id, role: 'ADMIN' })
                 .returning();
             if (!inserted)
@@ -231,36 +259,36 @@ export async function acceptAdminInviteTransaction({ inviteId, email, firstName,
         }
         const updatedAt = new Date();
         await tx
-            .update(admins)
+            .update(iam_schema_1.admins)
             .set({ status: 'ACTIVE', updatedAt })
-            .where(eq(admins.id, admin.id));
+            .where((0, drizzle_orm_1.eq)(iam_schema_1.admins.id, admin.id));
         admin = { ...admin, status: 'ACTIVE', updatedAt };
         await tx
-            .update(adminInvites)
+            .update(iam_schema_1.adminInvites)
             .set({ usedAt: new Date() })
-            .where(eq(adminInvites.id, inviteId));
+            .where((0, drizzle_orm_1.eq)(iam_schema_1.adminInvites.id, inviteId));
         return { user, admin };
     });
 }
 // —— Address queries ——
-export async function listSavedAddresses({ userId, }) {
-    const rows = await db
+async function listSavedAddresses({ userId, }) {
+    const rows = await client_1.db
         .select()
-        .from(savedAddresses)
-        .where(eq(savedAddresses.userId, userId))
-        .orderBy(desc(savedAddresses.isDefault), desc(savedAddresses.createdAt));
+        .from(iam_schema_1.savedAddresses)
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.savedAddresses.userId, userId))
+        .orderBy((0, drizzle_orm_1.desc)(iam_schema_1.savedAddresses.isDefault), (0, drizzle_orm_1.desc)(iam_schema_1.savedAddresses.createdAt));
     return rows;
 }
-export async function createSavedAddress({ userId, label, addressJson, countryCode, isDefault, }) {
-    return await db.transaction(async (tx) => {
+async function createSavedAddress({ userId, label, addressJson, countryCode, isDefault, }) {
+    return await client_1.db.transaction(async (tx) => {
         if (isDefault) {
             await tx
-                .update(savedAddresses)
+                .update(iam_schema_1.savedAddresses)
                 .set({ isDefault: false })
-                .where(eq(savedAddresses.userId, userId));
+                .where((0, drizzle_orm_1.eq)(iam_schema_1.savedAddresses.userId, userId));
         }
         const [row] = await tx
-            .insert(savedAddresses)
+            .insert(iam_schema_1.savedAddresses)
             .values({
             userId,
             label: label ?? null,
@@ -274,38 +302,38 @@ export async function createSavedAddress({ userId, label, addressJson, countryCo
         return row;
     });
 }
-export async function updateSavedAddress({ id, userId, data, }) {
-    const [row] = await db
-        .update(savedAddresses)
+async function updateSavedAddress({ id, userId, data, }) {
+    const [row] = await client_1.db
+        .update(iam_schema_1.savedAddresses)
         .set({ ...data, updatedAt: new Date() })
-        .where(and(eq(savedAddresses.id, id), eq(savedAddresses.userId, userId)))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.savedAddresses.id, id), (0, drizzle_orm_1.eq)(iam_schema_1.savedAddresses.userId, userId)))
         .returning();
     return row ?? null;
 }
-export async function deleteSavedAddress({ id, userId, }) {
-    await db
-        .delete(savedAddresses)
-        .where(and(eq(savedAddresses.id, id), eq(savedAddresses.userId, userId)));
+async function deleteSavedAddress({ id, userId, }) {
+    await client_1.db
+        .delete(iam_schema_1.savedAddresses)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.savedAddresses.id, id), (0, drizzle_orm_1.eq)(iam_schema_1.savedAddresses.userId, userId)));
 }
 // —— Saved payment method queries ——
-export async function listSavedPaymentMethods({ userId, }) {
-    const rows = await db
+async function listSavedPaymentMethods({ userId, }) {
+    const rows = await client_1.db
         .select()
-        .from(savedPaymentMethods)
-        .where(eq(savedPaymentMethods.userId, userId))
-        .orderBy(desc(savedPaymentMethods.isDefault), desc(savedPaymentMethods.createdAt));
+        .from(iam_schema_1.savedPaymentMethods)
+        .where((0, drizzle_orm_1.eq)(iam_schema_1.savedPaymentMethods.userId, userId))
+        .orderBy((0, drizzle_orm_1.desc)(iam_schema_1.savedPaymentMethods.isDefault), (0, drizzle_orm_1.desc)(iam_schema_1.savedPaymentMethods.createdAt));
     return rows;
 }
-export async function createSavedPaymentMethod({ userId, provider, token, brand, lastFour, expiryMonth, expiryYear, isDefault, }) {
-    return await db.transaction(async (tx) => {
+async function createSavedPaymentMethod({ userId, provider, token, brand, lastFour, expiryMonth, expiryYear, isDefault, }) {
+    return await client_1.db.transaction(async (tx) => {
         if (isDefault) {
             await tx
-                .update(savedPaymentMethods)
+                .update(iam_schema_1.savedPaymentMethods)
                 .set({ isDefault: false })
-                .where(eq(savedPaymentMethods.userId, userId));
+                .where((0, drizzle_orm_1.eq)(iam_schema_1.savedPaymentMethods.userId, userId));
         }
         const [row] = await tx
-            .insert(savedPaymentMethods)
+            .insert(iam_schema_1.savedPaymentMethods)
             .values({
             userId,
             provider,
@@ -322,8 +350,8 @@ export async function createSavedPaymentMethod({ userId, provider, token, brand,
         return row;
     });
 }
-export async function deleteSavedPaymentMethod({ id, userId, }) {
-    await db
-        .delete(savedPaymentMethods)
-        .where(and(eq(savedPaymentMethods.id, id), eq(savedPaymentMethods.userId, userId)));
+async function deleteSavedPaymentMethod({ id, userId, }) {
+    await client_1.db
+        .delete(iam_schema_1.savedPaymentMethods)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(iam_schema_1.savedPaymentMethods.id, id), (0, drizzle_orm_1.eq)(iam_schema_1.savedPaymentMethods.userId, userId)));
 }

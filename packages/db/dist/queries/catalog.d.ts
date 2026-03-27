@@ -4,6 +4,13 @@
  */
 import type { Category, Product, ProductPrice, ProductImage, ProductStylingGuide, BestsellerEntry, Banner } from '../schema/catalog.schema';
 import type { ProductVariant } from '../schema/inventory.schema';
+export interface ProductListVariantRow {
+    variantId: string;
+    color: string;
+    size: string;
+    availableQty: number;
+    stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+}
 export interface ProductListItemRow {
     id: string;
     slug: string;
@@ -16,6 +23,7 @@ export interface ProductListItemRow {
     sgdAmount: string;
     usdAmount: string;
     stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+    variants: ProductListVariantRow[];
 }
 export interface VariantWithStockRow {
     variantId: string;
@@ -48,20 +56,24 @@ export declare function listCategories(): Promise<Category[]>;
 export declare function getCategoryBySlug({ slug, }: {
     slug: string;
 }): Promise<Category | null>;
-export declare function listProducts({ categorySlug, page, limit, currency, }: {
+/** Storefront listing sort — uses product_prices via view columns for price modes */
+export type ProductListSort = 'newest' | 'price-asc' | 'price-desc';
+export declare function listProducts({ categorySlug, page, limit, currency, sort, }: {
     categorySlug?: string | null;
     page?: number;
     limit?: number;
     currency: 'LKR' | 'SGD' | 'USD';
+    sort?: ProductListSort;
 }): Promise<{
     products: ProductListItemRow[];
     total: number;
 }>;
-export declare function searchProducts({ query, page, limit, currency, }: {
+export declare function searchProducts({ query, page, limit, currency, sort, }: {
     query: string;
     page?: number;
     limit?: number;
     currency: 'LKR' | 'SGD' | 'USD';
+    sort?: ProductListSort;
 }): Promise<{
     products: ProductListItemRow[];
     total: number;

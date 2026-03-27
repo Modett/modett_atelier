@@ -1,8 +1,4 @@
 "use strict";
-/**
- * IAM service layer — business logic, validation, errors.
- * RORO. Uses query functions from @modett/db. Throws AppError for expected failures.
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -37,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.checkEmailExists = checkEmailExists;
 exports.signup = signup;
 exports.login = login;
 exports.logout = logout;
@@ -68,7 +65,11 @@ function sanitiseUser(user) {
     const { passwordHash: _, ...rest } = user;
     return rest;
 }
-// —— Signup / Login / Logout ——
+async function checkEmailExists({ email, }) {
+    const normalisedEmail = email.toLowerCase().trim();
+    const user = await (0, db_1.getUserByEmail)({ email: normalisedEmail });
+    return user !== null && user !== undefined;
+}
 async function signup({ firstName, lastName, email, password, newsletterOptIn, }) {
     const normalisedEmail = email.toLowerCase().trim();
     const existing = await (0, db_1.getUserByEmail)({ email: normalisedEmail });
@@ -117,7 +118,6 @@ async function login({ email, password, rememberMe, }) {
 async function logout({ sessionId }) {
     await (0, db_1.invalidateSession)({ sessionId });
 }
-// —— Me ——
 async function getMe({ userId, }) {
     const user = await (0, db_1.getUserById)({ id: userId });
     if (!user)
@@ -163,7 +163,6 @@ async function changePassword({ userId, currentPassword, newPassword, }) {
     });
     return { sessionId: session.id };
 }
-// —— Addresses ——
 async function listSavedAddressesForUser({ userId, }) {
     return (0, db_1.listSavedAddresses)({ userId });
 }
@@ -185,14 +184,12 @@ async function updateSavedAddressForUser({ id, userId, data, }) {
 async function deleteSavedAddressForUser({ id, userId, }) {
     await (0, db_1.deleteSavedAddress)({ id, userId });
 }
-// —— Payment methods ——
 async function listSavedPaymentMethodsForUser({ userId, }) {
     return (0, db_1.listSavedPaymentMethods)({ userId });
 }
 async function deleteSavedPaymentMethodForUser({ id, userId, }) {
     await (0, db_1.deleteSavedPaymentMethod)({ id, userId });
 }
-// —— Admin auth ——
 async function adminLogin({ email, password, }) {
     const normalisedEmail = email.toLowerCase().trim();
     const user = await (0, db_1.getUserByEmail)({ email: normalisedEmail });
@@ -218,7 +215,6 @@ async function adminLogin({ email, password, }) {
 async function adminLogout({ sessionId, }) {
     await (0, db_1.invalidateSession)({ sessionId });
 }
-// —— Admin invites ——
 async function createAdminInviteForOwner({ email, createdByAdminId, }) {
     const normalisedEmail = email.toLowerCase().trim();
     const rawToken = crypto.randomBytes(32).toString('hex');
@@ -251,7 +247,6 @@ async function acceptAdminInvite({ rawToken, firstName, lastName, password, }) {
     });
     return { user: sanitiseUser(user), admin };
 }
-// —— Admin management (OWNER only, enforced in routes) ——
 async function listAdminsForOwner() {
     const rows = await (0, db_1.listAdmins)();
     return rows.map((r) => ({ ...r, user: sanitiseUser(r.user) }));
@@ -281,4 +276,3 @@ async function suspendAdminForOwner({ targetAdminId, requestingAdminId, }) {
         await (0, db_1.invalidateSession)({ sessionId: s.id });
     }
 }
-//# sourceMappingURL=iam.service.js.map

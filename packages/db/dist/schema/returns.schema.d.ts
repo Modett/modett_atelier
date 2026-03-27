@@ -2,6 +2,7 @@
  * Returns schema — return_requests, return_request_items, return_events
  * Mirrors packages/db/migrations/0001_initial.sql
  */
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 export declare const returnTypeEnum: import("drizzle-orm/pg-core").PgEnum<["REFUND", "EXCHANGE"]>;
 export declare const returnStatusEnum: import("drizzle-orm/pg-core").PgEnum<["SUBMITTED", "PENDING_REVIEW", "APPROVED", "REJECTED", "FULFILLED"]>;
 export declare const returnRequests: import("drizzle-orm/pg-core").PgTableWithColumns<{
@@ -64,7 +65,7 @@ export declare const returnRequests: import("drizzle-orm/pg-core").PgTableWithCo
             tableName: "return_requests";
             dataType: "string";
             columnType: "PgEnumColumn";
-            data: "PENDING_REVIEW" | "APPROVED" | "FULFILLED" | "REJECTED" | "SUBMITTED";
+            data: "FULFILLED" | "SUBMITTED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
             driverParam: string;
             notNull: true;
             hasDefault: true;
@@ -275,7 +276,7 @@ export declare const returnRequestItems: import("drizzle-orm/pg-core").PgTableWi
             tableName: "return_request_items";
             dataType: "string";
             columnType: "PgEnumColumn";
-            data: "PENDING_REVIEW" | "APPROVED" | "FULFILLED" | "REJECTED" | "SUBMITTED";
+            data: "FULFILLED" | "SUBMITTED" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
             driverParam: string;
             notNull: true;
             hasDefault: true;
@@ -433,4 +434,10 @@ export declare const returnEvents: import("drizzle-orm/pg-core").PgTableWithColu
     };
     dialect: "pg";
 }>;
+export type ReturnRequest = InferSelectModel<typeof returnRequests>;
+export type NewReturnRequest = InferInsertModel<typeof returnRequests>;
+export type ReturnRequestItem = InferSelectModel<typeof returnRequestItems>;
+export type NewReturnRequestItem = InferInsertModel<typeof returnRequestItems>;
+export type ReturnEvent = InferSelectModel<typeof returnEvents>;
+export type NewReturnEvent = InferInsertModel<typeof returnEvents>;
 //# sourceMappingURL=returns.schema.d.ts.map

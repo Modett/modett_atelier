@@ -94,6 +94,7 @@ export interface StartCheckoutResult {
   expiresAt: Date
   currency: CurrencyCode
   summary: {
+    cartId: string
     subtotal: string
     taxAmount: string
     total: string
@@ -211,6 +212,7 @@ export async function startCheckout({
     expiresAt: reservation.expires_at,
     currency,
     summary: {
+      cartId: cart.id,
       subtotal: subtotal.toFixed(2),
       taxAmount: taxAmount.toFixed(2),
       total: total.toFixed(2),

@@ -5,6 +5,7 @@
  */
 import * as pg from 'pg';
 import * as schema from './schema/index';
+export declare const pool: pg.Pool;
 export declare const db: import("drizzle-orm/node-postgres").NodePgDatabase<typeof schema> & {
     $client: pg.Pool;
 };

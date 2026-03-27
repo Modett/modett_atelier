@@ -42,8 +42,11 @@ import type {
   ProductListItemRow,
   ProductDetailRow,
   VariantWithStockRow,
+  ProductListSort,
 } from '@modett/db'
 import type { Category, ProductImage, ProductStylingGuide, Banner } from '@modett/db'
+import { getStorageService } from '../../infrastructure/storage'
+import { StorageError } from '../../infrastructure/storage'
 
 export interface Money {
   amount: string
@@ -72,6 +75,14 @@ function resolvePriceForCurrency({
   return { amount, currency }
 }
 
+export interface ProductListVariant {
+  variantId: string
+  color: string
+  size: string
+  availableQty: number
+  stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+}
+
 export interface ProductListItem {
   id: string
   slug: string
@@ -81,6 +92,7 @@ export interface ProductListItem {
   keyImage: { url: string; altText: string | null } | null
   price: Money
   stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  variants: ProductListVariant[]
 }
 
 export interface VariantWithStock {
@@ -129,6 +141,13 @@ function rowToProductListItem(
       currency,
     }),
     stockStatus: row.stockStatus,
+    variants: (row.variants ?? []).map((v) => ({
+      variantId: v.variantId,
+      color: v.color,
+      size: v.size,
+      availableQty: v.availableQty,
+      stockStatus: v.stockStatus,
+    })),
   }
 }
 
@@ -143,11 +162,13 @@ export async function getProductListing({
   page = 1,
   limit = 24,
   currency = 'LKR',
+  sort,
 }: {
   categorySlug?: string | null
   page?: number
   limit?: number
   currency?: CurrencyCode
+  sort?: ProductListSort
 }): Promise<{
   products: ProductListItem[]
   total: number
@@ -160,6 +181,7 @@ export async function getProductListing({
     page,
     limit,
     currency,
+    sort,
   })
   const totalPages = Math.ceil(total / limit) || 1
   return {
@@ -176,11 +198,13 @@ export async function searchProducts({
   page = 1,
   limit = 24,
   currency = 'LKR',
+  sort,
 }: {
   query: string
   page?: number
   limit?: number
   currency?: CurrencyCode
+  sort?: ProductListSort
 }): Promise<{
   products: ProductListItem[]
   total: number
@@ -196,6 +220,7 @@ export async function searchProducts({
     page,
     limit,
     currency,
+    sort,
   })
   const totalPages = Math.ceil(total / limit) || 1
   return {
@@ -471,7 +496,147 @@ export async function adminDeleteProductImage({
   imageId: string
   productId: string
 }): Promise<void> {
+  const product = await getProductById({ id: productId })
+  if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
+  const image = product.images.find((img) => img.id === imageId)
+  if (!image) throw new AppError('IMAGE_NOT_FOUND', 404)
+
+  const storage = getStorageService()
+  try {
+    const pathname = new URL(image.url).pathname
+    const prefix = pathname.startsWith('/') ? pathname.slice(1) : pathname
+    await storage.deleteByPrefix(prefix)
+  } catch (err) {
+    if (err instanceof StorageError) {
+      throw new AppError('STORAGE_ERROR', 500, err.message)
+    }
+    throw err
+  }
   await deleteProductImage({ id: imageId, productId })
+
+  if (product.keyImageId === imageId) {
+    const remaining = product.images.filter((img) => img.id !== imageId)
+    if (remaining.length > 0) {
+      await setKeyImage({ productId, imageId: remaining[0].id })
+    } else {
+      await updateProduct({ id: productId, data: { keyImageId: null } })
+    }
+  }
+}
+
+export interface ProductImageUploadFile {
+  buffer: Buffer
+  originalname: string
+  mimetype: string
+}
+
+export async function adminUploadProductImagesFromFiles({
+  productId,
+  files,
+}: {
+  productId: string
+  files: ProductImageUploadFile[]
+}): Promise<ProductImage[]> {
+  if (files.length === 0) throw new AppError('NO_FILES', 400)
+  if (files.length > 6) throw new AppError('TOO_MANY_FILES', 400)
+
+  const product = await getProductById({ id: productId })
+  if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
+
+  const storage = getStorageService()
+  const nextSortOrder =
+    product.images.length > 0
+      ? Math.max(...product.images.map((i) => i.sortOrder)) + 1
+      : 0
+  const created: ProductImage[] = []
+  let sortOrder = nextSortOrder
+
+  for (const file of files) {
+    let variants
+    try {
+      variants = await storage.uploadProductImage(
+        product.slug,
+        file.buffer,
+        file.originalname,
+        sortOrder,
+      )
+    } catch (err) {
+      if (err instanceof StorageError) {
+        throw new AppError('STORAGE_ERROR', 500, err.message)
+      }
+      throw err
+    }
+    const baseUrl = variants.full.url.replace(/-full\.webp$/, '')
+    const altText = `${product.displayName} - Image ${sortOrder + 1}`
+    const image = await createProductImage({
+      productId,
+      url: baseUrl,
+      altText,
+      sortOrder,
+    })
+    if (sortOrder === nextSortOrder && product.images.length === 0) {
+      await setKeyImage({ productId, imageId: image.id })
+    }
+    created.push(image)
+    sortOrder += 1
+  }
+  return created
+}
+
+export async function adminGetPresignedStylingGuideUploadUrl({
+  productId,
+  contentType,
+  fileName,
+}: {
+  productId: string
+  contentType: string
+  fileName: string
+}): Promise<{ uploadUrl: string; key: string; expiresIn: number }> {
+  const product = await getProductById({ id: productId })
+  if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
+  const { randomUUID } = await import('node:crypto')
+  const ext = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.')) : '.mp4'
+  const subPath = `${product.slug}/video-${randomUUID()}${ext}`
+  const storage = getStorageService()
+  try {
+    return storage.getPresignedUploadUrl('styling-guides', subPath, contentType)
+  } catch (err) {
+    if (err instanceof StorageError) {
+      throw new AppError('STORAGE_ERROR', 500, err.message)
+    }
+    throw err
+  }
+}
+
+export async function adminConfirmStylingGuideVideo({
+  productId,
+  key,
+  linkUrl: providedLinkUrl,
+}: {
+  productId: string
+  key: string
+  linkUrl?: string | null
+}): Promise<ProductStylingGuide> {
+  const product = await getProductById({ id: productId })
+  if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
+  const storage = getStorageService()
+  let exists: boolean
+  try {
+    exists = await storage.objectExists(key)
+  } catch (err) {
+    if (err instanceof StorageError) {
+      throw new AppError('STORAGE_ERROR', 500, err.message)
+    }
+    throw err
+  }
+  if (!exists) throw new AppError('STYLING_GUIDE_VIDEO_NOT_FOUND', 404)
+  const linkUrl = providedLinkUrl ?? storage.getPublicUrl(key)
+  return upsertStylingGuide({
+    productId,
+    type: 'VIDEO',
+    linkUrl,
+    active: true,
+  })
 }
 
 export async function adminSetKeyImage({

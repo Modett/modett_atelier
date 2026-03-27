@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Returns route handlers — customer submit/list/detail, admin list/detail
- * and status transitions (open, approve, reject, fulfil). Success: { data: T }.
- * No try/catch — errors propagate to global handler.
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -44,7 +39,6 @@ const auth_1 = require("../../middleware/auth");
 const validate_1 = require("../../middleware/validate");
 const returnsService = __importStar(require("./returns.service"));
 const router = (0, express_1.Router)();
-// —— Customer: POST /returns ——
 const createReturnBodySchema = zod_1.z.object({
     orderId: zod_1.z.string().uuid(),
     type: zod_1.z.enum(['REFUND', 'EXCHANGE']),
@@ -83,7 +77,6 @@ router.post('/returns', auth_1.requireAuth, (0, validate_1.validate)(createRetur
         data: { returnRequest: result.returnRequest, items: result.items },
     });
 });
-// —— Customer: GET /orders/:orderId/returns ——
 router.get('/orders/:orderId/returns', auth_1.requireAuth, async (req, res) => {
     const authReq = req;
     const orderId = req.params.orderId;
@@ -93,7 +86,6 @@ router.get('/orders/:orderId/returns', auth_1.requireAuth, async (req, res) => {
     });
     res.status(200).json({ data: { returns: result.returns } });
 });
-// —— Customer: GET /returns/:returnRequestId ——
 router.get('/returns/:returnRequestId', auth_1.requireAuth, async (req, res) => {
     const authReq = req;
     const returnRequestId = req.params.returnRequestId;
@@ -109,7 +101,6 @@ router.get('/returns/:returnRequestId', auth_1.requireAuth, async (req, res) => 
         },
     });
 });
-// —— Admin: GET /admin/returns ——
 const adminReturnsQuerySchema = zod_1.z.object({
     page: zod_1.z.coerce.number().int().min(1).default(1),
     limit: zod_1.z.coerce.number().int().max(100).default(50),
@@ -142,7 +133,6 @@ router.get('/admin/returns', auth_1.requireAdmin, (0, validate_1.validateQuery)(
         },
     });
 });
-// —— Admin: GET /admin/returns/:returnRequestId ——
 router.get('/admin/returns/:returnRequestId', auth_1.requireAdmin, async (req, res) => {
     const returnRequestId = req.params.returnRequestId;
     const result = await returnsService.adminGetReturnDetail({
@@ -156,7 +146,6 @@ router.get('/admin/returns/:returnRequestId', auth_1.requireAdmin, async (req, r
         },
     });
 });
-// —— Admin: POST /admin/returns/:returnRequestId/open ——
 router.post('/admin/returns/:returnRequestId/open', auth_1.requireAdmin, async (req, res) => {
     const authReq = req;
     const returnRequestId = req.params.returnRequestId;
@@ -166,7 +155,6 @@ router.post('/admin/returns/:returnRequestId/open', auth_1.requireAdmin, async (
     });
     res.status(200).json({ data: { ok: true } });
 });
-// —— Admin: POST /admin/returns/:returnRequestId/approve ——
 const approveBodySchema = zod_1.z.object({
     adminNote: zod_1.z.string().optional(),
 });
@@ -181,7 +169,6 @@ router.post('/admin/returns/:returnRequestId/approve', auth_1.requireAdmin, (0, 
     });
     res.status(200).json({ data: { ok: true } });
 });
-// —— Admin: POST /admin/returns/:returnRequestId/reject ——
 const rejectBodySchema = zod_1.z.object({
     reason: zod_1.z.string().min(1),
     adminNote: zod_1.z.string().optional(),
@@ -198,7 +185,6 @@ router.post('/admin/returns/:returnRequestId/reject', auth_1.requireAdmin, (0, v
     });
     res.status(200).json({ data: { ok: true } });
 });
-// —— Admin: POST /admin/returns/:returnRequestId/fulfil ——
 const fulfilBodySchema = zod_1.z.object({
     adminNote: zod_1.z.string().optional(),
 });
@@ -214,4 +200,3 @@ router.post('/admin/returns/:returnRequestId/fulfil', auth_1.requireAdmin, (0, v
     res.status(200).json({ data: { ok: true } });
 });
 exports.default = router;
-//# sourceMappingURL=returns.routes.js.map

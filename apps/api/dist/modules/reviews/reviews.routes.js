@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Reviews route handlers — storefront product reviews, customer submit/mine/token-status,
- * admin moderation (flagged list, hide/show, flag, resolve). Success: { data: T }.
- * No try/catch — errors propagate to global handler.
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -42,9 +37,9 @@ const express_1 = require("express");
 const zod_1 = require("zod");
 const auth_1 = require("../../middleware/auth");
 const validate_1 = require("../../middleware/validate");
+const multer_config_1 = require("../../infrastructure/upload/multer.config");
 const reviewsService = __importStar(require("./reviews.service"));
 const router = (0, express_1.Router)();
-// —— Storefront: GET /products/:productId/reviews (no auth) ——
 const productReviewsQuerySchema = zod_1.z.object({
     page: zod_1.z.coerce.number().int().min(1).default(1),
     limit: zod_1.z.coerce.number().int().max(50).default(20),
@@ -77,7 +72,6 @@ router.get('/products/:productId/reviews', (0, validate_1.validateQuery)(product
         },
     });
 });
-// —— Customer: POST /reviews ——
 const submitReviewBodySchema = zod_1.z.object({
     token: zod_1.z.string().uuid(),
     orderItemId: zod_1.z.string().uuid(),
@@ -85,10 +79,70 @@ const submitReviewBodySchema = zod_1.z.object({
     body: zod_1.z.string().max(2000).optional(),
     mediaUrls: zod_1.z.array(zod_1.z.string().url()).max(5).optional(),
 });
-router.post('/reviews', auth_1.requireAuth, (0, validate_1.validate)(submitReviewBodySchema), async (req, res) => {
+const submitReviewMultipartSchema = zod_1.z.object({
+    token: zod_1.z.string().uuid(),
+    orderItemId: zod_1.z.string().uuid(),
+    rating: zod_1.z.coerce.number().int().min(1).max(5),
+    body: zod_1.z.string().max(2000).optional(),
+});
+router.post('/reviews', auth_1.requireAuth, (req, res, next) => {
+    const contentType = req.headers['content-type'] ?? '';
+    if (contentType.includes('multipart/form-data')) {
+        const multerHandler = multer_config_1.reviewPhotoUpload.fields([
+            { name: 'token', maxCount: 1 },
+            { name: 'orderItemId', maxCount: 1 },
+            { name: 'rating', maxCount: 1 },
+            { name: 'body', maxCount: 1 },
+            { name: 'photos', maxCount: 3 },
+        ]);
+        return multerHandler(req, res, (err) => {
+            if (err) {
+                const message = err instanceof Error ? err.message : 'Upload failed';
+                return res.status(400).json({
+                    error: { code: 'UPLOAD_ERROR', message },
+                });
+            }
+            next();
+        });
+    }
+    next();
+}, async (req, res) => {
     const authReq = req;
-    const body = req
-        .body;
+    const contentType = req.headers['content-type'] ?? '';
+    if (contentType.includes('multipart/form-data')) {
+        const parsed = submitReviewMultipartSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: 'Invalid form fields',
+                    details: parsed.error.flatten().fieldErrors,
+                },
+            });
+        }
+        const body = parsed.data;
+        const files = req.files?.photos ?? [];
+        const review = await reviewsService.submitReviewWithPhotos({
+            userId: authReq.user.id,
+            plainToken: body.token,
+            orderItemId: body.orderItemId,
+            rating: body.rating,
+            body: body.body,
+            files: files.map((f) => ({ buffer: f.buffer, mimetype: f.mimetype })),
+        });
+        return res.status(201).json({ data: { review } });
+    }
+    const parsed = submitReviewBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({
+            error: {
+                code: 'VALIDATION_ERROR',
+                message: 'Invalid request body',
+                details: parsed.error.flatten().fieldErrors,
+            },
+        });
+    }
+    const body = parsed.data;
     const review = await reviewsService.submitReview({
         userId: authReq.user.id,
         plainToken: body.token,
@@ -99,7 +153,6 @@ router.post('/reviews', auth_1.requireAuth, (0, validate_1.validate)(submitRevie
     });
     res.status(201).json({ data: { review } });
 });
-// —— Customer: GET /reviews/mine ——
 const mineQuerySchema = zod_1.z.object({
     page: zod_1.z.coerce.number().int().min(1).default(1),
     limit: zod_1.z.coerce.number().int().max(50).default(20),
@@ -122,7 +175,6 @@ router.get('/reviews/mine', auth_1.requireAuth, (0, validate_1.validateQuery)(mi
         },
     });
 });
-// —— Customer: GET /reviews/token-status ——
 const tokenStatusQuerySchema = zod_1.z.object({
     orderItemId: zod_1.z.string().uuid(),
 });
@@ -143,7 +195,6 @@ router.get('/reviews/token-status', auth_1.requireAuth, (0, validate_1.validateQ
         },
     });
 });
-// —— Admin: GET /admin/reviews/flagged ——
 const flaggedQuerySchema = zod_1.z.object({
     page: zod_1.z.coerce.number().int().min(1).default(1),
     limit: zod_1.z.coerce.number().int().max(100).default(50),
@@ -164,7 +215,6 @@ router.get('/admin/reviews/flagged', auth_1.requireAdmin, (0, validate_1.validat
         },
     });
 });
-// —— Admin: GET /admin/products/:productId/reviews ——
 const adminProductReviewsQuerySchema = zod_1.z.object({
     page: zod_1.z.coerce.number().int().min(1).default(1),
     limit: zod_1.z.coerce.number().int().max(100).default(50),
@@ -196,7 +246,6 @@ router.get('/admin/products/:productId/reviews', auth_1.requireAdmin, (0, valida
         },
     });
 });
-// —— Admin: POST /admin/reviews/:reviewId/hide ——
 router.post('/admin/reviews/:reviewId/hide', auth_1.requireAdmin, async (req, res) => {
     const authReq = req;
     await reviewsService.adminHideReview({
@@ -205,7 +254,6 @@ router.post('/admin/reviews/:reviewId/hide', auth_1.requireAdmin, async (req, re
     });
     res.status(200).json({ data: { ok: true } });
 });
-// —— Admin: POST /admin/reviews/:reviewId/show ——
 router.post('/admin/reviews/:reviewId/show', auth_1.requireAdmin, async (req, res) => {
     const authReq = req;
     await reviewsService.adminShowReview({
@@ -214,7 +262,6 @@ router.post('/admin/reviews/:reviewId/show', auth_1.requireAdmin, async (req, re
     });
     res.status(200).json({ data: { ok: true } });
 });
-// —— Admin: POST /admin/reviews/:reviewId/flag ——
 const flagBodySchema = zod_1.z.object({
     reason: zod_1.z.string().min(1).max(500),
 });
@@ -228,7 +275,6 @@ router.post('/admin/reviews/:reviewId/flag', auth_1.requireAdmin, (0, validate_1
     });
     res.status(200).json({ data: { ok: true } });
 });
-// —— Admin: POST /admin/reviews/:reviewId/resolve-flag ——
 router.post('/admin/reviews/:reviewId/resolve-flag', auth_1.requireAdmin, async (req, res) => {
     const authReq = req;
     await reviewsService.adminResolveFlag({
@@ -238,4 +284,3 @@ router.post('/admin/reviews/:reviewId/resolve-flag', auth_1.requireAdmin, async 
     res.status(200).json({ data: { ok: true } });
 });
 exports.default = router;
-//# sourceMappingURL=reviews.routes.js.map

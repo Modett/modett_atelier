@@ -1,7 +1,9 @@
 /**
  * Reviews schema — review_request_tokens, reviews, review_media, review_flags
  * Mirrors packages/db/migrations/0001_initial.sql
+ * camelCase property names map to snake_case column names.
  */
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 export declare const reviewStatusEnum: import("drizzle-orm/pg-core").PgEnum<["VISIBLE", "HIDDEN"]>;
 export declare const mediaTypeEnum: import("drizzle-orm/pg-core").PgEnum<["IMAGE"]>;
 export declare const reviewRequestTokens: import("drizzle-orm/pg-core").PgTableWithColumns<{
@@ -25,7 +27,7 @@ export declare const reviewRequestTokens: import("drizzle-orm/pg-core").PgTableW
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        order_item_id: import("drizzle-orm/pg-core").PgColumn<{
+        orderItemId: import("drizzle-orm/pg-core").PgColumn<{
             name: "order_item_id";
             tableName: "review_request_tokens";
             dataType: "string";
@@ -42,7 +44,7 @@ export declare const reviewRequestTokens: import("drizzle-orm/pg-core").PgTableW
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        token_hash: import("drizzle-orm/pg-core").PgColumn<{
+        tokenHash: import("drizzle-orm/pg-core").PgColumn<{
             name: "token_hash";
             tableName: "review_request_tokens";
             dataType: "string";
@@ -59,7 +61,7 @@ export declare const reviewRequestTokens: import("drizzle-orm/pg-core").PgTableW
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        expires_at: import("drizzle-orm/pg-core").PgColumn<{
+        expiresAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "expires_at";
             tableName: "review_request_tokens";
             dataType: "date";
@@ -76,7 +78,7 @@ export declare const reviewRequestTokens: import("drizzle-orm/pg-core").PgTableW
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        used_at: import("drizzle-orm/pg-core").PgColumn<{
+        usedAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "used_at";
             tableName: "review_request_tokens";
             dataType: "date";
@@ -117,7 +119,7 @@ export declare const reviewsTable: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        user_id: import("drizzle-orm/pg-core").PgColumn<{
+        userId: import("drizzle-orm/pg-core").PgColumn<{
             name: "user_id";
             tableName: "reviews";
             dataType: "string";
@@ -134,7 +136,7 @@ export declare const reviewsTable: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        order_id: import("drizzle-orm/pg-core").PgColumn<{
+        orderId: import("drizzle-orm/pg-core").PgColumn<{
             name: "order_id";
             tableName: "reviews";
             dataType: "string";
@@ -151,7 +153,7 @@ export declare const reviewsTable: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        order_item_id: import("drizzle-orm/pg-core").PgColumn<{
+        orderItemId: import("drizzle-orm/pg-core").PgColumn<{
             name: "order_item_id";
             tableName: "reviews";
             dataType: "string";
@@ -168,7 +170,7 @@ export declare const reviewsTable: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        product_id: import("drizzle-orm/pg-core").PgColumn<{
+        productId: import("drizzle-orm/pg-core").PgColumn<{
             name: "product_id";
             tableName: "reviews";
             dataType: "string";
@@ -185,7 +187,7 @@ export declare const reviewsTable: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        variant_id: import("drizzle-orm/pg-core").PgColumn<{
+        variantId: import("drizzle-orm/pg-core").PgColumn<{
             name: "variant_id";
             tableName: "reviews";
             dataType: "string";
@@ -253,7 +255,7 @@ export declare const reviewsTable: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        created_at: import("drizzle-orm/pg-core").PgColumn<{
+        createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "reviews";
             dataType: "date";
@@ -270,7 +272,7 @@ export declare const reviewsTable: import("drizzle-orm/pg-core").PgTableWithColu
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updated_at: import("drizzle-orm/pg-core").PgColumn<{
+        updatedAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "updated_at";
             tableName: "reviews";
             dataType: "date";
@@ -311,7 +313,7 @@ export declare const reviewMedia: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        review_id: import("drizzle-orm/pg-core").PgColumn<{
+        reviewId: import("drizzle-orm/pg-core").PgColumn<{
             name: "review_id";
             tableName: "review_media";
             dataType: "string";
@@ -362,7 +364,7 @@ export declare const reviewMedia: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        sort_order: import("drizzle-orm/pg-core").PgColumn<{
+        sortOrder: import("drizzle-orm/pg-core").PgColumn<{
             name: "sort_order";
             tableName: "review_media";
             dataType: "number";
@@ -403,7 +405,7 @@ export declare const reviewFlags: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        review_id: import("drizzle-orm/pg-core").PgColumn<{
+        reviewId: import("drizzle-orm/pg-core").PgColumn<{
             name: "review_id";
             tableName: "review_flags";
             dataType: "string";
@@ -437,7 +439,7 @@ export declare const reviewFlags: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        auto_flagged: import("drizzle-orm/pg-core").PgColumn<{
+        autoFlagged: import("drizzle-orm/pg-core").PgColumn<{
             name: "auto_flagged";
             tableName: "review_flags";
             dataType: "boolean";
@@ -454,7 +456,7 @@ export declare const reviewFlags: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        created_at: import("drizzle-orm/pg-core").PgColumn<{
+        createdAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "created_at";
             tableName: "review_flags";
             dataType: "date";
@@ -471,7 +473,7 @@ export declare const reviewFlags: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        resolved_at: import("drizzle-orm/pg-core").PgColumn<{
+        resolvedAt: import("drizzle-orm/pg-core").PgColumn<{
             name: "resolved_at";
             tableName: "review_flags";
             dataType: "date";
@@ -488,7 +490,7 @@ export declare const reviewFlags: import("drizzle-orm/pg-core").PgTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        resolved_by_admin_id: import("drizzle-orm/pg-core").PgColumn<{
+        resolvedByAdminId: import("drizzle-orm/pg-core").PgColumn<{
             name: "resolved_by_admin_id";
             tableName: "review_flags";
             dataType: "string";
@@ -508,4 +510,13 @@ export declare const reviewFlags: import("drizzle-orm/pg-core").PgTableWithColum
     };
     dialect: "pg";
 }>;
+export type ReviewRequestToken = InferSelectModel<typeof reviewRequestTokens>;
+export type NewReviewRequestToken = InferInsertModel<typeof reviewRequestTokens>;
+export type Review = InferSelectModel<typeof reviewsTable>;
+export type NewReview = InferInsertModel<typeof reviewsTable>;
+export type ReviewMedia = InferSelectModel<typeof reviewMedia>;
+export type NewReviewMedia = InferInsertModel<typeof reviewMedia>;
+export type ReviewFlag = InferSelectModel<typeof reviewFlags>;
+export type NewReviewFlag = InferInsertModel<typeof reviewFlags>;
+export { reviewsTable as reviews };
 //# sourceMappingURL=reviews.schema.d.ts.map

@@ -2,6 +2,7 @@
  * Cart schema — carts, cart_items, reservations, reservation_items
  * Mirrors packages/db/migrations/0001_initial.sql
  */
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 export declare const cartStatusEnum: import("drizzle-orm/pg-core").PgEnum<["ACTIVE", "ABANDONED", "CHECKED_OUT"]>;
 export declare const reservationStatusEnum: import("drizzle-orm/pg-core").PgEnum<["HELD", "CONSUMED", "EXPIRED"]>;
 export declare const carts: import("drizzle-orm/pg-core").PgTableWithColumns<{
@@ -84,7 +85,7 @@ export declare const carts: import("drizzle-orm/pg-core").PgTableWithColumns<{
             data: Date;
             driverParam: string;
             notNull: true;
-            hasDefault: false;
+            hasDefault: true;
             isPrimaryKey: false;
             isAutoincrement: false;
             hasRuntimeDefault: false;
@@ -491,4 +492,12 @@ export declare const reservationItems: import("drizzle-orm/pg-core").PgTableWith
     };
     dialect: "pg";
 }>;
+export type Cart = InferSelectModel<typeof carts>;
+export type NewCart = InferInsertModel<typeof carts>;
+export type CartItem = InferSelectModel<typeof cartItems>;
+export type NewCartItem = InferInsertModel<typeof cartItems>;
+export type Reservation = InferSelectModel<typeof reservations>;
+export type NewReservation = InferInsertModel<typeof reservations>;
+export type ReservationItem = InferSelectModel<typeof reservationItems>;
+export type NewReservationItem = InferInsertModel<typeof reservationItems>;
 //# sourceMappingURL=cart.schema.d.ts.map

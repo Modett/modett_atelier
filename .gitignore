@@ -1,1 +1,34 @@
-node_modules
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+apps/api/.env
+apps/web/.env.local
+
+# Keep .env.example files (they have no real secrets)
+!.env.example
+!apps/api/.env.example
+!apps/web/.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

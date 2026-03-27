@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Messaging service — preferences, queue notification (opt-in gating),
- * transactional helpers, BIS/price-drop, notify-me, inbox, admin campaigns.
- * RORO. Uses AppError for service-level validation; db layer throws MessagingError.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getMyPreferences = getMyPreferences;
 exports.updateMyPreferences = updateMyPreferences;
@@ -50,7 +45,6 @@ function isChannelAllowed({ prefs, channel, isTransactional, }) {
             return false;
     }
 }
-// —— Preferences ——
 async function getMyPreferences({ userId, }) {
     const prefs = await (0, db_1.getNotificationPreferences)({ userId });
     if (!prefs)
@@ -66,7 +60,6 @@ async function updateMyPreferences({ userId, emailOptIn, smsOptIn, whatsappOptIn
         pushOptIn,
     });
 }
-// —— Notification dispatch (used by all other modules) ——
 async function queueNotification({ userId, channel, templateKey, payloadJson, dedupeKey, isTransactional = false, inboxMessage, }) {
     const prefs = userId != null && userId !== ''
         ? await (0, db_1.getNotificationPreferences)({ userId })
@@ -95,7 +88,6 @@ async function queueNotification({ userId, channel, templateKey, payloadJson, de
     }
     return { queued: true };
 }
-// —— Transactional notification helpers ——
 async function notifyOrderReceipt({ userId, orderId, orderRef, totalAmount, currency, }) {
     await queueNotification({
         userId,
@@ -211,7 +203,6 @@ async function notifyLoyaltyTierUpgraded({ userId, newTier, previousTier, }) {
         },
     });
 }
-// —— Back-in-stock ——
 async function subscribeBackInStock({ userId, variantId, channels, }) {
     await (0, db_1.subscribeBIS)({
         userId,
@@ -240,7 +231,6 @@ async function notifyBackInStockSubscribers({ variantId, productName, variantLab
         }
     }
 }
-// —— Price-drop ——
 async function subscribePriceDrop({ userId, variantId, targetPrice, channels, }) {
     await (0, db_1.subscribePriceDrop)({
         userId,
@@ -273,14 +263,12 @@ async function notifyPriceDropSubscribers({ variantId, newPrice, currency, produ
         }
     }
 }
-// —— Notify-me demand ——
 async function recordNotifyMe({ variantId, userId, sessionId, }) {
     await (0, db_1.recordNotifyMeEvent)({ variantId, userId, sessionId });
 }
 async function getNotifyMeDemand({ limit, } = {}) {
     return (0, db_1.getNotifyMeDemand)({ limit });
 }
-// —— Inbox ——
 async function getMyInbox({ userId, page, limit, unreadOnly, }) {
     return (0, db_1.getInboxForUser)({ userId, page, limit, unreadOnly });
 }
@@ -290,7 +278,6 @@ async function markRead({ messageId, userId, }) {
 async function markAllRead({ userId }) {
     await (0, db_1.markAllInboxRead)({ userId });
 }
-// —— Admin campaigns ——
 async function adminCreateCampaign({ name, contentJson, channelsJson, audienceFilterJson, adminId, }) {
     return (0, db_1.createCampaign)({
         name,
@@ -331,4 +318,3 @@ async function adminGetCampaign({ id, }) {
         throw new errors_1.AppError('CAMPAIGN_NOT_FOUND', 404);
     return campaign;
 }
-//# sourceMappingURL=messaging.service.js.map

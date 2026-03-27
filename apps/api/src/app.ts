@@ -1,5 +1,7 @@
+import 'express-async-errors'
 import type { Express } from 'express'
 import express from 'express'
+import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import { setupSwagger } from './docs/swagger'
 import { iamRoutes } from './modules/iam'
@@ -17,8 +19,40 @@ import { messagingRoutes } from './modules/messaging'
 
 export const app: Express = express()
 
+// Railway sits behind a reverse proxy — required for correct req.ip and secure cookies
+app.set('trust proxy', 1)
+
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_WWW,
+].filter(Boolean) as string[]
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true)
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true)
+    }
+    return callback(new Error(`CORS: origin ${origin} not allowed`))
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+}))
 app.use(express.json())
 app.use(cookieParser())
+
+// Health check — Railway polls this to verify deployment
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    version: process.env.npm_package_version ?? '1.0.0',
+    env: process.env.NODE_ENV ?? 'development',
+    time: new Date().toISOString(),
+  })
+})
 
 app.use('/api', iamRoutes)
 app.use('/api', catalogRoutes)

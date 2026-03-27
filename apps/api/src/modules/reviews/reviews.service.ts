@@ -4,10 +4,7 @@
  */
 
 import crypto from 'node:crypto'
-import {
-  getOrderById,
-  getOrderItems,
-} from '@modett/db'
+import { getOrderById, getOrderItems } from '@modett/db'
 import {
   getOrderItemForReview,
   createReview as createReviewQuery,
@@ -26,6 +23,8 @@ import {
 import type { Review, RatingAggregate } from '@modett/db'
 import { AppError } from '../../lib/errors'
 import { OrderOperationError } from '@modett/db'
+import { getStorageService } from '../../infrastructure/storage'
+import { StorageError } from '../../infrastructure/storage'
 import { notifyReviewRequest } from '../messaging'
 
 function hashToken(plain: string): string {
@@ -82,6 +81,41 @@ export async function submitReview({
     throw new AppError('TOO_MANY_MEDIA', 400)
   }
 
+  return submitReviewInternal({
+    orderItem,
+    userId,
+    plainToken,
+    orderItemId,
+    rating,
+    body,
+    mediaUrls,
+  })
+}
+
+type OrderItemForReview = Awaited<ReturnType<typeof getOrderItemForReview>> extends infer R
+  ? R extends null
+    ? never
+    : R
+  : never
+
+async function submitReviewInternal({
+  orderItem,
+  userId,
+  plainToken,
+  orderItemId,
+  rating,
+  body,
+  mediaUrls,
+}: {
+  orderItem: OrderItemForReview
+  userId: string
+  plainToken: string
+  orderItemId: string
+  rating: number
+  body?: string | null
+  mediaUrls?: string[]
+}): Promise<Review> {
+  const tokenHash = hashToken(plainToken)
   try {
     return await createReviewQuery({
       userId,
@@ -100,6 +134,74 @@ export async function submitReview({
     }
     throw err
   }
+}
+
+export interface ReviewPhotoFile {
+  buffer: Buffer
+  mimetype: string
+}
+
+/** Submit review with uploaded photo files. Uploads to R2 then creates review with media URLs. */
+export async function submitReviewWithPhotos({
+  userId,
+  plainToken,
+  orderItemId,
+  rating,
+  body,
+  files,
+}: {
+  userId: string
+  plainToken: string
+  orderItemId: string
+  rating: number
+  body?: string | null
+  files: ReviewPhotoFile[]
+}): Promise<Review> {
+  if (files.length > 3) {
+    throw new AppError('TOO_MANY_MEDIA', 400)
+  }
+  const orderItem = await getOrderItemForReview({ orderItemId })
+  if (!orderItem) {
+    throw new AppError('ORDER_ITEM_NOT_FOUND', 404)
+  }
+  const order = await getOrderById({ id: orderItem.orderId })
+  if (!order) {
+    throw new AppError('REVIEW_TOKEN_INVALID', 401)
+  }
+  if (order.user_id !== userId) {
+    throw new AppError('REVIEW_TOKEN_INVALID', 401)
+  }
+  if (rating < 1 || rating > 5) {
+    throw new AppError('INVALID_RATING', 400)
+  }
+  const batchId = crypto.randomUUID()
+  const storage = getStorageService()
+  const mediaUrls: string[] = []
+  for (let i = 0; i < files.length; i++) {
+    try {
+      const result = await storage.uploadFile(
+        'reviews',
+        `${batchId}/photo-${crypto.randomUUID()}`,
+        files[i].buffer,
+        files[i].mimetype,
+      )
+      mediaUrls.push(result.url)
+    } catch (err) {
+      if (err instanceof StorageError) {
+        throw new AppError('STORAGE_ERROR', 500, err.message)
+      }
+      throw err
+    }
+  }
+  return submitReviewInternal({
+    orderItem,
+    userId,
+    plainToken,
+    orderItemId,
+    rating,
+    body,
+    mediaUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+  })
 }
 
 export async function getProductReviews({

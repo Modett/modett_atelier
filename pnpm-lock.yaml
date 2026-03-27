@@ -63,15 +63,27 @@ importers:
       dotenv:
         specifier: ^16.4.0
         version: 16.6.1
+      drizzle-orm:
+        specifier: ^0.36.4
+        version: 0.36.4(@types/pg@8.16.0)(@types/react@19.2.14)(pg@8.18.0)(react@19.2.4)
       express:
         specifier: ^4.18.2
         version: 4.22.1
       express-async-errors:
         specifier: ^3.1.1
         version: 3.1.1(express@4.22.1)
+      helmet:
+        specifier: ^8.1.0
+        version: 8.1.0
+      ioredis:
+        specifier: ^5.9.3
+        version: 5.9.3
       multer:
         specifier: ^2.1.1
         version: 2.1.1
+      pg:
+        specifier: ^8.13.0
+        version: 8.18.0
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -103,6 +115,9 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.35
+      '@types/pg':
+        specifier: ^8.11.0
+        version: 8.16.0
       '@types/sharp':
         specifier: ^0.32.0
         version: 0.32.0
@@ -112,9 +127,6 @@ importers:
       '@types/swagger-ui-express':
         specifier: ^4.1.8
         version: 4.1.8
-      drizzle-orm:
-        specifier: ^0.36.4
-        version: 0.36.4(@types/pg@8.16.0)(@types/react@19.2.14)(pg@8.18.0)(react@19.2.4)
       tsx:
         specifier: ^4.7.0
         version: 4.21.0
@@ -2983,6 +2995,10 @@ packages:
   hasown@2.0.2:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
+
+  helmet@8.1.0:
+    resolution: {integrity: sha512-jOiHyAZsmnr8LqoPGmCjYAaiuWwjAPLgY8ZX2XrmHawt99/u1y6RgrZMTeoPfpUbV96HOalYgz1qzkRbw54Pmg==}
+    engines: {node: '>=18.0.0'}
 
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
@@ -7113,6 +7129,8 @@ snapshots:
   hasown@2.0.2:
     dependencies:
       function-bind: 1.1.2
+
+  helmet@8.1.0: {}
 
   http-errors@2.0.1:
     dependencies:

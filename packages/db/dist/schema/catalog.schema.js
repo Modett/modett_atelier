@@ -1,133 +1,136 @@
+"use strict";
 /**
  * Catalog schema — categories, products, prices, images, styling guides, banners
  * Mirrors packages/db/migrations/0001_initial.sql
  * Column mapping: camelCase property → snake_case column
  */
-import { pgSchema, uuid, text, boolean, integer, timestamp, jsonb, numeric, primaryKey, check, } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
-import { admins } from './iam.schema';
-const catalog = pgSchema('catalog');
-export const stylingGuideTypeEnum = catalog.enum('styling_guide_type', [
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.banners = exports.bestsellerList = exports.productStylingGuides = exports.productRelations = exports.productPrices = exports.productImages = exports.products = exports.categories = exports.stylingGuideTypeEnum = void 0;
+const pg_core_1 = require("drizzle-orm/pg-core");
+const drizzle_orm_1 = require("drizzle-orm");
+const iam_schema_1 = require("./iam.schema");
+const catalog = (0, pg_core_1.pgSchema)('catalog');
+exports.stylingGuideTypeEnum = catalog.enum('styling_guide_type', [
     'VIDEO',
     'GALLERY',
     'TEXT',
 ]);
-export const categories = catalog.table('categories', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    name: text('name').notNull(),
-    slug: text('slug').notNull().unique('uq_categories_slug'),
-    active: boolean('active').notNull().default(true),
-    sortOrder: integer('sort_order').notNull().default(0),
-    createdAt: timestamp('created_at', { withTimezone: true })
+exports.categories = catalog.table('categories', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    name: (0, pg_core_1.text)('name').notNull(),
+    slug: (0, pg_core_1.text)('slug').notNull().unique('uq_categories_slug'),
+    active: (0, pg_core_1.boolean)('active').notNull().default(true),
+    sortOrder: (0, pg_core_1.integer)('sort_order').notNull().default(0),
+    createdAt: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-        .notNull()
-        .defaultNow(),
-});
-export const products = catalog.table('products', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    categoryId: uuid('category_id').references(() => categories.id),
-    slug: text('slug').notNull().unique('uq_products_slug'),
-    displayName: text('display_name').notNull(),
-    shortName: text('short_name').notNull(),
-    description: text('description'),
-    fabricInfo: text('fabric_info'),
-    productCode: text('product_code').notNull().unique('uq_products_product_code'),
-    active: boolean('active').notNull().default(true),
-    isSale: boolean('is_sale').notNull().default(false),
-    keyImageId: uuid('key_image_id'),
-    createdAt: timestamp('created_at', { withTimezone: true })
-        .notNull()
-        .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-        .notNull()
-        .defaultNow(),
-    deletedAt: timestamp('deleted_at', { withTimezone: true }),
-});
-export const productImages = catalog.table('product_images', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    productId: uuid('product_id')
-        .notNull()
-        .references(() => products.id, { onDelete: 'cascade' }),
-    url: text('url').notNull(),
-    altText: text('alt_text'),
-    sortOrder: integer('sort_order').notNull().default(0),
-    createdAt: timestamp('created_at', { withTimezone: true })
+    updatedAt: (0, pg_core_1.timestamp)('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });
-export const productPrices = catalog.table('product_prices', {
-    productId: uuid('product_id')
+exports.products = catalog.table('products', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    categoryId: (0, pg_core_1.uuid)('category_id').references(() => exports.categories.id),
+    slug: (0, pg_core_1.text)('slug').notNull().unique('uq_products_slug'),
+    displayName: (0, pg_core_1.text)('display_name').notNull(),
+    shortName: (0, pg_core_1.text)('short_name').notNull(),
+    description: (0, pg_core_1.text)('description'),
+    fabricInfo: (0, pg_core_1.text)('fabric_info'),
+    productCode: (0, pg_core_1.text)('product_code').notNull().unique('uq_products_product_code'),
+    active: (0, pg_core_1.boolean)('active').notNull().default(true),
+    isSale: (0, pg_core_1.boolean)('is_sale').notNull().default(false),
+    keyImageId: (0, pg_core_1.uuid)('key_image_id'),
+    createdAt: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
+        .notNull()
+        .defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)('updated_at', { withTimezone: true })
+        .notNull()
+        .defaultNow(),
+    deletedAt: (0, pg_core_1.timestamp)('deleted_at', { withTimezone: true }),
+});
+exports.productImages = catalog.table('product_images', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    productId: (0, pg_core_1.uuid)('product_id')
+        .notNull()
+        .references(() => exports.products.id, { onDelete: 'cascade' }),
+    url: (0, pg_core_1.text)('url').notNull(),
+    altText: (0, pg_core_1.text)('alt_text'),
+    sortOrder: (0, pg_core_1.integer)('sort_order').notNull().default(0),
+    createdAt: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
+        .notNull()
+        .defaultNow(),
+});
+exports.productPrices = catalog.table('product_prices', {
+    productId: (0, pg_core_1.uuid)('product_id')
         .primaryKey()
-        .references(() => products.id, { onDelete: 'cascade' }),
-    lkrAmount: numeric('lkr_amount', { precision: 12, scale: 2 }).notNull(),
-    sgdAmount: numeric('sgd_amount', { precision: 12, scale: 2 }).notNull(),
-    usdAmount: numeric('usd_amount', { precision: 12, scale: 2 }).notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
+        .references(() => exports.products.id, { onDelete: 'cascade' }),
+    lkrAmount: (0, pg_core_1.numeric)('lkr_amount', { precision: 12, scale: 2 }).notNull(),
+    sgdAmount: (0, pg_core_1.numeric)('sgd_amount', { precision: 12, scale: 2 }).notNull(),
+    usdAmount: (0, pg_core_1.numeric)('usd_amount', { precision: 12, scale: 2 }).notNull(),
+    updatedAt: (0, pg_core_1.timestamp)('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 }, (t) => [
-    check('chk_lkr_non_negative', sql `${t.lkrAmount} >= 0`),
-    check('chk_sgd_non_negative', sql `${t.sgdAmount} >= 0`),
-    check('chk_usd_non_negative', sql `${t.usdAmount} >= 0`),
+    (0, pg_core_1.check)('chk_lkr_non_negative', (0, drizzle_orm_1.sql) `${t.lkrAmount} >= 0`),
+    (0, pg_core_1.check)('chk_sgd_non_negative', (0, drizzle_orm_1.sql) `${t.sgdAmount} >= 0`),
+    (0, pg_core_1.check)('chk_usd_non_negative', (0, drizzle_orm_1.sql) `${t.usdAmount} >= 0`),
 ]);
-export const productRelations = catalog.table('product_relations', {
-    productId: uuid('product_id')
+exports.productRelations = catalog.table('product_relations', {
+    productId: (0, pg_core_1.uuid)('product_id')
         .notNull()
-        .references(() => products.id, { onDelete: 'cascade' }),
-    relatedProductId: uuid('related_product_id')
+        .references(() => exports.products.id, { onDelete: 'cascade' }),
+    relatedProductId: (0, pg_core_1.uuid)('related_product_id')
         .notNull()
-        .references(() => products.id, { onDelete: 'cascade' }),
-    relationType: text('relation_type').notNull().default('SIMILAR'),
+        .references(() => exports.products.id, { onDelete: 'cascade' }),
+    relationType: (0, pg_core_1.text)('relation_type').notNull().default('SIMILAR'),
 }, (t) => [
-    primaryKey({ columns: [t.productId, t.relatedProductId] }),
-    check('chk_no_self_relation', sql `${t.productId} <> ${t.relatedProductId}`),
+    (0, pg_core_1.primaryKey)({ columns: [t.productId, t.relatedProductId] }),
+    (0, pg_core_1.check)('chk_no_self_relation', (0, drizzle_orm_1.sql) `${t.productId} <> ${t.relatedProductId}`),
 ]);
-export const productStylingGuides = catalog.table('product_styling_guides', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    productId: uuid('product_id')
+exports.productStylingGuides = catalog.table('product_styling_guides', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    productId: (0, pg_core_1.uuid)('product_id')
         .notNull()
-        .references(() => products.id, { onDelete: 'cascade' }),
-    type: stylingGuideTypeEnum('type').notNull(),
-    linkUrl: text('link_url'),
-    contentJson: jsonb('content_json'),
-    active: boolean('active').notNull().default(true),
-    createdAt: timestamp('created_at', { withTimezone: true })
+        .references(() => exports.products.id, { onDelete: 'cascade' }),
+    type: (0, exports.stylingGuideTypeEnum)('type').notNull(),
+    linkUrl: (0, pg_core_1.text)('link_url'),
+    contentJson: (0, pg_core_1.jsonb)('content_json'),
+    active: (0, pg_core_1.boolean)('active').notNull().default(true),
+    createdAt: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
+    updatedAt: (0, pg_core_1.timestamp)('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });
-export const bestsellerList = catalog.table('bestseller_list', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    productId: uuid('product_id')
+exports.bestsellerList = catalog.table('bestseller_list', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    productId: (0, pg_core_1.uuid)('product_id')
         .notNull()
-        .references(() => products.id, { onDelete: 'cascade' })
+        .references(() => exports.products.id, { onDelete: 'cascade' })
         .unique(),
-    sortOrder: integer('sort_order').notNull().default(0),
-    addedByAdminId: uuid('added_by_admin_id').references(() => admins.id, {
+    sortOrder: (0, pg_core_1.integer)('sort_order').notNull().default(0),
+    addedByAdminId: (0, pg_core_1.uuid)('added_by_admin_id').references(() => iam_schema_1.admins.id, {
         onDelete: 'set null',
     }),
-    addedAt: timestamp('added_at', { withTimezone: true })
+    addedAt: (0, pg_core_1.timestamp)('added_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });
-export const banners = catalog.table('banners', {
-    id: uuid('id').primaryKey().defaultRandom(),
-    message: text('message').notNull(),
-    linkUrl: text('link_url'),
-    enabled: boolean('enabled').notNull().default(false),
-    startAt: timestamp('start_at', { withTimezone: true }),
-    endAt: timestamp('end_at', { withTimezone: true }),
-    createdBy: uuid('created_by').references(() => admins.id, {
+exports.banners = catalog.table('banners', {
+    id: (0, pg_core_1.uuid)('id').primaryKey().defaultRandom(),
+    message: (0, pg_core_1.text)('message').notNull(),
+    linkUrl: (0, pg_core_1.text)('link_url'),
+    enabled: (0, pg_core_1.boolean)('enabled').notNull().default(false),
+    startAt: (0, pg_core_1.timestamp)('start_at', { withTimezone: true }),
+    endAt: (0, pg_core_1.timestamp)('end_at', { withTimezone: true }),
+    createdBy: (0, pg_core_1.uuid)('created_by').references(() => iam_schema_1.admins.id, {
         onDelete: 'set null',
     }),
-    createdAt: timestamp('created_at', { withTimezone: true })
+    createdAt: (0, pg_core_1.timestamp)('created_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
+    updatedAt: (0, pg_core_1.timestamp)('updated_at', { withTimezone: true })
         .notNull()
         .defaultNow(),
 });

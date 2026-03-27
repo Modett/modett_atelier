@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Inventory service — stock holds/releases, restock, damage, adjustment,
- * reconciliation. Uses withInventoryLock for all hold/release. RORO. Throws AppError.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getVariantStock = getVariantStock;
 exports.getVariantAvailabilityForProduct = getVariantAvailabilityForProduct;
@@ -22,7 +18,6 @@ exports.getMovementHistory = getMovementHistory;
 const db_1 = require("@modett/db");
 const db_2 = require("@modett/db");
 const errors_1 = require("../../lib/errors");
-// —— Barcode generation (internal) ——
 function generateUnitIdentifiers({ variantId, sequence, }) {
     const prefix = variantId.replace(/-/g, '').slice(0, 8).toUpperCase();
     const padded = String(sequence).padStart(6, '0');
@@ -31,7 +26,6 @@ function generateUnitIdentifiers({ variantId, sequence, }) {
         unitSku: `SKU-${prefix}-${padded}`,
     };
 }
-// —— Stock read ——
 async function getVariantStock({ variantId, }) {
     const stock = await (0, db_2.getVariantStock)({ variantId });
     if (!stock)
@@ -51,7 +45,6 @@ async function getStockDetails({ variantId, }) {
     ]);
     return { availability, units, recentMovements };
 }
-// —— Restock ——
 async function restockVariant({ variantId, qty, adminId, }) {
     if (qty <= 0 || qty > 500) {
         throw new errors_1.AppError('INVALID_RESTOCK_QTY', 400);
@@ -79,7 +72,6 @@ async function restockVariant({ variantId, qty, adminId, }) {
     });
     return { restockedQty: qty, newUnits };
 }
-// —— Hold / release (for checkout module) ——
 async function holdStock({ variantId, qty, }) {
     const success = await (0, db_2.withInventoryLock)(variantId, async () => {
         return await (0, db_2.atomicHoldStock)({ variantId, qty });
@@ -92,7 +84,6 @@ async function releaseHold({ variantId, qty, }) {
         await (0, db_2.atomicReleaseHold)({ variantId, qty });
     });
 }
-// —— Damage and adjustment ——
 async function markUnitDamaged({ unitId, adminId, }) {
     const unit = await (0, db_2.getInventoryUnit)({ unitId });
     if (!unit)
@@ -159,14 +150,12 @@ async function updateLowStockThreshold({ variantId, threshold, adminId, }) {
         throw new errors_1.AppError('VARIANT_NOT_FOUND', 404);
     return stock;
 }
-// —— Barcode scan ——
 async function scanBarcode({ barcodeValue, }) {
     const unit = await (0, db_2.getInventoryUnitByBarcode)({ barcodeValue });
     if (!unit)
         throw new errors_1.AppError('BARCODE_NOT_FOUND', 404);
     return unit;
 }
-// —— Reconciliation ——
 async function runReconciliation({ variantId, adminId, }) {
     const variantIds = variantId != null
         ? [variantId]
@@ -205,11 +194,9 @@ async function markReconciliationResolved({ logId, resolvedNote, adminId, }) {
         throw new errors_1.AppError('LOG_ENTRY_NOT_FOUND', 404);
     return log;
 }
-// —— Admin list ——
 async function listUnitsForVariant({ variantId, status, }) {
     return await (0, db_2.listInventoryUnitsForVariant)({ variantId, status });
 }
 async function getMovementHistory({ variantId, limit, offset, }) {
     return await (0, db_2.listInventoryMovements)({ variantId, limit, offset });
 }
-//# sourceMappingURL=inventory.service.js.map

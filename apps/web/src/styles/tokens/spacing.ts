@@ -17,9 +17,9 @@ export const spacing = {
 export const layout = {
   containerMax:         '1280px',
   containerMaxWide:     '1440px',
-  gutterMobile:         '1.25rem',
-  gutterTablet:         '2rem',
-  gutterDesktop:        '3rem',
+  gutterMobile:         '1.25rem',   // px-5
+  gutterTablet:         '2rem',      // px-8
+  gutterDesktop:        '3rem',      // px-12
   productGapMobile:     '0.75rem',
   productGapDesktop:    '1.25rem',
   sectionPaddingMobile: '4rem',

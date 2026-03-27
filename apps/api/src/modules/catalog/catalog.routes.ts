@@ -7,6 +7,7 @@ import { Router, type Request, type Response, type IRouter } from 'express'
 import { z } from 'zod'
 import { validate } from '../../middleware/validate'
 import { requireAdmin } from '../../middleware/auth'
+import { imageUpload } from '../../infrastructure/upload/multer.config'
 import * as catalogService from './catalog.service'
 import type { AdminRequest } from '../../middleware/auth'
 
@@ -56,12 +57,15 @@ router.get('/catalog/categories', async (_req: Request, res: Response) => {
   res.status(200).json({ data: { categories } })
 })
 
+const productListSortSchema = z.enum(['newest', 'price-asc', 'price-desc'])
+
 const productsQuerySchema = z.object({
   category: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(24),
   currency: currencySchema.optional(),
   q: z.string().optional(),
+  sort: productListSortSchema.optional(),
 })
 
 /**
@@ -126,6 +130,7 @@ router.get('/catalog/products', async (req: Request, res: Response) => {
       page: query.page,
       limit: query.limit,
       currency,
+      sort: query.sort,
     })
     return res.status(200).json({ data: result })
   }
@@ -135,6 +140,7 @@ router.get('/catalog/products', async (req: Request, res: Response) => {
     page: query.page,
     limit: query.limit,
     currency,
+    sort: query.sort,
   })
   res.status(200).json({ data: result })
 })
@@ -430,19 +436,12 @@ router.delete(
   },
 )
 
-const addImageSchema = z.object({
-  url: z.string().url(),
-  altText: z.string().optional().nullable(),
-  sortOrder: z.number().int().min(0).optional().default(0),
-  setAsKey: z.boolean().optional().default(false),
-})
-
 /**
  * @swagger
  * /admin/catalog/products/{id}/images:
  *   post:
  *     tags: [Admin Catalog]
- *     summary: Register a product image URL (upload to R2 first, then call this)
+ *     summary: Upload product images (multipart, max 6)
  *     security: [{ adminCookieAuth: [] }]
  *     parameters:
  *       - in: path
@@ -450,31 +449,51 @@ const addImageSchema = z.object({
  *         required: true
  *         schema: { type: string, format: uuid }
  *     requestBody:
- *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
- *             required: [url]
  *             properties:
- *               url:       { type: string, format: uri }
- *               altText:   { type: string }
- *               sortOrder: { type: integer, default: 0 }
- *               setAsKey:  { type: boolean, default: false }
+ *               images: { type: array, items: { type: string, format: binary } }
  *     responses:
- *       201: { description: Image registered }
+ *       201: { description: Images uploaded and registered }
+ *       400: { description: No files or invalid type }
  */
 router.post(
   '/admin/catalog/products/:id/images',
   requireAdmin,
-  validate(addImageSchema),
+  (req: Request, res: Response, next: () => void) => {
+    const multerHandler = imageUpload.array('images', 6)
+    multerHandler(
+      req as unknown as Parameters<typeof multerHandler>[0],
+      res as unknown as Parameters<typeof multerHandler>[1],
+      (err: unknown) => {
+      if (err) {
+        const message = err instanceof Error ? err.message : 'Upload failed'
+        return res.status(400).json({
+          error: { code: 'UPLOAD_ERROR', message },
+        })
+      }
+      next()
+    },
+    )
+  },
   async (req: Request, res: Response) => {
-    const body = (req as { body: z.infer<typeof addImageSchema> }).body
-    const image = await catalogService.adminUploadProductImage({
+    const files = (req as Request & { files: Express.Multer.File[] }).files
+    if (!files?.length) {
+      return res.status(400).json({
+        error: { code: 'NO_FILES', message: 'At least one image is required' },
+      })
+    }
+    const images = await catalogService.adminUploadProductImagesFromFiles({
       productId: req.params.id!,
-      ...body,
+      files: files.map((f) => ({
+        buffer: f.buffer,
+        originalname: f.originalname,
+        mimetype: f.mimetype,
+      })),
     })
-    res.status(201).json({ data: { image } })
+    res.status(201).json({ data: { images } })
   },
 )
 
@@ -505,7 +524,7 @@ router.delete(
       productId: req.params.id!,
       imageId: req.params.imageId!,
     })
-    res.status(200).json({ data: { ok: true } })
+    res.status(204).send()
   },
 )
 
@@ -516,7 +535,7 @@ const setKeyImageSchema = z.object({
 /**
  * @swagger
  * /admin/catalog/products/{id}/images/key:
- *   patch:
+ *   post:
  *     tags: [Admin Catalog]
  *     summary: Set the key image for a product
  *     security: [{ adminCookieAuth: [] }]
@@ -536,6 +555,20 @@ const setKeyImageSchema = z.object({
  *     responses:
  *       200: { description: Key image updated }
  */
+router.post(
+  '/admin/catalog/products/:id/images/key',
+  requireAdmin,
+  validate(setKeyImageSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof setKeyImageSchema> }).body
+    await catalogService.adminSetKeyImage({
+      productId: req.params.id!,
+      imageId: body.imageId,
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
 router.patch(
   '/admin/catalog/products/:id/images/key',
   requireAdmin,
@@ -675,6 +708,96 @@ router.delete(
       variantId: req.params.variantId!,
     })
     res.status(200).json({ data: { ok: true } })
+  },
+)
+
+const presignedUploadUrlSchema = z.object({
+  contentType: z.string().min(1),
+  fileName: z.string().min(1),
+})
+
+/**
+ * @swagger
+ * /admin/catalog/products/{id}/styling-guides/upload-url:
+ *   post:
+ *     tags: [Admin Catalog]
+ *     summary: Get presigned URL for styling guide video upload
+ *     security: [{ adminCookieAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [contentType, fileName]
+ *             properties:
+ *               contentType: { type: string, example: video/mp4 }
+ *               fileName: { type: string, example: lookbook.mp4 }
+ *     responses:
+ *       200: { description: Presigned URL and key }
+ */
+router.post(
+  '/admin/catalog/products/:id/styling-guides/upload-url',
+  requireAdmin,
+  validate(presignedUploadUrlSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof presignedUploadUrlSchema> }).body
+    const result = await catalogService.adminGetPresignedStylingGuideUploadUrl({
+      productId: req.params.id!,
+      contentType: body.contentType,
+      fileName: body.fileName,
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+const confirmStylingGuideSchema = z.object({
+  key: z.string().min(1),
+  type: z.literal('VIDEO'),
+  linkUrl: z.string().url().optional().nullable(),
+})
+
+/**
+ * @swagger
+ * /admin/catalog/products/{id}/styling-guides:
+ *   post:
+ *     tags: [Admin Catalog]
+ *     summary: Confirm styling guide video upload and save record
+ *     security: [{ adminCookieAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [key, type]
+ *             properties:
+ *               key: { type: string }
+ *               type: { type: string, enum: [VIDEO] }
+ *               linkUrl: { type: string, format: uri }
+ *     responses:
+ *       200: { description: Styling guide saved }
+ */
+router.post(
+  '/admin/catalog/products/:id/styling-guides',
+  requireAdmin,
+  validate(confirmStylingGuideSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof confirmStylingGuideSchema> }).body
+    const stylingGuide = await catalogService.adminConfirmStylingGuideVideo({
+      productId: req.params.id!,
+      key: body.key,
+      linkUrl: body.linkUrl ?? undefined,
+    })
+    res.status(200).json({ data: { stylingGuide } })
   },
 )
 

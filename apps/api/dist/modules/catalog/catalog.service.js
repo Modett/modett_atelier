@@ -1,8 +1,37 @@
 "use strict";
-/**
- * Catalog service — business logic, validation, currency resolution.
- * RORO. Uses query functions from @modett/db. Throws AppError for expected failures.
- */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCategories = getCategories;
 exports.getProductListing = getProductListing;
@@ -16,6 +45,9 @@ exports.adminUpdateProduct = adminUpdateProduct;
 exports.adminDeleteProduct = adminDeleteProduct;
 exports.adminUploadProductImage = adminUploadProductImage;
 exports.adminDeleteProductImage = adminDeleteProductImage;
+exports.adminUploadProductImagesFromFiles = adminUploadProductImagesFromFiles;
+exports.adminGetPresignedStylingGuideUploadUrl = adminGetPresignedStylingGuideUploadUrl;
+exports.adminConfirmStylingGuideVideo = adminConfirmStylingGuideVideo;
 exports.adminSetKeyImage = adminSetKeyImage;
 exports.adminReorderImages = adminReorderImages;
 exports.adminCreateVariant = adminCreateVariant;
@@ -32,6 +64,8 @@ exports.adminEnableBanner = adminEnableBanner;
 exports.adminDisableBanner = adminDisableBanner;
 const errors_1 = require("../../lib/errors");
 const db_1 = require("@modett/db");
+const storage_1 = require("../../infrastructure/storage");
+const storage_2 = require("../../infrastructure/storage");
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function resolvePriceForCurrency({ lkrAmount, sgdAmount, usdAmount, currency, }) {
     const amount = currency === 'LKR'
@@ -58,18 +92,25 @@ function rowToProductListItem(row, currency) {
             currency,
         }),
         stockStatus: row.stockStatus,
+        variants: (row.variants ?? []).map((v) => ({
+            variantId: v.variantId,
+            color: v.color,
+            size: v.size,
+            availableQty: v.availableQty,
+            stockStatus: v.stockStatus,
+        })),
     };
 }
-// —— Storefront ——
 async function getCategories() {
     return (0, db_1.listCategories)();
 }
-async function getProductListing({ categorySlug, page = 1, limit = 24, currency = 'LKR', }) {
+async function getProductListing({ categorySlug, page = 1, limit = 24, currency = 'LKR', sort, }) {
     const { products, total } = await (0, db_1.listProducts)({
         categorySlug,
         page,
         limit,
         currency,
+        sort,
     });
     const totalPages = Math.ceil(total / limit) || 1;
     return {
@@ -80,7 +121,7 @@ async function getProductListing({ categorySlug, page = 1, limit = 24, currency 
         totalPages,
     };
 }
-async function searchProducts({ query, page = 1, limit = 24, currency = 'LKR', }) {
+async function searchProducts({ query, page = 1, limit = 24, currency = 'LKR', sort, }) {
     if (!query || query.trim().length < 2) {
         throw new errors_1.AppError('QUERY_TOO_SHORT', 400);
     }
@@ -89,6 +130,7 @@ async function searchProducts({ query, page = 1, limit = 24, currency = 'LKR', }
         page,
         limit,
         currency,
+        sort,
     });
     const totalPages = Math.ceil(total / limit) || 1;
     return {
@@ -146,7 +188,6 @@ async function getHomepage({ currency = 'LKR', }) {
     const featuredProducts = featuredRows.map((r) => rowToProductListItem(r, currency));
     return { featuredProducts, banner };
 }
-// —— Admin ——
 async function adminGetAllProducts({ page = 1, limit = 50, includeInactive = false, }) {
     const { products, total } = await (0, db_1.listAllProducts)({
         page,
@@ -248,7 +289,118 @@ async function adminUploadProductImage({ productId, url, altText, sortOrder = 0,
     return image;
 }
 async function adminDeleteProductImage({ imageId, productId, }) {
+    const product = await (0, db_1.getProductById)({ id: productId });
+    if (!product)
+        throw new errors_1.AppError('PRODUCT_NOT_FOUND', 404);
+    const image = product.images.find((img) => img.id === imageId);
+    if (!image)
+        throw new errors_1.AppError('IMAGE_NOT_FOUND', 404);
+    const storage = (0, storage_1.getStorageService)();
+    try {
+        const pathname = new URL(image.url).pathname;
+        const prefix = pathname.startsWith('/') ? pathname.slice(1) : pathname;
+        await storage.deleteByPrefix(prefix);
+    }
+    catch (err) {
+        if (err instanceof storage_2.StorageError) {
+            throw new errors_1.AppError('STORAGE_ERROR', 500, err.message);
+        }
+        throw err;
+    }
     await (0, db_1.deleteProductImage)({ id: imageId, productId });
+    if (product.keyImageId === imageId) {
+        const remaining = product.images.filter((img) => img.id !== imageId);
+        if (remaining.length > 0) {
+            await (0, db_1.setKeyImage)({ productId, imageId: remaining[0].id });
+        }
+        else {
+            await (0, db_1.updateProduct)({ id: productId, data: { keyImageId: null } });
+        }
+    }
+}
+async function adminUploadProductImagesFromFiles({ productId, files, }) {
+    if (files.length === 0)
+        throw new errors_1.AppError('NO_FILES', 400);
+    if (files.length > 6)
+        throw new errors_1.AppError('TOO_MANY_FILES', 400);
+    const product = await (0, db_1.getProductById)({ id: productId });
+    if (!product)
+        throw new errors_1.AppError('PRODUCT_NOT_FOUND', 404);
+    const storage = (0, storage_1.getStorageService)();
+    const nextSortOrder = product.images.length > 0
+        ? Math.max(...product.images.map((i) => i.sortOrder)) + 1
+        : 0;
+    const created = [];
+    let sortOrder = nextSortOrder;
+    for (const file of files) {
+        let variants;
+        try {
+            variants = await storage.uploadProductImage(product.slug, file.buffer, file.originalname, sortOrder);
+        }
+        catch (err) {
+            if (err instanceof storage_2.StorageError) {
+                throw new errors_1.AppError('STORAGE_ERROR', 500, err.message);
+            }
+            throw err;
+        }
+        const baseUrl = variants.full.url.replace(/-full\.webp$/, '');
+        const altText = `${product.displayName} - Image ${sortOrder + 1}`;
+        const image = await (0, db_1.createProductImage)({
+            productId,
+            url: baseUrl,
+            altText,
+            sortOrder,
+        });
+        if (sortOrder === nextSortOrder && product.images.length === 0) {
+            await (0, db_1.setKeyImage)({ productId, imageId: image.id });
+        }
+        created.push(image);
+        sortOrder += 1;
+    }
+    return created;
+}
+async function adminGetPresignedStylingGuideUploadUrl({ productId, contentType, fileName, }) {
+    const product = await (0, db_1.getProductById)({ id: productId });
+    if (!product)
+        throw new errors_1.AppError('PRODUCT_NOT_FOUND', 404);
+    const { randomUUID } = await Promise.resolve().then(() => __importStar(require('node:crypto')));
+    const ext = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.')) : '.mp4';
+    const subPath = `${product.slug}/video-${randomUUID()}${ext}`;
+    const storage = (0, storage_1.getStorageService)();
+    try {
+        return storage.getPresignedUploadUrl('styling-guides', subPath, contentType);
+    }
+    catch (err) {
+        if (err instanceof storage_2.StorageError) {
+            throw new errors_1.AppError('STORAGE_ERROR', 500, err.message);
+        }
+        throw err;
+    }
+}
+async function adminConfirmStylingGuideVideo({ productId, key, linkUrl: providedLinkUrl, }) {
+    const product = await (0, db_1.getProductById)({ id: productId });
+    if (!product)
+        throw new errors_1.AppError('PRODUCT_NOT_FOUND', 404);
+    const storage = (0, storage_1.getStorageService)();
+    let exists;
+    try {
+        exists = await storage.objectExists(key);
+    }
+    catch (err) {
+        if (err instanceof storage_2.StorageError) {
+            throw new errors_1.AppError('STORAGE_ERROR', 500, err.message);
+        }
+        throw err;
+    }
+    if (!exists)
+        throw new errors_1.AppError('STYLING_GUIDE_VIDEO_NOT_FOUND', 404);
+    const linkUrl = providedLinkUrl ?? storage.getPublicUrl(key);
+    return (0, db_1.upsertStylingGuide)({
+        productId,
+        type: 'VIDEO',
+        linkUrl,
+        active: true,
+    });
 }
 async function adminSetKeyImage({ productId, imageId, }) {
     const product = await (0, db_1.getProductById)({ id: productId });
@@ -330,4 +482,3 @@ async function adminDisableBanner({ id, }) {
         throw new errors_1.AppError('BANNER_NOT_FOUND', 404);
     return banner;
 }
-//# sourceMappingURL=catalog.service.js.map

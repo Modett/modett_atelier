@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Checkout route handlers — start, address, contact, shipping, payment-intent, confirmation.
- * optionalAuth + resolveCheckoutIdentity on all routes. Success: { data: T }.
- * No try/catch — errors propagate to global handler.
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -67,7 +62,6 @@ const checkoutStartBodySchema = zod_1.z.object({
     currency: zod_1.z.enum(['LKR', 'SGD', 'USD']),
     guestEmail: zod_1.z.string().email().optional(),
 });
-// POST /checkout/start
 router.post('/checkout/start', auth_1.optionalAuth, resolveCheckoutIdentity, rateLimit_1.rateLimitCheckoutStart, (0, validate_1.validate)(checkoutStartBodySchema), async (req, res) => {
     const r = req;
     const body = req.body;
@@ -93,7 +87,6 @@ const addressBodySchema = zod_1.z.object({
     addressJson: zod_1.z.object({}).passthrough(),
     countryCode: zod_1.z.string().length(2),
 });
-// POST /checkout/:orderId/address
 router.post('/checkout/:orderId/address', auth_1.optionalAuth, resolveCheckoutIdentity, validateOrderIdParam, (0, validate_1.validate)(addressBodySchema), async (req, res) => {
     const orderId = req.params.orderId;
     const body = req.body;
@@ -117,7 +110,6 @@ const contactBodySchema = zod_1.z.object({
     })
         .optional(),
 });
-// POST /checkout/:orderId/contact
 router.post('/checkout/:orderId/contact', auth_1.optionalAuth, resolveCheckoutIdentity, validateOrderIdParam, (0, validate_1.validate)(contactBodySchema), async (req, res) => {
     const orderId = req.params.orderId;
     const body = req.body;
@@ -134,7 +126,6 @@ const shippingMethodsQuerySchema = zod_1.z.object({
     countryCode: zod_1.z.string().length(2),
     currency: zod_1.z.enum(['LKR', 'SGD', 'USD']).default('LKR'),
 });
-// GET /checkout/shipping-methods
 router.get('/checkout/shipping-methods', auth_1.optionalAuth, resolveCheckoutIdentity, (0, validate_1.validateQuery)(shippingMethodsQuerySchema), async (req, res) => {
     const query = req.validatedQuery;
     const methods = await checkoutService.getShippingMethods({
@@ -147,7 +138,6 @@ const shippingMethodBodySchema = zod_1.z.object({
     shippingMethodId: zod_1.z.string().uuid(),
     currency: zod_1.z.enum(['LKR', 'SGD', 'USD']),
 });
-// POST /checkout/:orderId/shipping-method
 router.post('/checkout/:orderId/shipping-method', auth_1.optionalAuth, resolveCheckoutIdentity, validateOrderIdParam, (0, validate_1.validate)(shippingMethodBodySchema), async (req, res) => {
     const orderId = req.params.orderId;
     const body = req.body;
@@ -158,15 +148,9 @@ router.post('/checkout/:orderId/shipping-method', auth_1.optionalAuth, resolveCh
     });
     res.status(200).json({ data: { order: result } });
 });
-// When the Payments module is built, this route will be extended to:
-// 1. Create a Stripe PaymentIntent via Stripe SDK
-// 2. Return { clientSecret } for the frontend Stripe Elements widget
-// The stampPaymentSubmitted call (grace window) stays here — it must
-// happen at the moment the customer submits payment, not in the webhook.
 const paymentIntentBodySchema = zod_1.z.object({
     reservationId: zod_1.z.string().uuid(),
 });
-// POST /checkout/:orderId/payment-intent
 router.post('/checkout/:orderId/payment-intent', auth_1.optionalAuth, resolveCheckoutIdentity, rateLimit_1.rateLimitPaymentIntent, validateOrderIdParam, (0, validate_1.validate)(paymentIntentBodySchema), async (req, res) => {
     const orderId = req.params.orderId;
     const body = req.body;
@@ -188,7 +172,6 @@ router.post('/checkout/:orderId/payment-intent', auth_1.optionalAuth, resolveChe
 const confirmationQuerySchema = zod_1.z.object({
     guestEmail: zod_1.z.string().email().optional(),
 });
-// GET /checkout/:orderId/confirmation
 router.get('/checkout/:orderId/confirmation', auth_1.optionalAuth, resolveCheckoutIdentity, validateOrderIdParam, (0, validate_1.validateQuery)(confirmationQuerySchema), async (req, res) => {
     const orderId = req.params.orderId;
     const query = req.validatedQuery;
@@ -200,4 +183,3 @@ router.get('/checkout/:orderId/confirmation', auth_1.optionalAuth, resolveChecko
     res.status(200).json({ data: result });
 });
 exports.checkoutRoutes = router;
-//# sourceMappingURL=checkout.routes.js.map

@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Payments route handlers — session, webhook, status.
- * Success: { data: T }. Webhook returns { Status: 200 } for PAYable.
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -48,29 +44,25 @@ const sessionBodySchema = zod_1.z.object({
     orderId: zod_1.z.string().uuid(),
     reservationId: zod_1.z.string().uuid(),
     cartId: zod_1.z.string().uuid(),
-    amount: zod_1.z.string(),
     currency: zod_1.z.enum(['LKR', 'SGD', 'USD']),
     customerFirstName: zod_1.z.string().min(1),
     customerLastName: zod_1.z.string().min(1),
     customerEmail: zod_1.z.string().email(),
-    customerMobilePhone: zod_1.z.string().min(7).max(20),
+    customerMobilePhone: zod_1.z.string().min(7).max(15),
     billingAddress: zod_1.z.object({
-        street: zod_1.z.string(),
-        city: zod_1.z.string(),
-        province: zod_1.z.string(),
-        country: zod_1.z.string().length(3),
-        postcode: zod_1.z.string(),
+        street: zod_1.z.string().min(1),
+        city: zod_1.z.string().min(1),
+        province: zod_1.z.string().default(''),
+        country: zod_1.z.string().min(2).max(3),
+        postcode: zod_1.z.string().default(''),
     }),
 });
-// POST /payments/session
 router.post('/payments/session', auth_1.optionalAuth, (0, validate_1.validate)(sessionBodySchema), async (req, res) => {
-    const body = req
-        .body;
+    const body = req.body;
     const result = await paymentsService.createPaymentSession({
         orderId: body.orderId,
         reservationId: body.reservationId,
         cartId: body.cartId,
-        amount: body.amount,
         currency: body.currency,
         customerFirstName: body.customerFirstName,
         customerLastName: body.customerLastName,
@@ -80,15 +72,23 @@ router.post('/payments/session', auth_1.optionalAuth, (0, validate_1.validate)(s
     });
     res.status(200).json({ data: result });
 });
-// POST /payments/webhook — no auth; PAYable sends JSON body
 router.post('/payments/webhook', async (req, res) => {
-    await paymentsService.handleWebhook({ payload: req.body });
+    try {
+        await paymentsService.handleWebhook({ payload: req.body });
+    }
+    catch (err) {
+        const code = err?.code;
+        const statusCode = err?.statusCode;
+        if (code === 'WEBHOOK_INVALID_CHECKVALUE' || statusCode === 400) {
+            return res.status(400).send();
+        }
+        console.error('[webhook] Unhandled error:', err);
+    }
     res.status(200).json({ Status: 200 });
 });
 const statusQuerySchema = zod_1.z.object({
     guestEmail: zod_1.z.string().email().optional(),
 });
-// GET /payments/status/:orderId
 router.get('/payments/status/:orderId', auth_1.optionalAuth, (0, validate_1.validateQuery)(statusQuerySchema), async (req, res) => {
     const orderId = req.params.orderId;
     const query = req
@@ -102,4 +102,3 @@ router.get('/payments/status/:orderId', auth_1.optionalAuth, (0, validate_1.vali
     res.status(200).json({ data: result });
 });
 exports.paymentsRoutes = router;
-//# sourceMappingURL=payments.routes.js.map

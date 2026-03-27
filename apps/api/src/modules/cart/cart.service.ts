@@ -149,11 +149,13 @@ export async function addToCart({
   sessionId,
   variantId,
   qty,
+  currency = 'LKR',
 }: {
   userId?: string
   sessionId: string
   variantId: string
   qty: number
+  currency?: CurrencyCode
 }): Promise<GetCartResult> {
   if (!Number.isInteger(qty) || qty < 1 || qty > 10) {
     throw new AppError('VALIDATION_ERROR', 400, 'qty must be 1–10')
@@ -176,11 +178,7 @@ export async function addToCart({
   }
 
   await upsertCartItem({ cartId: cart.id, variantId, qty: newQty })
-  return getCart({
-    userId,
-    sessionId,
-    currency: 'LKR',
-  })
+  return getCart({ userId, sessionId, currency })
 }
 
 export async function updateCartItemQty({
@@ -188,11 +186,13 @@ export async function updateCartItemQty({
   sessionId,
   variantId,
   qty,
+  currency = 'LKR',
 }: {
   userId?: string
   sessionId: string
   variantId: string
   qty: number
+  currency?: CurrencyCode
 }): Promise<GetCartResult> {
   if (!Number.isInteger(qty) || qty < 1 || qty > 10) {
     throw new AppError('VALIDATION_ERROR', 400, 'qty must be 1–10')
@@ -208,45 +208,37 @@ export async function updateCartItemQty({
   }
 
   await upsertCartItem({ cartId: cart.id, variantId, qty })
-  return getCart({
-    userId,
-    sessionId,
-    currency: 'LKR',
-  })
+  return getCart({ userId, sessionId, currency })
 }
 
 export async function removeFromCart({
   userId,
   sessionId,
   variantId,
+  currency = 'LKR',
 }: {
   userId?: string
   sessionId: string
   variantId: string
+  currency?: CurrencyCode
 }): Promise<GetCartResult> {
   const cart = await resolveCart({ userId, sessionId })
   await removeCartItem({ cartId: cart.id, variantId })
-  return getCart({
-    userId,
-    sessionId,
-    currency: 'LKR',
-  })
+  return getCart({ userId, sessionId, currency })
 }
 
 export async function clearCart({
   userId,
   sessionId,
+  currency = 'LKR',
 }: {
   userId?: string
   sessionId: string
+  currency?: CurrencyCode
 }): Promise<GetCartResult> {
   const cart = await resolveCart({ userId, sessionId })
   await clearCartItems({ cartId: cart.id })
-  return getCart({
-    userId,
-    sessionId,
-    currency: 'LKR',
-  })
+  return getCart({ userId, sessionId, currency })
 }
 
 export async function mergeCartsOnLogin({

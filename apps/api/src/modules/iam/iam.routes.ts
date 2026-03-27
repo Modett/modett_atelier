@@ -5,8 +5,9 @@
 
 import { Router, type Request, type Response, type IRouter } from 'express'
 import { z } from 'zod'
-import { validate } from '../../middleware/validate'
+import { validate, validateQuery } from '../../middleware/validate'
 import {
+  rateLimit,
   rateLimitSignup,
   rateLimitAuth,
   rateLimitAdminAuth,
@@ -38,6 +39,28 @@ type AdminRequest = Request & {
   admin?: { id: string; role: string }
   sessionId?: string
 }
+
+// —— Check email (checkout flow) ——
+
+const checkEmailQuerySchema = z.object({
+  email: z.string().email(),
+})
+
+router.get(
+  '/auth/check-email',
+  rateLimit({
+    name: 'auth-check-email',
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    key: (req) => req.ip ?? 'unknown',
+  }),
+  validateQuery(checkEmailQuerySchema),
+  async (req: Request, res: Response) => {
+    const query = (req as Request & { validatedQuery: z.infer<typeof checkEmailQuerySchema> }).validatedQuery
+    const exists = await iamService.checkEmailExists({ email: query.email })
+    res.status(200).json({ data: { exists } })
+  },
+)
 
 // —— Customer auth ——
 

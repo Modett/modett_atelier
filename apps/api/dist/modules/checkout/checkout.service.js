@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Checkout service — start checkout, address/contact/shipping, payment initiation,
- * confirmation. RORO. Uses Decimal.js for all money. Throws AppError.
- */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -142,6 +138,7 @@ async function startCheckout({ userId, sessionId, currency, guestEmail, }) {
         expiresAt: reservation.expires_at,
         currency,
         summary: {
+            cartId: cart.id,
             subtotal: subtotal.toFixed(2),
             taxAmount: taxAmount.toFixed(2),
             total: total.toFixed(2),
@@ -149,7 +146,6 @@ async function startCheckout({ userId, sessionId, currency, guestEmail, }) {
         },
     };
 }
-// —— saveAddress ——
 async function saveAddress({ orderId, kind, addressJson, countryCode, }) {
     const order = await (0, db_1.getOrderById)({ id: orderId });
     if (!order)
@@ -167,7 +163,6 @@ async function saveAddress({ orderId, kind, addressJson, countryCode, }) {
         throw new errors_1.AppError('ORDER_NOT_FOUND', 404);
     return details;
 }
-// —— saveContact ——
 async function saveContact({ orderId, primaryPhone, extraPhones, isGift, giftReceiver, }) {
     const order = await (0, db_1.getOrderById)({ id: orderId });
     if (!order)
@@ -203,7 +198,6 @@ async function saveContact({ orderId, primaryPhone, extraPhones, isGift, giftRec
 async function getShippingMethods({ countryCode, currency, }) {
     return (0, shipping_1.getMethodsForCheckout)({ countryCode, currency });
 }
-// —— selectShippingMethod ——
 async function selectShippingMethod({ orderId, shippingMethodId, currency, }) {
     const order = await (0, db_1.getOrderById)({ id: orderId });
     if (!order)
@@ -285,7 +279,6 @@ async function initiatePayment({ orderId, reservationId, }) {
         stripeReady: true,
     };
 }
-// —— getOrderConfirmation ——
 async function getOrderConfirmation({ orderId, userId, guestEmail, }) {
     const details = await (0, db_1.getOrderWithDetails)({ id: orderId });
     if (!details)
@@ -307,4 +300,3 @@ async function getOrderConfirmation({ orderId, userId, guestEmail, }) {
     }
     return details;
 }
-//# sourceMappingURL=checkout.service.js.map

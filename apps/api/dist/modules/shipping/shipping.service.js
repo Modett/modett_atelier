@@ -1,8 +1,4 @@
 "use strict";
-/**
- * Shipping service — rate resolution, storefront methods, admin CRUD. RORO.
- * Uses Decimal.js for money. Throws AppError. Exports used by Checkout module.
- */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -23,10 +19,13 @@ exports.adminUpdateMethod = adminUpdateMethod;
 exports.adminActivateMethod = adminActivateMethod;
 exports.adminDeactivateMethod = adminDeactivateMethod;
 exports.adminDeleteMethod = adminDeleteMethod;
+exports.resolveShippingCostWithThreshold = resolveShippingCostWithThreshold;
+exports.getShippingEstimate = getShippingEstimate;
+exports.adminGetShippingSettings = adminGetShippingSettings;
+exports.adminUpdateShippingSettings = adminUpdateShippingSettings;
 const decimal_js_1 = __importDefault(require("decimal.js"));
 const errors_1 = require("../../lib/errors");
 const db_1 = require("@modett/db");
-// —— Rate resolution (exported for Checkout module) ——
 function resolveShippingCost({ method, currency, }) {
     if (method.rate_type === 'FREE') {
         return { amount: '0.00', currency };
@@ -46,19 +45,39 @@ function resolveShippingCost({ method, currency, }) {
     }
     return null;
 }
-async function getMethodsForCheckout({ countryCode, currency, }) {
+async function getMethodsForCheckout({ countryCode, currency, subtotal, }) {
+    if (!subtotal) {
+        const methods = await (0, db_1.getMethodsForCountry)({ countryCode });
+        return methods.map((method) => {
+            const cost = resolveShippingCost({ method, currency });
+            return {
+                id: method.id,
+                name: method.name,
+                carrier: method.carrier ?? null,
+                estimatedDays: method.estimated_days ?? null,
+                rateType: method.rate_type,
+                cost,
+            };
+        });
+    }
+    const settings = await (0, db_1.getShippingSettings)();
     const methods = await (0, db_1.getMethodsForCountry)({ countryCode });
-    return methods.map((method) => {
-        const cost = resolveShippingCost({ method, currency });
+    return Promise.all(methods.map(async (method) => {
+        const resolved = await resolveShippingCostWithThreshold({
+            method,
+            currency,
+            subtotal,
+            settings,
+        });
         return {
             id: method.id,
             name: method.name,
             carrier: method.carrier ?? null,
             estimatedDays: method.estimated_days ?? null,
             rateType: method.rate_type,
-            cost,
+            cost: resolved,
         };
-    });
+    }));
 }
 async function getMethodForOrder({ methodId, currency, }) {
     const method = await (0, db_1.getActiveMethodById)({ id: methodId });
@@ -134,7 +153,6 @@ async function adminDeleteZone({ id }) {
 async function adminGetMethodsForZone({ zoneId, includeInactive = false, }) {
     return (0, db_1.getMethodsForZone)({ zoneId, includeInactive });
 }
-// —— Admin methods ——
 async function adminCreateMethod({ zoneId, name, carrier, rateType, flatRateLkr, flatRateSgd, flatRateUsd, estimatedDays, }) {
     const zone = await (0, db_1.getZoneById)({ id: zoneId });
     if (!zone)
@@ -209,4 +227,121 @@ async function adminDeactivateMethod({ id, }) {
 async function adminDeleteMethod({ id }) {
     await (0, db_1.deleteMethod)({ id });
 }
-//# sourceMappingURL=shipping.service.js.map
+async function resolveShippingCostWithThreshold({ method, currency, subtotal, settings, }) {
+    const rawCost = resolveShippingCost({ method, currency });
+    const label = settings?.freeShippingLabel ?? 'Free Shipping';
+    if (method.rate_type === 'FREE') {
+        return {
+            amount: '0.00',
+            currency,
+            isFree: true,
+            originalAmount: null,
+            label,
+        };
+    }
+    if (!subtotal || !rawCost) {
+        return {
+            amount: rawCost?.amount ?? '0.00',
+            currency,
+            isFree: false,
+            originalAmount: null,
+            label,
+        };
+    }
+    const threshold = settings
+        ? (currency === 'LKR'
+            ? settings.freeThresholdLkr
+            : currency === 'SGD'
+                ? settings.freeThresholdSgd
+                : settings.freeThresholdUsd)
+        : null;
+    if (threshold !== null && threshold !== undefined) {
+        const subtotalDecimal = new decimal_js_1.default(subtotal);
+        const thresholdDecimal = new decimal_js_1.default(threshold);
+        if (subtotalDecimal.greaterThanOrEqualTo(thresholdDecimal)) {
+            return {
+                amount: '0.00',
+                currency,
+                isFree: true,
+                originalAmount: rawCost.amount,
+                label,
+            };
+        }
+    }
+    return {
+        amount: rawCost.amount,
+        currency,
+        isFree: false,
+        originalAmount: null,
+        label,
+    };
+}
+async function getShippingEstimate({ countryCode, currency, subtotal, }) {
+    const settings = await (0, db_1.getShippingSettings)();
+    const methods = await (0, db_1.getMethodsForCountry)({ countryCode });
+    if (methods.length === 0) {
+        return {
+            available: false,
+            methods: [],
+            thresholdAmount: null,
+            thresholdCurrency: currency,
+            freeShippingLabel: settings?.freeShippingLabel ?? 'Free Shipping',
+            amountUntilFree: null,
+        };
+    }
+    const resolvedMethods = await Promise.all(methods.map(async (method) => {
+        const resolved = await resolveShippingCostWithThreshold({
+            method,
+            currency,
+            subtotal,
+            settings,
+        });
+        return {
+            id: method.id,
+            name: method.name,
+            carrier: method.carrier ?? null,
+            estimatedDays: method.estimated_days ?? null,
+            rateType: method.rate_type,
+            cost: resolved,
+        };
+    }));
+    const threshold = settings
+        ? (currency === 'LKR'
+            ? settings.freeThresholdLkr
+            : currency === 'SGD'
+                ? settings.freeThresholdSgd
+                : settings.freeThresholdUsd)
+        : null;
+    const anyFree = resolvedMethods.some((m) => m.cost.isFree);
+    return {
+        available: true,
+        methods: resolvedMethods,
+        thresholdAmount: threshold ? String(threshold) : null,
+        thresholdCurrency: currency,
+        freeShippingLabel: settings?.freeShippingLabel ?? 'Free Shipping',
+        amountUntilFree: threshold && !anyFree
+            ? new decimal_js_1.default(threshold).minus(subtotal).toFixed(2)
+            : null,
+    };
+}
+async function adminGetShippingSettings() {
+    return (0, db_1.getShippingSettings)();
+}
+async function adminUpdateShippingSettings({ freeThresholdLkr, freeThresholdSgd, freeThresholdUsd, freeShippingLabel, adminId, }) {
+    if (freeThresholdLkr !== null && freeThresholdLkr !== undefined && freeThresholdLkr < 0) {
+        throw new errors_1.AppError('INVALID_THRESHOLD', 400);
+    }
+    if (freeThresholdSgd !== null && freeThresholdSgd !== undefined && freeThresholdSgd < 0) {
+        throw new errors_1.AppError('INVALID_THRESHOLD', 400);
+    }
+    if (freeThresholdUsd !== null && freeThresholdUsd !== undefined && freeThresholdUsd < 0) {
+        throw new errors_1.AppError('INVALID_THRESHOLD', 400);
+    }
+    return (0, db_1.updateShippingSettings)({
+        freeThresholdLkr,
+        freeThresholdSgd,
+        freeThresholdUsd,
+        freeShippingLabel,
+        adminId,
+    });
+}

@@ -48,6 +48,18 @@ function sanitiseUser(user: User): SanitisedUser {
   return rest
 }
 
+// —— Check email (checkout flow) ——
+
+export async function checkEmailExists({
+  email,
+}: {
+  email: string
+}): Promise<boolean> {
+  const normalisedEmail = email.toLowerCase().trim()
+  const user = await getUserByEmail({ email: normalisedEmail })
+  return user !== null && user !== undefined
+}
+
 // —— Signup / Login / Logout ——
 
 export async function signup({

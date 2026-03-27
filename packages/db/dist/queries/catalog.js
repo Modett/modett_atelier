@@ -1,29 +1,62 @@
+"use strict";
 /**
  * Catalog query functions — categories, products (view + tables), images, styling guides, bestsellers, banners.
  * No business logic. RORO. Return null for not-found. Use views where specified.
  */
-import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm';
-import { db } from '../client';
-import { categories, products, productPrices, productImages, productStylingGuides, bestsellerList, banners, } from '../schema/catalog.schema';
-import { productVariants, variantStock } from '../schema/inventory.schema';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.listCategories = listCategories;
+exports.getCategoryBySlug = getCategoryBySlug;
+exports.listProducts = listProducts;
+exports.searchProducts = searchProducts;
+exports.getFeaturedProducts = getFeaturedProducts;
+exports.getProductBySlug = getProductBySlug;
+exports.getVariantsWithStock = getVariantsWithStock;
+exports.getRelatedProducts = getRelatedProducts;
+exports.getActiveStylingGuide = getActiveStylingGuide;
+exports.getActiveBanner = getActiveBanner;
+exports.getProductById = getProductById;
+exports.listAllProducts = listAllProducts;
+exports.createProduct = createProduct;
+exports.updateProduct = updateProduct;
+exports.softDeleteProduct = softDeleteProduct;
+exports.createProductImage = createProductImage;
+exports.deleteProductImage = deleteProductImage;
+exports.setKeyImage = setKeyImage;
+exports.reorderImages = reorderImages;
+exports.createVariant = createVariant;
+exports.softDeleteVariant = softDeleteVariant;
+exports.upsertStylingGuide = upsertStylingGuide;
+exports.getBestsellerList = getBestsellerList;
+exports.addToBestsellerList = addToBestsellerList;
+exports.removeFromBestsellerList = removeFromBestsellerList;
+exports.reorderBestsellerList = reorderBestsellerList;
+exports.listBanners = listBanners;
+exports.createBanner = createBanner;
+exports.updateBanner = updateBanner;
+exports.enableBanner = enableBanner;
+exports.disableBanner = disableBanner;
+const drizzle_orm_1 = require("drizzle-orm");
+const client_1 = require("../client");
+const catalog_schema_1 = require("../schema/catalog.schema");
+const inventory_schema_1 = require("../schema/inventory.schema");
 // —— Category queries ——
-export async function listCategories() {
-    const rows = await db
+async function listCategories() {
+    const rows = await client_1.db
         .select()
-        .from(categories)
-        .where(eq(categories.active, true))
-        .orderBy(asc(categories.sortOrder), asc(categories.name));
+        .from(catalog_schema_1.categories)
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.categories.active, true))
+        .orderBy((0, drizzle_orm_1.asc)(catalog_schema_1.categories.sortOrder), (0, drizzle_orm_1.asc)(catalog_schema_1.categories.name));
     return rows;
 }
-export async function getCategoryBySlug({ slug, }) {
-    const rows = await db
+async function getCategoryBySlug({ slug, }) {
+    const rows = await client_1.db
         .select()
-        .from(categories)
-        .where(and(eq(categories.slug, slug), eq(categories.active, true)));
+        .from(catalog_schema_1.categories)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(catalog_schema_1.categories.slug, slug), (0, drizzle_orm_1.eq)(catalog_schema_1.categories.active, true)));
     return rows[0] ?? null;
 }
 // —— Storefront listing (view + stock aggregate) ——
-const stockStatusSubquery = sql `
+const stockStatusSubquery = (0, drizzle_orm_1.sql) `
   SELECT va.product_id,
     CASE
       WHEN bool_or(va.stock_status = 'IN_STOCK') THEN 'IN_STOCK'
@@ -33,11 +66,34 @@ const stockStatusSubquery = sql `
   FROM inventory.variant_availability va
   GROUP BY va.product_id
 `;
-export async function listProducts({ categorySlug, page = 1, limit = 24, currency, }) {
+function productListJoinForSort(sort) {
+    if (sort === 'newest') {
+        return (0, drizzle_orm_1.sql) `JOIN catalog.products p ON p.id = v.id`;
+    }
+    return (0, drizzle_orm_1.sql) ``;
+}
+function productListOrderBy({ sort, currency, }) {
+    if (sort === 'newest') {
+        return (0, drizzle_orm_1.sql) `ORDER BY p.created_at DESC, v.slug ASC`;
+    }
+    const priceCol = currency === 'LKR'
+        ? (0, drizzle_orm_1.sql) `v.lkr_amount`
+        : currency === 'SGD'
+            ? (0, drizzle_orm_1.sql) `v.sgd_amount`
+            : (0, drizzle_orm_1.sql) `v.usd_amount`;
+    if (sort === 'price-asc') {
+        return (0, drizzle_orm_1.sql) `ORDER BY ${priceCol} ASC, v.slug ASC`;
+    }
+    if (sort === 'price-desc') {
+        return (0, drizzle_orm_1.sql) `ORDER BY ${priceCol} DESC, v.slug ASC`;
+    }
+    return (0, drizzle_orm_1.sql) `ORDER BY v.slug ASC`;
+}
+async function listProducts({ categorySlug, page = 1, limit = 24, currency, sort, }) {
     const offset = (page - 1) * limit;
     let total;
     if (categorySlug != null && categorySlug !== '') {
-        const countResult = await db.execute(sql `
+        const countResult = await client_1.db.execute((0, drizzle_orm_1.sql) `
       SELECT count(*)::int AS total
       FROM catalog.active_products_with_prices v
       JOIN catalog.categories c ON c.id = v.category_id AND c.active = true AND c.slug = ${categorySlug}
@@ -45,13 +101,13 @@ export async function listProducts({ categorySlug, page = 1, limit = 24, currenc
         total = countResult.rows[0]?.total ?? 0;
     }
     else {
-        const countResult = await db.execute(sql `
+        const countResult = await client_1.db.execute((0, drizzle_orm_1.sql) `
       SELECT count(*)::int AS total
       FROM catalog.active_products_with_prices v
     `);
         total = countResult.rows[0]?.total ?? 0;
     }
-    const listResult = await db.execute(sql `
+    const listResult = await client_1.db.execute((0, drizzle_orm_1.sql) `
     SELECT
       v.id,
       v.slug,
@@ -63,30 +119,49 @@ export async function listProducts({ categorySlug, page = 1, limit = 24, currenc
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
-      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus"
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.active_products_with_prices v
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
+    ${productListJoinForSort(sort)}
     ${categorySlug != null && categorySlug !== ''
-        ? sql `JOIN catalog.categories c ON c.id = v.category_id AND c.active = true AND c.slug = ${categorySlug}`
-        : sql ``}
-    ORDER BY v.slug
+        ? (0, drizzle_orm_1.sql) `JOIN catalog.categories c ON c.id = v.category_id AND c.active = true AND c.slug = ${categorySlug}`
+        : (0, drizzle_orm_1.sql) ``}
+    ${productListOrderBy({ sort, currency })}
     LIMIT ${limit}
     OFFSET ${offset}
   `);
-    const products = listResult.rows ?? [];
+    const rows = listResult.rows ?? [];
+    const products = rows.map((r) => ({
+        ...r,
+        variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+    }));
     return { products, total };
 }
-export async function searchProducts({ query, page = 1, limit = 24, currency, }) {
+async function searchProducts({ query, page = 1, limit = 24, currency, sort, }) {
     const offset = (page - 1) * limit;
     const pattern = `%${query}%`;
-    const countResult = await db.execute(sql `
+    const countResult = await client_1.db.execute((0, drizzle_orm_1.sql) `
     SELECT count(*)::int AS total
     FROM catalog.active_products_with_prices v
     WHERE (v.display_name ILIKE ${pattern} OR v.product_code ILIKE ${pattern})
   `);
     const total = countResult.rows[0]?.total ?? 0;
-    const listResult = await db.execute(sql `
+    const listResult = await client_1.db.execute((0, drizzle_orm_1.sql) `
     SELECT
       v.id,
       v.slug,
@@ -98,20 +173,39 @@ export async function searchProducts({ query, page = 1, limit = 24, currency, })
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
-      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus"
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.active_products_with_prices v
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
+    ${productListJoinForSort(sort)}
     WHERE (v.display_name ILIKE ${pattern} OR v.product_code ILIKE ${pattern})
-    ORDER BY v.slug
+    ${productListOrderBy({ sort, currency })}
     LIMIT ${limit}
     OFFSET ${offset}
   `);
-    const products = listResult.rows ?? [];
+    const rows = listResult.rows ?? [];
+    const products = rows.map((r) => ({
+        ...r,
+        variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+    }));
     return { products, total };
 }
-export async function getFeaturedProducts({ currency, }) {
-    const rows = await db.execute(sql `
+async function getFeaturedProducts({ currency, }) {
+    const result = await client_1.db.execute((0, drizzle_orm_1.sql) `
     SELECT
       v.id,
       v.slug,
@@ -123,53 +217,71 @@ export async function getFeaturedProducts({ currency, }) {
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
-      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus"
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.bestseller_list bl
     JOIN catalog.active_products_with_prices v ON v.id = bl.product_id
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
     ORDER BY bl.sort_order ASC, v.slug
   `);
-    return rows.rows ?? [];
+    const rows = result.rows ?? [];
+    return rows.map((r) => ({
+        ...r,
+        variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+    }));
 }
 // —— Product detail ——
-export async function getProductBySlug({ slug, currency, }) {
-    const productRows = await db
+async function getProductBySlug({ slug, currency, }) {
+    const productRows = await client_1.db
         .select({
-        id: products.id,
-        slug: products.slug,
-        displayName: products.displayName,
-        shortName: products.shortName,
-        description: products.description,
-        fabricInfo: products.fabricInfo,
-        isSale: products.isSale,
-        categoryId: products.categoryId,
-        lkrAmount: productPrices.lkrAmount,
-        sgdAmount: productPrices.sgdAmount,
-        usdAmount: productPrices.usdAmount,
+        id: catalog_schema_1.products.id,
+        slug: catalog_schema_1.products.slug,
+        displayName: catalog_schema_1.products.displayName,
+        shortName: catalog_schema_1.products.shortName,
+        description: catalog_schema_1.products.description,
+        fabricInfo: catalog_schema_1.products.fabricInfo,
+        isSale: catalog_schema_1.products.isSale,
+        categoryId: catalog_schema_1.products.categoryId,
+        lkrAmount: catalog_schema_1.productPrices.lkrAmount,
+        sgdAmount: catalog_schema_1.productPrices.sgdAmount,
+        usdAmount: catalog_schema_1.productPrices.usdAmount,
     })
-        .from(products)
-        .innerJoin(productPrices, eq(productPrices.productId, products.id))
-        .where(and(eq(products.slug, slug), eq(products.active, true), isNull(products.deletedAt)));
+        .from(catalog_schema_1.products)
+        .innerJoin(catalog_schema_1.productPrices, (0, drizzle_orm_1.eq)(catalog_schema_1.productPrices.productId, catalog_schema_1.products.id))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(catalog_schema_1.products.slug, slug), (0, drizzle_orm_1.eq)(catalog_schema_1.products.active, true), (0, drizzle_orm_1.isNull)(catalog_schema_1.products.deletedAt)));
     const row = productRows[0];
     if (!row)
         return null;
-    const imageRows = await db
+    const imageRows = await client_1.db
         .select({
-        id: productImages.id,
-        url: productImages.url,
-        altText: productImages.altText,
-        sortOrder: productImages.sortOrder,
+        id: catalog_schema_1.productImages.id,
+        url: catalog_schema_1.productImages.url,
+        altText: catalog_schema_1.productImages.altText,
+        sortOrder: catalog_schema_1.productImages.sortOrder,
     })
-        .from(productImages)
-        .where(eq(productImages.productId, row.id))
-        .orderBy(asc(productImages.sortOrder));
+        .from(catalog_schema_1.productImages)
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.productImages.productId, row.id))
+        .orderBy((0, drizzle_orm_1.asc)(catalog_schema_1.productImages.sortOrder));
     let category = null;
     if (row.categoryId) {
-        const catRows = await db
+        const catRows = await client_1.db
             .select()
-            .from(categories)
-            .where(eq(categories.id, row.categoryId));
+            .from(catalog_schema_1.categories)
+            .where((0, drizzle_orm_1.eq)(catalog_schema_1.categories.id, row.categoryId));
         category = catRows[0] ?? null;
     }
     const lkr = typeof row.lkrAmount === 'string' ? row.lkrAmount : String(row.lkrAmount);
@@ -195,8 +307,8 @@ export async function getProductBySlug({ slug, currency, }) {
         category,
     };
 }
-export async function getVariantsWithStock({ productId, }) {
-    const rows = await db.execute(sql `
+async function getVariantsWithStock({ productId, }) {
+    const rows = await client_1.db.execute((0, drizzle_orm_1.sql) `
     SELECT
       va.variant_id AS "variantId",
       va.color,
@@ -209,8 +321,8 @@ export async function getVariantsWithStock({ productId, }) {
   `);
     return rows.rows ?? [];
 }
-export async function getRelatedProducts({ productId, currency, }) {
-    const rows = await db.execute(sql `
+async function getRelatedProducts({ productId, currency, }) {
+    const result = await client_1.db.execute((0, drizzle_orm_1.sql) `
     SELECT
       v.id,
       v.slug,
@@ -222,52 +334,70 @@ export async function getRelatedProducts({ productId, currency, }) {
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
-      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus"
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.product_relations pr
     JOIN catalog.active_products_with_prices v ON v.id = pr.related_product_id
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
     WHERE pr.product_id = ${productId}
     ORDER BY v.slug
     LIMIT 8
   `);
-    return rows.rows ?? [];
+    const rows = result.rows ?? [];
+    return rows.map((r) => ({
+        ...r,
+        variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+    }));
 }
-export async function getActiveStylingGuide({ productId, }) {
-    const rows = await db
+async function getActiveStylingGuide({ productId, }) {
+    const rows = await client_1.db
         .select()
-        .from(productStylingGuides)
-        .where(and(eq(productStylingGuides.productId, productId), eq(productStylingGuides.active, true)));
+        .from(catalog_schema_1.productStylingGuides)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(catalog_schema_1.productStylingGuides.productId, productId), (0, drizzle_orm_1.eq)(catalog_schema_1.productStylingGuides.active, true)));
     return rows[0] ?? null;
 }
 // —— Banner ——
-export async function getActiveBanner() {
-    const rows = await db
+async function getActiveBanner() {
+    const rows = await client_1.db
         .select()
-        .from(banners)
-        .where(and(eq(banners.enabled, true), sql `(${banners.startAt} IS NULL OR ${banners.startAt} <= now())`, sql `(${banners.endAt} IS NULL OR ${banners.endAt} > now())`))
-        .orderBy(desc(banners.createdAt))
+        .from(catalog_schema_1.banners)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(catalog_schema_1.banners.enabled, true), (0, drizzle_orm_1.sql) `(${catalog_schema_1.banners.startAt} IS NULL OR ${catalog_schema_1.banners.startAt} <= now())`, (0, drizzle_orm_1.sql) `(${catalog_schema_1.banners.endAt} IS NULL OR ${catalog_schema_1.banners.endAt} > now())`))
+        .orderBy((0, drizzle_orm_1.desc)(catalog_schema_1.banners.createdAt))
         .limit(1);
     return rows[0] ?? null;
 }
 // —— Admin product queries ——
-export async function getProductById({ id, }) {
-    const productRows = await db
+async function getProductById({ id, }) {
+    const productRows = await client_1.db
         .select()
-        .from(products)
-        .where(and(eq(products.id, id), isNull(products.deletedAt)));
+        .from(catalog_schema_1.products)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(catalog_schema_1.products.id, id), (0, drizzle_orm_1.isNull)(catalog_schema_1.products.deletedAt)));
     const product = productRows[0];
     if (!product)
         return null;
-    const [priceRow] = await db
+    const [priceRow] = await client_1.db
         .select()
-        .from(productPrices)
-        .where(eq(productPrices.productId, id));
-    const imageRows = await db
+        .from(catalog_schema_1.productPrices)
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.productPrices.productId, id));
+    const imageRows = await client_1.db
         .select()
-        .from(productImages)
-        .where(eq(productImages.productId, id))
-        .orderBy(asc(productImages.sortOrder));
+        .from(catalog_schema_1.productImages)
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.productImages.productId, id))
+        .orderBy((0, drizzle_orm_1.asc)(catalog_schema_1.productImages.sortOrder));
     if (!priceRow)
         return null;
     return {
@@ -276,39 +406,39 @@ export async function getProductById({ id, }) {
         images: imageRows,
     };
 }
-export async function listAllProducts({ page = 1, limit = 50, includeInactive = false, }) {
+async function listAllProducts({ page = 1, limit = 50, includeInactive = false, }) {
     const offset = (page - 1) * limit;
-    const baseWhere = isNull(products.deletedAt);
+    const baseWhere = (0, drizzle_orm_1.isNull)(catalog_schema_1.products.deletedAt);
     const where = includeInactive
         ? baseWhere
-        : and(baseWhere, eq(products.active, true));
-    const countResult = await db
-        .select({ count: sql `count(*)::int` })
-        .from(products)
+        : (0, drizzle_orm_1.and)(baseWhere, (0, drizzle_orm_1.eq)(catalog_schema_1.products.active, true));
+    const countResult = await client_1.db
+        .select({ count: (0, drizzle_orm_1.sql) `count(*)::int` })
+        .from(catalog_schema_1.products)
         .where(where);
     const total = countResult[0]?.count ?? 0;
-    const productRows = await db
+    const productRows = await client_1.db
         .select()
-        .from(products)
+        .from(catalog_schema_1.products)
         .where(where)
-        .orderBy(desc(products.updatedAt))
+        .orderBy((0, drizzle_orm_1.desc)(catalog_schema_1.products.updatedAt))
         .limit(limit)
         .offset(offset);
     const result = [];
     for (const p of productRows) {
-        const [priceRow] = await db
+        const [priceRow] = await client_1.db
             .select()
-            .from(productPrices)
-            .where(eq(productPrices.productId, p.id));
-        const imageRows = await db
+            .from(catalog_schema_1.productPrices)
+            .where((0, drizzle_orm_1.eq)(catalog_schema_1.productPrices.productId, p.id));
+        const imageRows = await client_1.db
             .select()
-            .from(productImages)
-            .where(eq(productImages.productId, p.id))
-            .orderBy(asc(productImages.sortOrder));
-        const variantCountResult = await db
-            .select({ count: sql `count(*)::int` })
-            .from(productVariants)
-            .where(and(eq(productVariants.product_id, p.id), isNull(productVariants.deleted_at)));
+            .from(catalog_schema_1.productImages)
+            .where((0, drizzle_orm_1.eq)(catalog_schema_1.productImages.productId, p.id))
+            .orderBy((0, drizzle_orm_1.asc)(catalog_schema_1.productImages.sortOrder));
+        const variantCountResult = await client_1.db
+            .select({ count: (0, drizzle_orm_1.sql) `count(*)::int` })
+            .from(inventory_schema_1.productVariants)
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(inventory_schema_1.productVariants.product_id, p.id), (0, drizzle_orm_1.isNull)(inventory_schema_1.productVariants.deleted_at)));
         const variantCount = variantCountResult[0]?.count ?? 0;
         if (priceRow) {
             result.push({
@@ -321,10 +451,10 @@ export async function listAllProducts({ page = 1, limit = 50, includeInactive = 
     }
     return { products: result, total };
 }
-export async function createProduct({ categoryId, slug, displayName, shortName, description, fabricInfo, productCode, active, isSale, prices, }) {
-    return await db.transaction(async (tx) => {
+async function createProduct({ categoryId, slug, displayName, shortName, description, fabricInfo, productCode, active, isSale, prices, }) {
+    return await client_1.db.transaction(async (tx) => {
         const [product] = await tx
-            .insert(products)
+            .insert(catalog_schema_1.products)
             .values({
             categoryId: categoryId ?? null,
             slug,
@@ -340,7 +470,7 @@ export async function createProduct({ categoryId, slug, displayName, shortName, 
         if (!product)
             throw new Error('createProduct: no row returned');
         const [priceRow] = await tx
-            .insert(productPrices)
+            .insert(catalog_schema_1.productPrices)
             .values({
             productId: product.id,
             lkrAmount: prices.lkrAmount,
@@ -353,12 +483,12 @@ export async function createProduct({ categoryId, slug, displayName, shortName, 
         return { ...product, prices: priceRow };
     });
 }
-export async function updateProduct({ id, data, }) {
+async function updateProduct({ id, data, }) {
     const { lkrAmount, sgdAmount, usdAmount, ...productData } = data;
-    await db.transaction(async (tx) => {
+    await client_1.db.transaction(async (tx) => {
         const updatePayload = { ...productData, updatedAt: new Date() };
         if (Object.keys(updatePayload).length > 1) {
-            await tx.update(products).set(updatePayload).where(eq(products.id, id));
+            await tx.update(catalog_schema_1.products).set(updatePayload).where((0, drizzle_orm_1.eq)(catalog_schema_1.products.id, id));
         }
         if (lkrAmount !== undefined ||
             sgdAmount !== undefined ||
@@ -371,53 +501,53 @@ export async function updateProduct({ id, data, }) {
             if (usdAmount !== undefined)
                 priceUpdate.usdAmount = usdAmount;
             await tx
-                .update(productPrices)
+                .update(catalog_schema_1.productPrices)
                 .set(priceUpdate)
-                .where(eq(productPrices.productId, id));
+                .where((0, drizzle_orm_1.eq)(catalog_schema_1.productPrices.productId, id));
         }
     });
     return getProductById({ id });
 }
-export async function softDeleteProduct({ id }) {
-    await db
-        .update(products)
+async function softDeleteProduct({ id }) {
+    await client_1.db
+        .update(catalog_schema_1.products)
         .set({ deletedAt: new Date(), active: false, updatedAt: new Date() })
-        .where(and(eq(products.id, id), isNull(products.deletedAt)));
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(catalog_schema_1.products.id, id), (0, drizzle_orm_1.isNull)(catalog_schema_1.products.deletedAt)));
 }
-export async function createProductImage({ productId, url, altText, sortOrder = 0, }) {
-    const [row] = await db
-        .insert(productImages)
+async function createProductImage({ productId, url, altText, sortOrder = 0, }) {
+    const [row] = await client_1.db
+        .insert(catalog_schema_1.productImages)
         .values({ productId, url, altText: altText ?? null, sortOrder })
         .returning();
     if (!row)
         throw new Error('createProductImage: no row returned');
     return row;
 }
-export async function deleteProductImage({ id, productId, }) {
-    await db
-        .delete(productImages)
-        .where(and(eq(productImages.id, id), eq(productImages.productId, productId)));
+async function deleteProductImage({ id, productId, }) {
+    await client_1.db
+        .delete(catalog_schema_1.productImages)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(catalog_schema_1.productImages.id, id), (0, drizzle_orm_1.eq)(catalog_schema_1.productImages.productId, productId)));
 }
-export async function setKeyImage({ productId, imageId, }) {
-    await db
-        .update(products)
+async function setKeyImage({ productId, imageId, }) {
+    await client_1.db
+        .update(catalog_schema_1.products)
         .set({ keyImageId: imageId, updatedAt: new Date() })
-        .where(eq(products.id, productId));
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.products.id, productId));
 }
-export async function reorderImages({ productId, imageIds, }) {
-    await db.transaction(async (tx) => {
+async function reorderImages({ productId, imageIds, }) {
+    await client_1.db.transaction(async (tx) => {
         for (let i = 0; i < imageIds.length; i++) {
             await tx
-                .update(productImages)
+                .update(catalog_schema_1.productImages)
                 .set({ sortOrder: i })
-                .where(and(eq(productImages.id, imageIds[i]), eq(productImages.productId, productId)));
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(catalog_schema_1.productImages.id, imageIds[i]), (0, drizzle_orm_1.eq)(catalog_schema_1.productImages.productId, productId)));
         }
     });
 }
-export async function createVariant({ productId, color, size, skuGroup, }) {
-    return await db.transaction(async (tx) => {
+async function createVariant({ productId, color, size, skuGroup, }) {
+    return await client_1.db.transaction(async (tx) => {
         const [variant] = await tx
-            .insert(productVariants)
+            .insert(inventory_schema_1.productVariants)
             .values({
             product_id: productId,
             color,
@@ -427,26 +557,26 @@ export async function createVariant({ productId, color, size, skuGroup, }) {
             .returning();
         if (!variant)
             throw new Error('createVariant: no row returned');
-        await tx.insert(variantStock).values({
+        await tx.insert(inventory_schema_1.variantStock).values({
             variant_id: variant.id,
         });
         return variant;
     });
 }
-export async function softDeleteVariant({ id, productId, }) {
-    await db
-        .update(productVariants)
+async function softDeleteVariant({ id, productId, }) {
+    await client_1.db
+        .update(inventory_schema_1.productVariants)
         .set({ deleted_at: new Date(), updated_at: new Date() })
-        .where(and(eq(productVariants.id, id), eq(productVariants.product_id, productId)));
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(inventory_schema_1.productVariants.id, id), (0, drizzle_orm_1.eq)(inventory_schema_1.productVariants.product_id, productId)));
 }
-export async function upsertStylingGuide({ productId, type, linkUrl, contentJson, active = true, }) {
-    const existing = await db
+async function upsertStylingGuide({ productId, type, linkUrl, contentJson, active = true, }) {
+    const existing = await client_1.db
         .select()
-        .from(productStylingGuides)
-        .where(eq(productStylingGuides.productId, productId));
+        .from(catalog_schema_1.productStylingGuides)
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.productStylingGuides.productId, productId));
     if (existing[0]) {
-        const [updated] = await db
-            .update(productStylingGuides)
+        const [updated] = await client_1.db
+            .update(catalog_schema_1.productStylingGuides)
             .set({
             type,
             linkUrl: linkUrl ?? null,
@@ -454,14 +584,14 @@ export async function upsertStylingGuide({ productId, type, linkUrl, contentJson
             active,
             updatedAt: new Date(),
         })
-            .where(eq(productStylingGuides.productId, productId))
+            .where((0, drizzle_orm_1.eq)(catalog_schema_1.productStylingGuides.productId, productId))
             .returning();
         if (!updated)
             throw new Error('upsertStylingGuide: update failed');
         return updated;
     }
-    const [inserted] = await db
-        .insert(productStylingGuides)
+    const [inserted] = await client_1.db
+        .insert(catalog_schema_1.productStylingGuides)
         .values({
         productId,
         type,
@@ -474,8 +604,8 @@ export async function upsertStylingGuide({ productId, type, linkUrl, contentJson
         throw new Error('upsertStylingGuide: insert failed');
     return inserted;
 }
-export async function getBestsellerList() {
-    const rows = await db.execute(sql `
+async function getBestsellerList() {
+    const rows = await client_1.db.execute((0, drizzle_orm_1.sql) `
     SELECT
       bl.id,
       bl.product_id AS "productId",
@@ -500,9 +630,9 @@ export async function getBestsellerList() {
   `);
     return rows.rows ?? [];
 }
-export async function addToBestsellerList({ productId, sortOrder = 0, addedByAdminId, }) {
-    const [row] = await db
-        .insert(bestsellerList)
+async function addToBestsellerList({ productId, sortOrder = 0, addedByAdminId, }) {
+    const [row] = await client_1.db
+        .insert(catalog_schema_1.bestsellerList)
         .values({
         productId,
         sortOrder,
@@ -513,28 +643,28 @@ export async function addToBestsellerList({ productId, sortOrder = 0, addedByAdm
         throw new Error('addToBestsellerList: no row returned');
     return row;
 }
-export async function removeFromBestsellerList({ productId, }) {
-    await db.delete(bestsellerList).where(eq(bestsellerList.productId, productId));
+async function removeFromBestsellerList({ productId, }) {
+    await client_1.db.delete(catalog_schema_1.bestsellerList).where((0, drizzle_orm_1.eq)(catalog_schema_1.bestsellerList.productId, productId));
 }
-export async function reorderBestsellerList({ orderedProductIds, }) {
-    await db.transaction(async (tx) => {
+async function reorderBestsellerList({ orderedProductIds, }) {
+    await client_1.db.transaction(async (tx) => {
         for (let i = 0; i < orderedProductIds.length; i++) {
             await tx
-                .update(bestsellerList)
+                .update(catalog_schema_1.bestsellerList)
                 .set({ sortOrder: i })
-                .where(eq(bestsellerList.productId, orderedProductIds[i]));
+                .where((0, drizzle_orm_1.eq)(catalog_schema_1.bestsellerList.productId, orderedProductIds[i]));
         }
     });
 }
-export async function listBanners() {
-    return await db
+async function listBanners() {
+    return await client_1.db
         .select()
-        .from(banners)
-        .orderBy(desc(banners.createdAt));
+        .from(catalog_schema_1.banners)
+        .orderBy((0, drizzle_orm_1.desc)(catalog_schema_1.banners.createdAt));
 }
-export async function createBanner({ message, linkUrl, startAt, endAt, createdBy, }) {
-    const [row] = await db
-        .insert(banners)
+async function createBanner({ message, linkUrl, startAt, endAt, createdBy, }) {
+    const [row] = await client_1.db
+        .insert(catalog_schema_1.banners)
         .values({
         message,
         linkUrl: linkUrl ?? null,
@@ -548,27 +678,27 @@ export async function createBanner({ message, linkUrl, startAt, endAt, createdBy
         throw new Error('createBanner: no row returned');
     return row;
 }
-export async function updateBanner({ id, data, }) {
-    const [row] = await db
-        .update(banners)
+async function updateBanner({ id, data, }) {
+    const [row] = await client_1.db
+        .update(catalog_schema_1.banners)
         .set({ ...data, updatedAt: new Date() })
-        .where(eq(banners.id, id))
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.banners.id, id))
         .returning();
     return row ?? null;
 }
-export async function enableBanner({ id }) {
-    const [row] = await db
-        .update(banners)
+async function enableBanner({ id }) {
+    const [row] = await client_1.db
+        .update(catalog_schema_1.banners)
         .set({ enabled: true, updatedAt: new Date() })
-        .where(eq(banners.id, id))
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.banners.id, id))
         .returning();
     return row ?? null;
 }
-export async function disableBanner({ id }) {
-    const [row] = await db
-        .update(banners)
+async function disableBanner({ id }) {
+    const [row] = await client_1.db
+        .update(catalog_schema_1.banners)
         .set({ enabled: false, updatedAt: new Date() })
-        .where(eq(banners.id, id))
+        .where((0, drizzle_orm_1.eq)(catalog_schema_1.banners.id, id))
         .returning();
     return row ?? null;
 }

@@ -1,9 +1,4 @@
 "use strict";
-/**
- * Orders route handlers — customer order history/detail, admin list/detail,
- * fulfillment (pack/ship/deliver), cancel, shipping address, scan-to-pack.
- * Success: { data: T }. No try/catch — errors propagate to global handler.
- */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -46,7 +41,6 @@ const validate_1 = require("../../middleware/validate");
 const auth_2 = require("../../middleware/auth");
 const ordersService = __importStar(require("./orders.service"));
 const router = (0, express_1.Router)();
-// —— Customer routes ——
 const myOrdersQuerySchema = zod_1.z.object({
     page: zod_1.z.coerce.number().int().min(1).default(1),
     limit: zod_1.z.coerce.number().int().min(1).max(50).default(20),
@@ -71,7 +65,6 @@ router.get('/orders/:orderId', auth_1.requireAuth, async (req, res) => {
     });
     res.status(200).json({ data: result });
 });
-// —— Admin read ——
 const adminOrdersQuerySchema = zod_1.z.object({
     page: zod_1.z.coerce.number().int().min(1).default(1),
     limit: zod_1.z.coerce.number().int().min(1).max(100).default(50),
@@ -104,7 +97,6 @@ router.get('/admin/orders/:orderId', auth_1.requireAdmin, async (req, res) => {
     const result = await ordersService.adminGetOrderDetail({ orderId });
     res.status(200).json({ data: result });
 });
-// —— Admin fulfillment ——
 const packBodySchema = zod_1.z.object({
     note: zod_1.z.string().optional(),
 });
@@ -191,7 +183,6 @@ router.patch('/admin/orders/:orderId/shipping-address', auth_1.requireAdmin, (0,
     });
     res.status(200).json({ data: { ok: true } });
 }));
-// —— Scan-to-pack ——
 const scanBodySchema = zod_1.z.object({
     barcodeValue: zod_1.z.string().min(1),
     orderItemId: zod_1.z.string().uuid(),
@@ -224,4 +215,3 @@ router.get('/admin/orders/:orderId/packing-status', auth_1.requireAdmin, async (
     res.status(200).json({ data: result });
 });
 exports.ordersRoutes = router;
-//# sourceMappingURL=orders.routes.js.map
