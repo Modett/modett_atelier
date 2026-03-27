@@ -6,12 +6,14 @@
 import { eq, and, asc } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import { db } from '../client'
-import { shippingZones, shippingMethods } from '../schema/shipping.schema'
-import type { InferSelectModel } from 'drizzle-orm'
+import { shippingZones, shippingMethods, shippingSettings } from '../schema/shipping.schema'
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
 import { OrderOperationError } from '../errors'
 
 export type ShippingZone = InferSelectModel<typeof shippingZones>
 export type ShippingMethod = InferSelectModel<typeof shippingMethods>
+export type ShippingSettings = InferSelectModel<typeof shippingSettings>
+export type NewShippingSettings = InferInsertModel<typeof shippingSettings>
 
 // —— Zone read queries ——
 
@@ -347,4 +349,59 @@ export async function setMethodActive({
 
 export async function deleteMethod({ id }: { id: string }): Promise<void> {
   await setMethodActive({ id, active: false })
+}
+
+// —— Shipping settings (single row) ——
+
+export async function getShippingSettings(): Promise<ShippingSettings | null> {
+  const rows = await db.select().from(shippingSettings).limit(1)
+  return rows[0] ?? null
+}
+
+export async function updateShippingSettings({
+  freeThresholdLkr,
+  freeThresholdSgd,
+  freeThresholdUsd,
+  freeShippingLabel,
+  adminId,
+}: {
+  freeThresholdLkr?: number | null
+  freeThresholdSgd?: number | null
+  freeThresholdUsd?: number | null
+  freeShippingLabel?: string
+  adminId: string
+}): Promise<ShippingSettings> {
+  const updates: Partial<NewShippingSettings> = {
+    updatedAt: new Date(),
+    updatedByAdminId: adminId,
+  }
+
+  if (freeThresholdLkr !== undefined) {
+    updates.freeThresholdLkr = freeThresholdLkr === null
+      ? null
+      : String(freeThresholdLkr)
+  }
+  if (freeThresholdSgd !== undefined) {
+    updates.freeThresholdSgd = freeThresholdSgd === null
+      ? null
+      : String(freeThresholdSgd)
+  }
+  if (freeThresholdUsd !== undefined) {
+    updates.freeThresholdUsd = freeThresholdUsd === null
+      ? null
+      : String(freeThresholdUsd)
+  }
+  if (freeShippingLabel !== undefined) {
+    updates.freeShippingLabel = freeShippingLabel
+  }
+
+  const rows = await db
+    .update(shippingSettings)
+    .set(updates)
+    .returning()
+
+  if (!rows[0]) {
+    throw new OrderOperationError('SHIPPING_SETTINGS_NOT_FOUND', 500)
+  }
+  return rows[0]
 }

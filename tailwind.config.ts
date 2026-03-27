@@ -2,7 +2,7 @@
  * MODETT COLOUR SYSTEM
  * ─────────────────────────────────────────────────────
  * Brand voice: Elegance, Amplified.
- * Base palette: warm neutral (F8F5F2) on graphite (232D35)
+ * Base palette: warm neutral (F8F7F4) on graphite (232D35)
  *
  * RULES:
  *   1. Never use primitive.* in application components.
@@ -61,15 +61,15 @@ const config: Config = {
       },
       fontSize: {
         // ── HEADING SCALE (desktop) — values mirror tokens.css ──
-        display: ['var(--text-display)', { lineHeight: '1.2', letterSpacing: '-0.02em' }],
-        h1: ['var(--text-h1)', { lineHeight: '1.2', letterSpacing: '-0.02em' }],
+        display: ['var(--text-display)', { lineHeight: '1.0', letterSpacing: '-0.02em' }],
+        h1: ['var(--text-h1)', { lineHeight: '1.0', letterSpacing: '-0.02em' }],
         h2: ['var(--text-h2)', { lineHeight: '1.2', letterSpacing: '-0.01em' }],
         h3: ['var(--text-h3)', { lineHeight: '1.2', letterSpacing: '-0.01em' }],
         h4: ['var(--text-h4)', { lineHeight: '1.3', letterSpacing: '0' }],
         h5: ['var(--text-h5)', { lineHeight: '1.4', letterSpacing: '0' }],
         h6: ['var(--text-h6)', { lineHeight: '1.4', letterSpacing: '0' }],
         // ── HEADING SCALE (mobile) ──
-        'h1-mobile': ['var(--text-h1-mobile)', { lineHeight: '1.2', letterSpacing: '-0.02em' }],
+        'h1-mobile': ['var(--text-h1-mobile)', { lineHeight: '1.0', letterSpacing: '-0.02em' }],
         'h2-mobile': ['var(--text-h2-mobile)', { lineHeight: '1.2', letterSpacing: '-0.01em' }],
         'h3-mobile': ['var(--text-h3-mobile)', { lineHeight: '1.2', letterSpacing: '-0.01em' }],
         'h4-mobile': ['var(--text-h4-mobile)', { lineHeight: '1.4', letterSpacing: '0' }],
@@ -88,7 +88,7 @@ const config: Config = {
         label: ['var(--text-label)', { lineHeight: '1.4', letterSpacing: '0.08em' }],
       },
       lineHeight: {
-        tight: '1.2',
+        tight: '1.0',
         snug: '1.3',
         normal: '1.4',
         relaxed: '1.5',
@@ -113,8 +113,8 @@ const config: Config = {
       colors: {
         // Layer 1 — Primitives (design system palette page only; do not use in app UI)
         primitive: {
-          'warm-white': '#F8F5F2',
-          alabaster: '#E5E0D6',
+          'warm-white': '#F8F7F4',
+          alabaster: '#EFECE5',
           'silver-sage': '#C1D2CC',
           'warm-taupe': '#BBA496',
           'brushed-gold': '#C1AB85',

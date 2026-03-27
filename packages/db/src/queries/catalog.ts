@@ -30,6 +30,14 @@ import type { ProductVariant } from '../schema/inventory.schema'
 
 // —— Row types from views / assembled results (raw DB shape; service maps to Money) ——
 
+export interface ProductListVariantRow {
+  variantId: string
+  color: string
+  size: string
+  availableQty: number
+  stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+}
+
 export interface ProductListItemRow {
   id: string
   slug: string
@@ -42,6 +50,7 @@ export interface ProductListItemRow {
   sgdAmount: string
   usdAmount: string
   stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  variants: ProductListVariantRow[]
 }
 
 export interface VariantWithStockRow {
@@ -104,16 +113,53 @@ const stockStatusSubquery = sql`
   GROUP BY va.product_id
 `
 
+/** Storefront listing sort — uses product_prices via view columns for price modes */
+export type ProductListSort = 'newest' | 'price-asc' | 'price-desc'
+
+function productListJoinForSort(sort?: ProductListSort) {
+  if (sort === 'newest') {
+    return sql`JOIN catalog.products p ON p.id = v.id`
+  }
+  return sql``
+}
+
+function productListOrderBy({
+  sort,
+  currency,
+}: {
+  sort?: ProductListSort
+  currency: 'LKR' | 'SGD' | 'USD'
+}) {
+  if (sort === 'newest') {
+    return sql`ORDER BY p.created_at DESC, v.slug ASC`
+  }
+  const priceCol =
+    currency === 'LKR'
+      ? sql`v.lkr_amount`
+      : currency === 'SGD'
+        ? sql`v.sgd_amount`
+        : sql`v.usd_amount`
+  if (sort === 'price-asc') {
+    return sql`ORDER BY ${priceCol} ASC, v.slug ASC`
+  }
+  if (sort === 'price-desc') {
+    return sql`ORDER BY ${priceCol} DESC, v.slug ASC`
+  }
+  return sql`ORDER BY v.slug ASC`
+}
+
 export async function listProducts({
   categorySlug,
   page = 1,
   limit = 24,
   currency,
+  sort,
 }: {
   categorySlug?: string | null
   page?: number
   limit?: number
   currency: 'LKR' | 'SGD' | 'USD'
+  sort?: ProductListSort
 }): Promise<{ products: ProductListItemRow[]; total: number }> {
   const offset = (page - 1) * limit
 
@@ -145,21 +191,40 @@ export async function listProducts({
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
-      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus"
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.active_products_with_prices v
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
+    ${productListJoinForSort(sort)}
     ${
       categorySlug != null && categorySlug !== ''
         ? sql`JOIN catalog.categories c ON c.id = v.category_id AND c.active = true AND c.slug = ${categorySlug}`
         : sql``
     }
-    ORDER BY v.slug
+    ${productListOrderBy({ sort, currency })}
     LIMIT ${limit}
     OFFSET ${offset}
   `)
 
-  const products = (listResult.rows as unknown as ProductListItemRow[]) ?? []
+  const rows = (listResult.rows as unknown as Array<Omit<ProductListItemRow, 'variants'> & { variants: ProductListVariantRow[] | string }>) ?? []
+  const products: ProductListItemRow[] = rows.map((r) => ({
+    ...r,
+    variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+  }))
   return { products, total }
 }
 
@@ -168,11 +233,13 @@ export async function searchProducts({
   page = 1,
   limit = 24,
   currency,
+  sort,
 }: {
   query: string
   page?: number
   limit?: number
   currency: 'LKR' | 'SGD' | 'USD'
+  sort?: ProductListSort
 }): Promise<{ products: ProductListItemRow[]; total: number }> {
   const offset = (page - 1) * limit
   const pattern = `%${query}%`
@@ -196,17 +263,36 @@ export async function searchProducts({
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
-      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus"
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.active_products_with_prices v
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
+    ${productListJoinForSort(sort)}
     WHERE (v.display_name ILIKE ${pattern} OR v.product_code ILIKE ${pattern})
-    ORDER BY v.slug
+    ${productListOrderBy({ sort, currency })}
     LIMIT ${limit}
     OFFSET ${offset}
   `)
 
-  const products = (listResult.rows as unknown as ProductListItemRow[]) ?? []
+  const rows = (listResult.rows as unknown as Array<Omit<ProductListItemRow, 'variants'> & { variants: ProductListVariantRow[] | string }>) ?? []
+  const products: ProductListItemRow[] = rows.map((r) => ({
+    ...r,
+    variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+  }))
   return { products, total }
 }
 
@@ -215,7 +301,7 @@ export async function getFeaturedProducts({
 }: {
   currency: 'LKR' | 'SGD' | 'USD'
 }): Promise<ProductListItemRow[]> {
-  const rows = await db.execute(sql`
+  const result = await db.execute(sql`
     SELECT
       v.id,
       v.slug,
@@ -227,14 +313,32 @@ export async function getFeaturedProducts({
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
-      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus"
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.bestseller_list bl
     JOIN catalog.active_products_with_prices v ON v.id = bl.product_id
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
     ORDER BY bl.sort_order ASC, v.slug
   `)
-  return (rows.rows as unknown as ProductListItemRow[]) ?? []
+  const rows = (result.rows as unknown as Array<Omit<ProductListItemRow, 'variants'> & { variants: ProductListVariantRow[] | string }>) ?? []
+  return rows.map((r) => ({
+    ...r,
+    variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+  }))
 }
 
 // —— Product detail ——
@@ -343,7 +447,7 @@ export async function getRelatedProducts({
   productId: string
   currency: 'LKR' | 'SGD' | 'USD'
 }): Promise<ProductListItemRow[]> {
-  const rows = await db.execute(sql`
+  const result = await db.execute(sql`
     SELECT
       v.id,
       v.slug,
@@ -355,16 +459,34 @@ export async function getRelatedProducts({
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
-      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus"
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.product_relations pr
     JOIN catalog.active_products_with_prices v ON v.id = pr.related_product_id
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
     WHERE pr.product_id = ${productId}
     ORDER BY v.slug
     LIMIT 8
   `)
-  return (rows.rows as unknown as ProductListItemRow[]) ?? []
+  const rows = (result.rows as unknown as Array<Omit<ProductListItemRow, 'variants'> & { variants: ProductListVariantRow[] | string }>) ?? []
+  return rows.map((r) => ({
+    ...r,
+    variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+  }))
 }
 
 export async function getActiveStylingGuide({

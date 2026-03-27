@@ -10,7 +10,9 @@ import {
   boolean,
   timestamp,
   jsonb,
+  numeric,
 } from 'drizzle-orm/pg-core'
+import { admins } from './iam.schema'
 
 const shipping = pgSchema('shipping')
 
@@ -48,4 +50,17 @@ export const shippingMethods = shipping.table('shipping_methods', {
   updated_at: timestamp('updated_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
+})
+
+export const shippingSettings = shipping.table('shipping_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  freeThresholdLkr: numeric('free_threshold_lkr', { precision: 12, scale: 2 }),
+  freeThresholdSgd: numeric('free_threshold_sgd', { precision: 12, scale: 2 }),
+  freeThresholdUsd: numeric('free_threshold_usd', { precision: 12, scale: 2 }),
+  freeShippingLabel: text('free_shipping_label').notNull().default('Free Shipping'),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedByAdminId: uuid('updated_by_admin_id')
+    .references(() => admins.id),
 })
