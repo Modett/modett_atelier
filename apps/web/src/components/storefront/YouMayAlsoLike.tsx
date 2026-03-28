@@ -13,6 +13,7 @@ import { formatMoney } from '@/hooks/useCurrency'
 import { ProductCardSkeleton } from './ProductCardSkeleton'
 import { COLOUR_HEX_MAP } from './ColourSelector'
 import type { ProductSummary } from '@/types'
+import { productImagePlaceholderUrl } from '@/lib/assets'
 
 const ITEMS_PER_PAGE = 6
 
@@ -188,7 +189,7 @@ function mapToCardProps(
     isWishlisted: wishlistIds.has(product.id),
     primaryImage: product.keyImage
       ? { url: product.keyImage.url, altText: product.keyImage.altText ?? product.displayName }
-      : { url: '', altText: product.displayName },
+      : { url: productImagePlaceholderUrl, altText: product.displayName },
     colours: Array.from(colourMap.entries()).map(([name, data]) => ({
       value:   name,
       name:    name.charAt(0).toUpperCase() + name.slice(1),
