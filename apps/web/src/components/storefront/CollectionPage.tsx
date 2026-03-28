@@ -18,6 +18,7 @@ import { CollectionFilters } from './CollectionFilters'
 import { ActiveFilterChips } from './ActiveFilterChips'
 import { MobileFilterSheet } from './MobileFilterSheet'
 import type { ProductSummary } from '@/types'
+import { productImagePlaceholderUrl } from '@/lib/assets'
 
 interface CollectionPageProps {
   initialCategory?: string
@@ -492,7 +493,7 @@ function mapToCardProps(
     isWishlisted: wishlistIds.has(product.id),
     primaryImage: product.keyImage
       ? { url: product.keyImage.url, altText: product.keyImage.altText ?? product.displayName }
-      : { url: '', altText: product.displayName },
+      : { url: productImagePlaceholderUrl, altText: product.displayName },
     colours: Array.from(colourMap.entries()).map(([name, data]) => ({
       value: name,
       name:  name.charAt(0).toUpperCase() + name.slice(1),
