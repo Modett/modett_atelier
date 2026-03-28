@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "prebuild": "pnpm --filter @modett/types run build && pnpm --filter @modett/db run build",
     "build": "tsc --project tsconfig.json",
     "start": "node dist/server.js",
     "start:prod": "node dist/server.js",
