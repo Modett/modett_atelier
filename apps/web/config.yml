@@ -1,7 +1,0 @@
-tunnel: cbd78eb7-bbe4-4ad8-b318-3d22d3f033ca
-credentials-file: /Users/kumudikaj/.cloudflared/cbd78eb7-bbe4-4ad8-b318-3d22d3f033ca.json
-
-ingress:
-  - hostname: dev.modett.com
-    service: http://localhost:3000
-  - service: http_status:404
