@@ -4,7 +4,7 @@
   "installCommand": "cd ../.. && pnpm install",
   "outputDirectory":".next",
   "env": {
-    "NEXT_PUBLIC_API_URL": "@modett_api_url",
+    "NEXT_PUBLIC_API_URL": "https://modettapi-production.up.railway.app/",
     "NEXT_PUBLIC_SITE_URL": "@modett_site_url"
   }
 }
