@@ -5,7 +5,9 @@
 import type { ProductCardProps } from '@modett/ui'
 import type { CarouselSlide } from '@modett/ui'
 
-const PLACEHOLDER_IMAGE_BASE = '/images/products'
+/** Same R2 public URL prefix as packages/db seeds (product photography). */
+const R2_PRODUCT_IMAGES =
+  'https://pub-8804bb39c26f4399a33c5a5d1c2182f9.r2.dev/product_images'
 
 export const HOMEPAGE_BESTSELLERS: ProductCardProps[] = [
   {
@@ -14,11 +16,11 @@ export const HOMEPAGE_BESTSELLERS: ProductCardProps[] = [
     displayName: 'Crispy silk shirt',
     price: 'Rs 8,500.00',
     primaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-1-a`,
+      url: `${R2_PRODUCT_IMAGES}/tops/top1/1.jpeg`,
       altText: 'Crispy silk shirt front view',
     },
     secondaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-1-b`,
+      url: `${R2_PRODUCT_IMAGES}/tops/top1/2.jpeg`,
       altText: 'Crispy silk shirt back view',
     },
     colours: [
@@ -43,11 +45,11 @@ export const HOMEPAGE_BESTSELLERS: ProductCardProps[] = [
     displayName: 'Draped midi dress',
     price: 'Rs 12,500.00',
     primaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-2-a`,
+      url: `${R2_PRODUCT_IMAGES}/dresses/dress2/1.webp`,
       altText: 'Draped midi dress front view',
     },
     secondaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-2-b`,
+      url: `${R2_PRODUCT_IMAGES}/dresses/dress2/2.webp`,
       altText: 'Draped midi dress detail',
     },
     colours: [
@@ -70,11 +72,11 @@ export const HOMEPAGE_BESTSELLERS: ProductCardProps[] = [
     displayName: 'Tailored blazer',
     price: 'Rs 15,000.00',
     primaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-3-a`,
+      url: `${R2_PRODUCT_IMAGES}/blazer/blazer2/28.webp`,
       altText: 'Tailored blazer front view',
     },
     secondaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-3-b`,
+      url: `${R2_PRODUCT_IMAGES}/blazer/blazer2/29.webp`,
       altText: 'Tailored blazer back view',
     },
     colours: [
@@ -96,11 +98,11 @@ export const HOMEPAGE_BESTSELLERS: ProductCardProps[] = [
     displayName: 'Linen wrap skirt',
     price: 'Rs 7,200.00',
     primaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-4-a`,
+      url: `${R2_PRODUCT_IMAGES}/skirts/skirt1/33.webp`,
       altText: 'Linen wrap skirt front view',
     },
     secondaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-4-b`,
+      url: `${R2_PRODUCT_IMAGES}/skirts/skirt1/34.webp`,
       altText: 'Linen wrap skirt side view',
     },
     colours: [
@@ -124,11 +126,11 @@ export const HOMEPAGE_BESTSELLERS: ProductCardProps[] = [
     originalPrice: 'Rs 7,500.00',
     isSale: true,
     primaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-5-a`,
+      url: `${R2_PRODUCT_IMAGES}/tops/top2/5.jpeg`,
       altText: 'Silk cami top front view',
     },
     secondaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-5-b`,
+      url: `${R2_PRODUCT_IMAGES}/tops/top2/6.jpeg`,
       altText: 'Silk cami top back view',
     },
     colours: [
@@ -150,11 +152,11 @@ export const HOMEPAGE_BESTSELLERS: ProductCardProps[] = [
     displayName: 'Wide-leg trousers',
     price: 'Rs 9,800.00',
     primaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-6-a`,
+      url: `${R2_PRODUCT_IMAGES}/pant/pant1/8.jpeg`,
       altText: 'Wide-leg trousers front view',
     },
     secondaryImage: {
-      url: `${PLACEHOLDER_IMAGE_BASE}/product-6-b`,
+      url: `${R2_PRODUCT_IMAGES}/pant/pant1/9.webp`,
       altText: 'Wide-leg trousers side view',
     },
     colours: [

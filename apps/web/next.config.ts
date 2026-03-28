@@ -31,9 +31,11 @@ const nextConfig: NextConfig = {
         hostname: '**.r2.dev',
       },
       {
-        // Cloudflare R2 — dev seed bucket (exact)
+        // Cloudflare R2 — dev seed bucket (exact host + pathname for optimizer)
         protocol: 'https',
         hostname: 'pub-8804bb39c26f4399a33c5a5d1c2182f9.r2.dev',
+        port: '',
+        pathname: '/**',
       },
       {
         // Cloudflare R2 custom domain (configure when ready)
