@@ -1,13 +1,16 @@
 'use client'
 
 import { useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthPanel } from '@/components/providers/AuthProvider'
+import { consumePostAuthPath } from '@/lib/postAuthRedirect'
 import { LoginForm } from './LoginForm'
 import { RegisterForm } from './RegisterForm'
 
 export function AuthPanel({ open, onClose }: AuthPanelProps) {
+  const router = useRouter()
   const { view, setView } = useAuthPanel()
   const panelRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -35,6 +38,14 @@ export function AuthPanel({ open, onClose }: AuthPanelProps) {
       }
     })
   }, [onClose])
+
+  const handleAuthSuccess = useCallback(() => {
+    const next = consumePostAuthPath()
+    handleClose()
+    if (next) {
+      router.push(next)
+    }
+  }, [handleClose, router])
 
   useEffect(() => {
     if (!open) return
@@ -126,12 +137,12 @@ export function AuthPanel({ open, onClose }: AuthPanelProps) {
         <div className="px-8 py-10 md:px-10 md:py-12">
           {view === 'login' ? (
             <LoginForm
-              onSuccess={handleClose}
+              onSuccess={handleAuthSuccess}
               onSwitchToRegister={() => setView('register')}
             />
           ) : (
             <RegisterForm
-              onSuccess={handleClose}
+              onSuccess={handleAuthSuccess}
               onSwitchToLogin={() => setView('login')}
             />
           )}

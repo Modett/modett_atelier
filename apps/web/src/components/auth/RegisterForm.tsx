@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { z } from 'zod'
 import Link from 'next/link'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRegister } from '@/hooks/useRegister'
+import { useAuthPanel } from '@/components/providers/AuthProvider'
 import { AuthInput } from './AuthInput'
 import type { ApiError } from '@/types'
 
@@ -31,7 +32,15 @@ export function RegisterForm({
   onSuccess,
   onSwitchToLogin,
 }: RegisterFormProps) {
+  const { registerPrefillEmail, clearRegisterPrefill } = useAuthPanel()
   const [email, setEmail] = useState('')
+
+  useEffect(() => {
+    if (registerPrefillEmail) {
+      setEmail(registerPrefillEmail)
+      clearRegisterPrefill()
+    }
+  }, [registerPrefillEmail, clearRegisterPrefill])
   const [password, setPassword] = useState('')
   const [title, setTitle] = useState('')
   const [firstName, setFirstName] = useState('')

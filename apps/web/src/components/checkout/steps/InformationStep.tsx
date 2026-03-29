@@ -10,9 +10,9 @@ import { useSession } from '@/hooks/useSession'
 import { getCountryFromCookie } from '@/hooks/useCountry'
 import type { ApiError } from '@/types'
 
-const TITLE_OPTIONS: TitleOption[] = ['Mr', 'Ms', 'Miss', 'Mrs']
+export const TITLE_OPTIONS: TitleOption[] = ['Mr', 'Ms', 'Miss', 'Mrs']
 
-const COUNTRIES = [
+export const ADDRESS_COUNTRIES = [
   { code: 'LK', name: 'Sri Lanka' },
   { code: 'SG', name: 'Singapore' },
   { code: 'US', name: 'United States' },
@@ -141,7 +141,7 @@ const baseAddressSchema = z.object({
   postcode: z.string().min(4, 'Postcode must be at least 4 characters').max(10),
 })
 
-const addressSchema = baseAddressSchema.superRefine((data, ctx) => {
+export const addressSchema = baseAddressSchema.superRefine((data, ctx) => {
   const phoneRule = getPhoneRule(data.countryCode)
   if (!phoneRule.pattern.test(data.phone.replace(/\s/g, ''))) {
     ctx.addIssue({
@@ -161,7 +161,7 @@ const addressSchema = baseAddressSchema.superRefine((data, ctx) => {
   }
 })
 
-interface AddressFormData {
+export interface AddressFormData {
   title: TitleOption
   firstName: string
   lastName: string
@@ -173,7 +173,7 @@ interface AddressFormData {
   postcode: string
 }
 
-function makeEmptyAddress(): AddressFormData {
+export function makeEmptyAddressFormData(): AddressFormData {
   return {
     title: 'Mr',
     firstName: '',
@@ -205,7 +205,7 @@ export function InformationStep() {
         postcode: store.shippingAddress.postcode,
       }
     }
-    const empty = makeEmptyAddress()
+    const empty = makeEmptyAddressFormData()
     return {
       ...empty,
       firstName: user?.firstName ?? '',
@@ -227,7 +227,7 @@ export function InformationStep() {
         postcode: store.billingAddress.postcode,
       }
     }
-    return makeEmptyAddress()
+    return makeEmptyAddressFormData()
   })
 
   const [sameAsBilling, setSameAsBilling] = useState(store.sameAsBilling)
@@ -373,7 +373,7 @@ export function InformationStep() {
         </div>
       </div>
 
-      <AddressForm
+      <SharedAddressForm
         data={shipping}
         errors={errors}
         onChange={updateShipping}
@@ -443,7 +443,7 @@ export function InformationStep() {
             </div>
           </div>
 
-          <AddressForm
+          <SharedAddressForm
             data={billing}
             errors={billingErrors}
             onChange={updateBilling}
@@ -478,7 +478,7 @@ export function InformationStep() {
   )
 }
 
-function AddressForm({
+export function SharedAddressForm({
   data,
   errors,
   onChange,
@@ -612,7 +612,7 @@ function AddressForm({
           )}
         >
           <option value="">Select country</option>
-          {COUNTRIES.map((c) => (
+          {ADDRESS_COUNTRIES.map((c) => (
             <option key={c.code} value={c.code}>{c.name}</option>
           ))}
         </select>
@@ -730,7 +730,7 @@ export function InformationSummary() {
   const addr = useCheckoutStore((s) => s.shippingAddress)
   if (!addr) return null
 
-  const countryName = COUNTRIES.find((c) => c.code === addr.countryCode)?.name ?? addr.countryCode
+  const countryName = ADDRESS_COUNTRIES.find((c) => c.code === addr.countryCode)?.name ?? addr.countryCode
 
   return (
     <p className="font-body font-light text-[13px] text-muted-foreground">

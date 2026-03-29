@@ -6,6 +6,7 @@ import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useCheckoutStore } from '@/store/checkout.store'
+import { useAuthPanel } from '@/components/providers/AuthProvider'
 
 interface PaymentStatusResponse {
   orderId: string
@@ -25,6 +26,7 @@ type ConfirmState = 'polling' | 'success' | 'failed' | 'timeout'
 export default function OrderConfirmationPage() {
   const params = useParams<{ orderId: string }>()
   const router = useRouter()
+  const { openRegisterWithEmail } = useAuthPanel()
   const orderId = params.orderId
   const email = useCheckoutStore((s) => s.email)
   const isGuest = useCheckoutStore((s) => s.isGuest)
@@ -32,6 +34,10 @@ export default function OrderConfirmationPage() {
 
   const [state, setState] = useState<ConfirmState>('polling')
   const [orderRef, setOrderRef] = useState<string | null>(null)
+  /** Captured before clearCheckout so guest CTA still works after checkout state is reset */
+  const [guestAfterOrder, setGuestAfterOrder] = useState<{
+    email: string
+  } | null>(null)
   const pollCount = useRef(0)
 
   const poll = useCallback(async () => {
@@ -51,6 +57,12 @@ export default function OrderConfirmationPage() {
       const intentStatus = intent?.status
 
       if (paymentState === 'PAID' || paymentState === 'SUCCEEDED' || intentStatus === 'SUCCEEDED') {
+        const snap = useCheckoutStore.getState()
+        if (snap.isGuest && snap.email) {
+          setGuestAfterOrder({ email: snap.email })
+        } else {
+          setGuestAfterOrder(null)
+        }
         setState('success')
         clearCheckout()
         return true
@@ -107,7 +119,7 @@ export default function OrderConfirmationPage() {
 
   if (state === 'success') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6 w-full max-w-page mx-auto">
         <div className="w-16 h-16 rounded-full bg-[#4A7C59]/10 flex items-center justify-center mb-6 animate-in zoom-in duration-500">
           <CheckCircle2 className="w-10 h-10 text-[#4A7C59]" />
         </div>
@@ -136,6 +148,49 @@ export default function OrderConfirmationPage() {
         >
           Continue Shopping
         </button>
+
+        {guestAfterOrder && (
+          <div className="mt-12 border-t border-muted pt-8 text-center w-full max-w-lg">
+            <p className="font-display font-bold text-[18px] text-umber mb-2">
+              Save your details for next time
+            </p>
+            <p
+              className="font-body font-light text-[13px] text-muted-foreground mb-6 max-w-sm mx-auto"
+            >
+              Create an account to track this order, save your addresses,
+              and earn loyalty points on future purchases.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                clearCheckout()
+                openRegisterWithEmail(guestAfterOrder.email)
+              }}
+              className={cn(
+                'h-11 px-10 border border-umber text-umber',
+                'font-body font-light uppercase tracking-[0.25em] text-[12px]',
+                'rounded-none hover:bg-umber hover:text-background',
+                'transition-all duration-200',
+              )}
+            >
+              Create Account
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearCheckout()
+                router.push('/collections')
+              }}
+              className={cn(
+                'block mx-auto mt-4 font-body font-light text-[12px]',
+                'text-muted-foreground hover:text-umber',
+                'transition-colors duration-200',
+              )}
+            >
+              Continue as guest
+            </button>
+          </div>
+        )}
       </div>
     )
   }
