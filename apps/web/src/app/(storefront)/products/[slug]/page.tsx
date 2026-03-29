@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { ProductDetailPage } from '@/components/storefront/ProductDetailPage'
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'
+  `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api`
 
 interface Props {
   params: Promise<{ slug: string }>
