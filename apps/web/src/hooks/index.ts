@@ -6,7 +6,13 @@ export { useRegister }                      from './useRegister'
 export { useLogout }                        from './useLogout'
 
 // Currency / Geo
-export { useGeo, useCurrency, formatMoney, getCurrencyCookie, getCountryCookie } from './useCurrency'
+export {
+  useGeo,
+  useCurrency,
+  formatMoney,
+  getCurrencyCookie,
+  getCountryCookie,
+} from './useCurrency'
 
 // Catalog
 export { useCategories, CATEGORIES_QUERY_KEY } from './useCategories'

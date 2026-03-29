@@ -1,71 +1,77 @@
-import { NextResponse } from 'next/server'
+import { NextResponse }  from 'next/server'
 import type { NextRequest } from 'next/server'
+import { geolocation }   from '@vercel/functions'
 
+// ── Country → Currency mapping ──────────────────────────
 const COUNTRY_CURRENCY: Record<string, string> = {
-  LK: 'LKR',
-  SG: 'SGD',
+  LK: 'LKR',   // Sri Lanka
+  SG: 'SGD',   // Singapore
 }
 
-const ENV_DEFAULT_CURRENCY = process.env.NEXT_PUBLIC_DEFAULT_CURRENCY
-const ENV_DEFAULT_COUNTRY  = process.env.NEXT_PUBLIC_DEFAULT_COUNTRY
+const DEFAULT_CURRENCY = 'LKR'
+const DEFAULT_COUNTRY  = 'LK'
 
-const DEFAULT_CURRENCY =
-  ENV_DEFAULT_CURRENCY === 'LKR' ||
-  ENV_DEFAULT_CURRENCY === 'SGD' ||
-  ENV_DEFAULT_CURRENCY === 'USD'
-    ? ENV_DEFAULT_CURRENCY
-    : 'LKR'
-
-const DEFAULT_COUNTRY =
-  typeof ENV_DEFAULT_COUNTRY === 'string' &&
-  ENV_DEFAULT_COUNTRY.length === 2
-    ? ENV_DEFAULT_COUNTRY.toUpperCase()
-    : 'LK'
+// ── Valid currency codes ────────────────────────────────
+const VALID_CURRENCIES = ['LKR', 'SGD', 'USD']
 
 export function middleware(request: NextRequest) {
   const response = NextResponse.next()
 
+  // ── Check existing cookies ────────────────────────────
   const existingCountry  = request.cookies.get('country')?.value
   const existingCurrency = request.cookies.get('currency')?.value
 
+  // If valid cookies already exist, skip — do not overwrite
   if (
     existingCountry &&
     existingCurrency &&
-    ['LKR', 'SGD', 'USD'].includes(existingCurrency)
+    VALID_CURRENCIES.includes(existingCurrency)
   ) {
     return response
   }
 
+  // ── Detect country ────────────────────────────────────
   let countryCode: string
   let currency: string
 
   const isDev = process.env.NODE_ENV === 'development'
 
   if (isDev) {
-    countryCode = 'LK'
-    currency    = 'LKR'
+    // ── DEV MODE: hardcode Sri Lanka ───────────────────
+    // Vercel geo headers are NOT available on localhost.
+    // This ensures shipping methods and currency work in dev.
+    // TODO: Remove this block before going live if needed.
+    countryCode = DEFAULT_COUNTRY
+    currency    = DEFAULT_CURRENCY
   } else {
-    const cfCountry    = request.headers.get('CF-IPCountry')
-    const vercelHeader = request.headers.get('x-vercel-ip-country')
+    // ── PRODUCTION: use Vercel geo detection ──────────
+    // @vercel/functions reads X-Vercel-IP-Country header
+    // automatically set by Vercel's edge network.
+    const geo = geolocation(request)
 
-    const detectedCountry = cfCountry ?? vercelHeader ?? DEFAULT_COUNTRY
+    // geo.country is the 2-letter ISO country code e.g. "LK"
+    // It is undefined if Vercel cannot detect the country.
+    const detectedCountry = geo.country ?? DEFAULT_COUNTRY
 
-    countryCode =
-      detectedCountry === 'XX' || detectedCountry === 'T1'
-        ? DEFAULT_COUNTRY
-        : detectedCountry
+    // Filter out Cloudflare's placeholder codes
+    // 'XX' = unknown, 'T1' = Tor network
+    countryCode = (detectedCountry === 'XX' || detectedCountry === 'T1')
+      ? DEFAULT_COUNTRY
+      : detectedCountry
 
     currency = COUNTRY_CURRENCY[countryCode] ?? DEFAULT_CURRENCY
   }
 
+  // ── Cookie configuration ──────────────────────────────
   const COOKIE_OPTIONS = {
-    httpOnly: false,
+    httpOnly: false,   // MUST be false — client JS reads these cookies
     secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    maxAge:   60 * 60 * 24 * 30,
+    sameSite: 'lax'  as const,
+    maxAge:   60 * 60 * 24 * 30,   // 30 days
     path:     '/',
   }
 
+  // ── Set cookies on response ───────────────────────────
   if (existingCountry !== countryCode) {
     response.cookies.set('country', countryCode, COOKIE_OPTIONS)
   }
@@ -77,6 +83,8 @@ export function middleware(request: NextRequest) {
   return response
 }
 
+// ── Matcher: run on page routes only ─────────────────────
+// Skip: static files, images, API routes, Next.js internals
 export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|images/|api/).*)',
