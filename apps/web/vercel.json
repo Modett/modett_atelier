@@ -1,10 +1,6 @@
 {
-  "framework":      "nextjs",
-  "buildCommand":   "cd ../.. && pnpm --filter @modett/web build",
-  "installCommand": "cd ../.. && pnpm install",
-  "outputDirectory":".next",
-  "env": {
-    "NEXT_PUBLIC_API_URL": "https://modettapi-production.up.railway.app/",
-    "NEXT_PUBLIC_SITE_URL": "https://dev.modett.com/"
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter @modett/ui build && pnpm --filter @modett/utils build && pnpm --filter @modett/types build && cd apps/web && pnpm build",
+  "outputDirectory": ".next"
   }
-}
