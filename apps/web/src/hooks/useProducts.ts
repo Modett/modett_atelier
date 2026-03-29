@@ -16,7 +16,7 @@ export function useProducts({
   sort,
   limit = 24,
 }: UseProductsParams = {}) {
-  const { currency } = useGeo()
+  const { currency, isReady } = useGeo()
 
   return useInfiniteQuery({
     queryKey: ['products', { category, sort, limit, currency }],
@@ -40,6 +40,7 @@ export function useProducts({
       const { page, totalPages } = lastPage
       return page < totalPages ? page + 1 : undefined
     },
+    enabled:   isReady,
     staleTime: 2 * 60 * 1000,
   })
 }

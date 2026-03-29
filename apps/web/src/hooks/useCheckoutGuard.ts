@@ -3,14 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCurrency } from './useCurrency'
+import { getCurrencyCookie } from './useCurrency'
 import { CART_QUERY_KEY } from './useCart'
 import type { NormalizedCartResponse } from '@/lib/normalizeCart'
 
 export function useCheckoutGuard() {
   const queryClient = useQueryClient()
   const router      = useRouter()
-  const currency    = useCurrency()
 
   const [isNavigating, setIsNavigating] = useState(false)
   const [guardError,   setGuardError]   = useState<string | null>(null)
@@ -18,6 +17,8 @@ export function useCheckoutGuard() {
   async function proceedToCheckout() {
     setIsNavigating(true)
     setGuardError(null)
+
+    const currency = getCurrencyCookie()
 
     try {
       await queryClient.refetchQueries({

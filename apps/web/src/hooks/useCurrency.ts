@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react'
 import type { CurrencyCode, Money } from '@/types'
 
-const COUNTRY_CURRENCY: Record<string, CurrencyCode> = {
-  LK: 'LKR',
-  SG: 'SGD',
+interface GeoContext {
+  currency:    CurrencyCode
+  countryCode: string
+  isReady:     boolean
 }
 
 export function getCountryCookie(): string {
@@ -13,9 +14,7 @@ export function getCountryCookie(): string {
   const match = document.cookie
     .split('; ')
     .find(row => row.startsWith('country='))
-  const value = match?.split('=')?.[1]
-  if (value && value.length === 2) return value.toUpperCase()
-  return 'LK'
+  return match?.split('=')?.[1] ?? 'LK'
 }
 
 export function getCurrencyCookie(): CurrencyCode {
@@ -27,57 +26,44 @@ export function getCurrencyCookie(): CurrencyCode {
   if (value === 'LKR' || value === 'SGD' || value === 'USD') {
     return value
   }
-  // Fall back to deriving from country cookie
-  const country = getCountryCookie()
-  return COUNTRY_CURRENCY[country] ?? 'LKR'
-}
-
-interface GeoContext {
-  currency:    CurrencyCode
-  countryCode: string
+  return 'LKR'
 }
 
 export function useGeo(): GeoContext {
   const [geo, setGeo] = useState<GeoContext>({
     currency:    'LKR',
     countryCode: 'LK',
+    isReady:     false,
   })
 
   useEffect(() => {
     setGeo({
       currency:    getCurrencyCookie(),
       countryCode: getCountryCookie(),
+      isReady:     true,
     })
   }, [])
 
   return geo
 }
 
-// Backwards-compatible — existing callers continue to work unchanged
 export function useCurrency(): CurrencyCode {
-  const { currency } = useGeo()
-  return currency
+  return useGeo().currency
 }
 
 export function formatMoney(money: Money): string {
-  const { amount, currency } = money
-  const num = parseFloat(amount)
-
-  switch (currency) {
-    case 'LKR':
-      return `LKR ${num.toLocaleString('en-LK', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`
-    case 'SGD':
-      return `SGD ${num.toLocaleString('en-SG', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`
-    case 'USD':
-      return `USD ${num.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`
-  }
+  const num = parseFloat(money.amount)
+  const formatter = new Intl.NumberFormat(
+    money.currency === 'LKR'
+      ? 'en-LK'
+      : money.currency === 'SGD'
+        ? 'en-SG'
+        : 'en-US',
+    {
+      style:                 'currency',
+      currency:              money.currency,
+      minimumFractionDigits: 2,
+    },
+  )
+  return formatter.format(num)
 }

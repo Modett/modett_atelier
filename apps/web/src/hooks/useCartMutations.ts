@@ -4,14 +4,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { normalizeCartResponse, type ApiCartResponse, type NormalizedCartResponse } from '@/lib/normalizeCart'
 import { CART_QUERY_KEY } from './useCart'
-import { useCurrency } from './useCurrency'
+import { getCurrencyCookie } from './useCurrency'
 import { useUIStore } from '@/store/ui.store'
 
 function useCartCacheUpdater() {
   const queryClient = useQueryClient()
-  const currency    = useCurrency()
 
   return (data: NormalizedCartResponse) => {
+    const currency = getCurrencyCookie()
     queryClient.setQueryData(
       [...CART_QUERY_KEY, currency],
       data
@@ -21,9 +21,9 @@ function useCartCacheUpdater() {
 
 function useInvalidateCart() {
   const queryClient = useQueryClient()
-  const currency    = useCurrency()
 
   return () => {
+    const currency = getCurrencyCookie()
     queryClient.invalidateQueries({ queryKey: [...CART_QUERY_KEY, currency] })
   }
 }

@@ -2,11 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { useCurrency } from './useCurrency'
+import { useGeo } from './useCurrency'
 import type { ProductSummary, PaginatedResponse } from '@/types'
 
 export function useProductSearch(query: string) {
-  const currency = useCurrency()
+  const { currency, isReady } = useGeo()
 
   return useQuery({
     queryKey: ['product-search', query, currency],
@@ -17,7 +17,7 @@ export function useProductSearch(query: string) {
       )
       return res.data
     },
-    enabled:   query.trim().length >= 2,
+    enabled:   isReady && query.trim().length >= 2,
     staleTime: 60 * 1000,
   })
 }

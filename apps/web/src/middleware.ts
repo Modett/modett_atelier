@@ -6,16 +6,35 @@ const COUNTRY_CURRENCY: Record<string, string> = {
   SG: 'SGD',
 }
 
-const DEFAULT_CURRENCY = 'USD'
+const ENV_DEFAULT_CURRENCY = process.env.NEXT_PUBLIC_DEFAULT_CURRENCY
+const ENV_DEFAULT_COUNTRY  = process.env.NEXT_PUBLIC_DEFAULT_COUNTRY
 
-// TODO: REMOVE before production — Cloudflare CF-IPCountry will take over automatically.
-// In development Cloudflare is not in the request path so CF-IPCountry is never set.
-// We hardcode LK/LKR for dev so shipping methods load correctly locally.
-const DEV_COUNTRY  = 'LK'
-const DEV_CURRENCY = 'LKR'
+const DEFAULT_CURRENCY =
+  ENV_DEFAULT_CURRENCY === 'LKR' ||
+  ENV_DEFAULT_CURRENCY === 'SGD' ||
+  ENV_DEFAULT_CURRENCY === 'USD'
+    ? ENV_DEFAULT_CURRENCY
+    : 'LKR'
+
+const DEFAULT_COUNTRY =
+  typeof ENV_DEFAULT_COUNTRY === 'string' &&
+  ENV_DEFAULT_COUNTRY.length === 2
+    ? ENV_DEFAULT_COUNTRY.toUpperCase()
+    : 'LK'
 
 export function middleware(request: NextRequest) {
   const response = NextResponse.next()
+
+  const existingCountry  = request.cookies.get('country')?.value
+  const existingCurrency = request.cookies.get('currency')?.value
+
+  if (
+    existingCountry &&
+    existingCurrency &&
+    ['LKR', 'SGD', 'USD'].includes(existingCurrency)
+  ) {
+    return response
+  }
 
   let countryCode: string
   let currency: string
@@ -23,22 +42,27 @@ export function middleware(request: NextRequest) {
   const isDev = process.env.NODE_ENV === 'development'
 
   if (isDev) {
-    countryCode = DEV_COUNTRY
-    currency    = DEV_CURRENCY
+    countryCode = 'LK'
+    currency    = 'LKR'
   } else {
-    const cfCountry = request.headers.get('CF-IPCountry')
-    countryCode = cfCountry ?? 'US'
-    currency    = COUNTRY_CURRENCY[countryCode] ?? DEFAULT_CURRENCY
+    const cfCountry    = request.headers.get('CF-IPCountry')
+    const vercelHeader = request.headers.get('x-vercel-ip-country')
+
+    const detectedCountry = cfCountry ?? vercelHeader ?? DEFAULT_COUNTRY
+
+    countryCode =
+      detectedCountry === 'XX' || detectedCountry === 'T1'
+        ? DEFAULT_COUNTRY
+        : detectedCountry
+
+    currency = COUNTRY_CURRENCY[countryCode] ?? DEFAULT_CURRENCY
   }
 
-  const existingCountry  = request.cookies.get('country')?.value
-  const existingCurrency = request.cookies.get('currency')?.value
-
   const COOKIE_OPTIONS = {
-    httpOnly: false,       // readable by client-side JS (useCurrency / useGeo hooks)
+    httpOnly: false,
     secure:   process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,
-    maxAge:   60 * 60 * 24 * 30,   // 30 days
+    maxAge:   60 * 60 * 24 * 30,
     path:     '/',
   }
 
@@ -55,14 +79,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths EXCEPT:
-     * - _next/static (static files)
-     * - _next/image  (image optimisation)
-     * - favicon.ico
-     * - images/      (public images)
-     * - api/         (API routes — geo detection not needed here)
-     */
     '/((?!_next/static|_next/image|favicon.ico|images/|api/).*)',
   ],
 }

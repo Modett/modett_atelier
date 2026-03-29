@@ -1,11 +1,10 @@
 import path   from 'path'
 import type { NextConfig } from 'next'
 
-// Geo-IP detection via Cloudflare CF-IPCountry header (set automatically on any
-// domain proxied through Cloudflare — no configuration required).
-// In development: country is hardcoded to LK (Sri Lanka) in middleware.ts.
-// In production:  remove the DEV_COUNTRY / DEV_CURRENCY override in middleware.ts
-//                 and CF-IPCountry will be used automatically.
+// Geo / currency cookies: middleware uses CF-IPCountry when proxied through
+// Cloudflare, otherwise x-vercel-ip-country on Vercel. Optional
+// NEXT_PUBLIC_DEFAULT_COUNTRY / NEXT_PUBLIC_DEFAULT_CURRENCY for fallbacks.
+// Development forces LK/LKR in middleware.
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

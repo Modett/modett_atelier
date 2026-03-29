@@ -44,7 +44,7 @@ interface UseProductOptions {
 }
 
 export function useProduct(slug: string, options?: UseProductOptions) {
-  const { currency } = useGeo()
+  const { currency, isReady } = useGeo()
 
   return useQuery({
     queryKey: ['product', slug, currency],
@@ -55,7 +55,8 @@ export function useProduct(slug: string, options?: UseProductOptions) {
       )
       return normalizeProduct(res.data.product)
     },
-    enabled:   options?.enabled !== false && !!slug,
+    enabled:
+      isReady && options?.enabled !== false && !!slug,
     staleTime: 2 * 60 * 1000,
   })
 }

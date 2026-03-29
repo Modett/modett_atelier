@@ -17,7 +17,7 @@ const BOUTIQUES = [
 
 export function ShippingStep() {
   const store = useCheckoutStore()
-  const { currency, countryCode } = useGeo()
+  const { currency, countryCode, isReady: geoReady } = useGeo()
   const { summary } = useCart()
 
   const [deliveryType, setDeliveryType] = useState<'home' | 'boutique'>(
@@ -44,7 +44,7 @@ export function ShippingStep() {
     countryCode,
     currency,
     subtotal: summary?.subtotal.amount,
-    enabled: deliveryType === 'home',
+    enabled: deliveryType === 'home' && geoReady,
   })
 
   useEffect(() => {

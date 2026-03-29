@@ -11,7 +11,7 @@ interface HomepageData {
 }
 
 export function useHomepage() {
-  const { currency } = useGeo()
+  const { currency, isReady } = useGeo()
 
   return useQuery({
     queryKey: ['homepage', currency],
@@ -22,6 +22,7 @@ export function useHomepage() {
       )
       return res.data
     },
+    enabled:   isReady,
     staleTime: 5 * 60 * 1000,
   })
 }
