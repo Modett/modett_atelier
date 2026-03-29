@@ -22,7 +22,7 @@ export function CheckoutOrderSummary({
   className,
 }: CheckoutOrderSummaryProps) {
   const { items, summary, itemCount } = useCart()
-  const { currency, countryCode: geoCountry } = useGeo()
+  const { currency, countryCode: geoCountry, isReady: geoReady } = useGeo()
 
   // Prop countryCode (from address form) takes priority; fall back to geo-detected
   // country so the estimate shows even before the address step is reached.
@@ -36,6 +36,7 @@ export function CheckoutOrderSummary({
     currency,
     subtotal: summary?.subtotal.amount ?? '0',
     enabled: !!effectiveCountry && !!summary,
+    isReady: geoReady,
   })
 
   const selectedMethod = selectedMethodId && shippingData

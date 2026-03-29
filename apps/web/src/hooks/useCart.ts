@@ -8,7 +8,7 @@ import { useGeo } from './useCurrency'
 export const CART_QUERY_KEY = ['cart'] as const
 
 export function useCart() {
-  const { currency } = useGeo()
+  const { currency, isReady } = useGeo()
 
   const query = useQuery<NormalizedCartResponse>({
     queryKey: [...CART_QUERY_KEY, currency],
@@ -19,6 +19,7 @@ export function useCart() {
       )
       return normalizeCartResponse(res.data)
     },
+    enabled:              isReady,
     staleTime:            30 * 1000,
     refetchOnWindowFocus: true,
   })

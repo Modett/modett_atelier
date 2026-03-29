@@ -24,13 +24,14 @@ export function CartOrderSummary({
   const [promoCode,  setPromoCode]  = useState('')
   const [promoError, setPromoError] = useState<string | null>(null)
 
-  const { currency, countryCode } = useGeo()
+  const { currency, countryCode, isReady: geoReady } = useGeo()
 
   const { data: shippingEst } = useShippingEstimate({
     countryCode,
     currency,
     subtotal: summary?.subtotal.amount ?? '0',
     enabled: !!summary && parseFloat(summary.subtotal.amount) > 0,
+    isReady: geoReady,
   })
 
   const cheapestMethod = shippingEst?.methods[0] ?? null
