@@ -22,6 +22,10 @@ export default function CartPage() {
 
   const [editingItem, setEditingItem] = useState<CartItem | null>(null)
 
+  function handleEditDrawerClose() {
+    setTimeout(() => setEditingItem(null), 320)
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-page mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12">
@@ -86,7 +90,7 @@ export default function CartPage() {
       {/* Edit item drawer */}
       <EditItemDrawer
         item={editingItem}
-        onClose={() => setEditingItem(null)}
+        onClose={handleEditDrawerClose}
       />
     </div>
   )

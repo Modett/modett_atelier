@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { X, ChevronLeft, ChevronRight, Heart, Loader2 } from 'lucide-react'
@@ -31,30 +31,47 @@ interface EditItemDrawerProps {
 }
 
 export function EditItemDrawer({ item, onClose }: EditItemDrawerProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const displayItem = useRef<CartItem | null>(item)
+
+  if (item) {
+    displayItem.current = item
+  }
+
+  useLayoutEffect(() => {
+    setIsOpen(!!item)
+  }, [item])
+
+  const requestClose = useCallback(() => {
+    setIsOpen(false)
+    onClose()
+  }, [onClose])
+
   useEffect(() => {
-    const isOpen = !!item
-    document.body.style.overflow = isOpen ? 'hidden' : ''
+    document.body.style.overflow = item ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [item])
 
   useEffect(() => {
     if (!item) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') requestClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [item, onClose])
+  }, [item, requestClose])
+
+  const displayed = displayItem.current
 
   return (
     <>
       <div
         aria-hidden="true"
-        onClick={onClose}
+        onClick={requestClose}
         className={cn(
           'fixed inset-0 z-40 bg-graphite/40',
           'transition-opacity duration-200',
-          item
+          isOpen
             ? 'opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none',
         )}
@@ -63,19 +80,19 @@ export function EditItemDrawer({ item, onClose }: EditItemDrawerProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={item ? `Edit ${item.displayName}` : 'Edit item'}
-        aria-hidden={!item}
+        aria-label={`Edit ${displayed?.displayName ?? ''}`}
+        aria-hidden={!isOpen}
         className={cn(
           'fixed top-0 right-0 bottom-0 z-50',
           'w-full max-w-[420px]',
           'bg-background flex flex-col',
           'shadow-[-6px_0_32px_rgba(35,45,53,0.10)]',
           'transition-transform duration-300 ease-out',
-          item ? 'translate-x-0' : 'translate-x-full',
+          isOpen ? 'translate-x-0' : 'translate-x-full',
         )}
       >
-        {item && (
-          <EditItemDrawerInner item={item} onClose={onClose} />
+        {displayed && (
+          <EditItemDrawerInner item={displayed} onClose={requestClose} />
         )}
       </div>
     </>
