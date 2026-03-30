@@ -14,7 +14,7 @@ import {
   rateLimitAdminInvites,
   rateLimitAcceptInvite,
 } from '../../middleware/rateLimit'
-import { requireAuth, requireAdmin, requireOwner } from '../../middleware/auth'
+import { optionalAuth, requireAuth, requireAdmin, requireOwner } from '../../middleware/auth'
 import { mergeCartsOnLogin } from '../cart'
 import {
   crossOriginCookieAttributes,
@@ -199,6 +199,30 @@ router.post('/auth/logout', async (req: Request, res: Response) => {
   clearSidCookie(res, '/')
   res.status(200).json({ data: { ok: true } })
 })
+
+/**
+ * Guest-safe session probe — always 200. Avoids 401 noise for logged-out users
+ * (GET /me requires auth). Same cookies as /me; use for storefront session UI.
+ */
+router.get(
+  '/auth/session',
+  rateLimit({
+    name:       'auth-session',
+    windowMs:   60 * 1000,
+    max:        120,
+    key:        (req) => req.ip ?? 'unknown',
+  }),
+  optionalAuth,
+  async (req: Request, res: Response) => {
+    const user = (req as { user?: { id: string } }).user
+    if (!user?.id) {
+      res.status(200).json({ data: { user: null } })
+      return
+    }
+    const profile = await iamService.getMe({ userId: user.id })
+    res.status(200).json({ data: { user: profile } })
+  },
+)
 
 // —— Me (requireAuth) ——
 

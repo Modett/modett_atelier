@@ -22,12 +22,18 @@ export const app: Express = express()
 // Railway sits behind a reverse proxy — required for correct req.ip and secure cookies
 app.set('trust proxy', 1)
 
+const extraCorsOrigins = (process.env.CORS_ALLOW_ORIGINS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter((s) => s.length > 0)
+
 const rawAllowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_WWW,
   process.env.FRONTEND_URL?.replace(/^https:\/\//, 'https://www.'),
+  ...extraCorsOrigins,
 ].filter((o): o is string => typeof o === 'string' && o.length > 0)
 
 const ALLOWED_ORIGINS = [...new Set(rawAllowedOrigins)]

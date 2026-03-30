@@ -19,14 +19,9 @@ function useCartCacheUpdater() {
   }
 }
 
-function useInvalidateCart() {
-  const queryClient = useQueryClient()
-
-  return () => {
-    const currency = getCurrencyCookie()
-    queryClient.invalidateQueries({ queryKey: [...CART_QUERY_KEY, currency] })
-  }
-}
+// Do not invalidate cart queries after mutations: the response body is authoritative.
+// An immediate GET /cart refetch can run before/with a different cid (cross-origin
+// cookie timing) and overwrite the cache with an empty cart.
 
 // ── ADD TO CART ──────────────────────────────────────
 interface AddToCartInput {
@@ -36,7 +31,6 @@ interface AddToCartInput {
 
 export function useAddToCart() {
   const updateCache   = useCartCacheUpdater()
-  const invalidate    = useInvalidateCart()
   const openBag       = useUIStore(s => s.openBag)
 
   return useMutation({
@@ -46,7 +40,6 @@ export function useAddToCart() {
     },
     onSuccess: (data) => {
       updateCache(data)
-      invalidate()
       openBag()
     },
   })
@@ -60,7 +53,6 @@ interface UpdateQtyInput {
 
 export function useUpdateCartQty() {
   const updateCache = useCartCacheUpdater()
-  const invalidate  = useInvalidateCart()
 
   return useMutation({
     mutationFn: async ({ variantId, qty }: UpdateQtyInput) => {
@@ -72,7 +64,6 @@ export function useUpdateCartQty() {
     },
     onSuccess: (data) => {
       updateCache(data)
-      invalidate()
     },
   })
 }
@@ -80,7 +71,6 @@ export function useUpdateCartQty() {
 // ── REMOVE FROM CART ─────────────────────────────────
 export function useRemoveFromCart() {
   const updateCache = useCartCacheUpdater()
-  const invalidate  = useInvalidateCart()
 
   return useMutation({
     mutationFn: async (variantId: string) => {
@@ -91,7 +81,6 @@ export function useRemoveFromCart() {
     },
     onSuccess: (data) => {
       updateCache(data)
-      invalidate()
     },
   })
 }
@@ -99,7 +88,6 @@ export function useRemoveFromCart() {
 // ── CLEAR CART ───────────────────────────────────────
 export function useClearCart() {
   const updateCache = useCartCacheUpdater()
-  const invalidate  = useInvalidateCart()
 
   return useMutation({
     mutationFn: async () => {
@@ -108,7 +96,6 @@ export function useClearCart() {
     },
     onSuccess: (data) => {
       updateCache(data)
-      invalidate()
     },
   })
 }

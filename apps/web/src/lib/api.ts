@@ -22,13 +22,16 @@ async function apiClient<T>(
     })
   }
 
+  const { headers: optionHeaders, credentials, ...restFetch } = fetchOptions
+  void credentials
+
   const response = await fetch(url.toString(), {
+    ...restFetch,
     headers: {
       'Content-Type': 'application/json',
-      ...fetchOptions.headers,
+      ...optionHeaders,
     },
     credentials: 'include',
-    ...fetchOptions,
   })
 
   if (!response.ok) {
