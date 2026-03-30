@@ -46,6 +46,9 @@ export function CollectionPage({
   const [showFilters, setShowFilters]             = useState(true)
   const [gridCols, setGridCols]                   = useState<2 | 3>(3)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [pendingQuickAddProductIds, setPendingQuickAddProductIds] = useState(
+    () => new Set<string>(),
+  )
 
   const {
     data,
@@ -115,10 +118,27 @@ export function CollectionPage({
       const product = allProducts.find((p) => p.id === productId)
       if (!product) return
       const variant = product.variants?.find(
-        (v) => v.color === colourValue && v.size === sizeValue
+        (v) => v.color === colourValue && v.size === sizeValue,
       )
       if (!variant) return
-      addToCart.mutate({ variantId: variant.variantId, qty: 1 })
+
+      setPendingQuickAddProductIds((prev) => {
+        const next = new Set(prev)
+        next.add(productId)
+        return next
+      })
+      addToCart.mutate(
+        { variantId: variant.variantId, qty: 1 },
+        {
+          onSettled: () => {
+            setPendingQuickAddProductIds((prev) => {
+              const next = new Set(prev)
+              next.delete(productId)
+              return next
+            })
+          },
+        },
+      )
     },
     [allProducts, addToCart],
   )
@@ -382,7 +402,7 @@ export function CollectionPage({
                     onWishlistToggle: handleWishlistToggle,
                     onCardClick: handleCardClick,
                     onQuickAddToCart: handleQuickAddToCart,
-                    isAddingToCart: addToCart.isPending,
+                    isAddingToCart: pendingQuickAddProductIds.has(p.id),
                   }))}
                   isLoading={isLoading}
                   gridCols={gridCols}
