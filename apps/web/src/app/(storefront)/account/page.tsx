@@ -1,213 +1,279 @@
 'use client'
 
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { cn } from '@/lib/utils'
-import { useOrders, useLoyalty, useInbox } from '@/hooks/useAccount'
-import { useWishlist } from '@/hooks/useWishlist'
-import { formatMoney } from '@/hooks/useCurrency'
-import type { CurrencyCode } from '@/types'
-import { getOrderStatusBadge, orderBadgeClassName } from '@/lib/orderDisplay'
-import { productImagePlaceholderUrl } from '@/lib/assets'
+import { useSession } from '@/hooks/useSession'
+import { useUpdateProfile } from '@/hooks/useAccount'
+import { TITLE_OPTIONS } from '@/components/checkout/steps/InformationStep'
+import type { TitleOption } from '@/store/checkout.store'
+import { DeleteAccountModal } from '@/components/account/DeleteAccountModal'
 
-function LinesSkeleton() {
-  return (
-    <div className="animate-pulse space-y-2 py-1">
-      <div className="h-4 w-40 bg-muted rounded-none" />
-      <div className="h-4 w-28 bg-muted rounded-none" />
-      <div className="h-4 w-full bg-muted/70 rounded-none" />
-    </div>
-  )
+const TITLE_LABELS: Record<TitleOption, string> = {
+  Mr:   'Mr.',
+  Ms:   'Ms.',
+  Miss: 'Miss',
+  Mrs:  'Mrs.',
 }
 
-export default function AccountDashboardPage() {
-  const ordersQ   = useOrders(1)
-  const loyaltyQ  = useLoyalty()
-  const wishlistQ = useWishlist()
-  const inboxQ    = useInbox(1)
+export default function AccountPersonalDetailsPage() {
+  const { user, isLoading }     = useSession()
+  const updateProfile           = useUpdateProfile()
 
-  const recentOrders = ordersQ.data?.orders.slice(0, 3) ?? []
-  const loyalty      = loyaltyQ.data
-  const wishlist     = wishlistQ.data ?? []
-  const inbox        = inboxQ.data
+  const [titlePreference, setTitlePreference] = useState<TitleOption>('Mr')
+  const [firstName, setFirstName]             = useState('')
+  const [lastName, setLastName]               = useState('')
+  const [dob, setDob]                         = useState('')
+  const [newsletter, setNewsletter]           = useState(false)
+  const [savedFlash, setSavedFlash]         = useState(false)
+  const [deleteOpen, setDeleteOpen]         = useState(false)
+  const [deleteConfirm, setDeleteConfirm]   = useState('')
+
+  useEffect(() => {
+    if (!user) return
+    setFirstName(user.firstName)
+    setLastName(user.lastName)
+    setNewsletter(user.newsletterOptIn)
+    if (user.dob) {
+      const d = user.dob.includes('T') ? user.dob.slice(0, 10) : user.dob.slice(0, 10)
+      setDob(d)
+    } else {
+      setDob('')
+    }
+  }, [user])
+
+  const dirty = useMemo(() => {
+    if (!user) return false
+    const userDob = user.dob
+      ? (user.dob.includes('T') ? user.dob.slice(0, 10) : user.dob.slice(0, 10))
+      : ''
+    const formDob = dob.trim()
+    return (
+      firstName !== user.firstName
+      || lastName !== user.lastName
+      || formDob !== userDob
+    )
+  }, [user, firstName, lastName, dob])
+
+  function handleSaveProfile() {
+    if (!user || !dirty) return
+    updateProfile.mutate(
+      {
+        firstName,
+        lastName,
+        dob:        dob.trim() ? dob.trim() : null,
+        dobConsent: !!dob.trim(),
+      },
+      {
+        onSuccess: () => {
+          setSavedFlash(true)
+          setTimeout(() => setSavedFlash(false), 2000)
+        },
+      },
+    )
+  }
+
+  function handleNewsletterToggle() {
+    if (!user) return
+    const next = !newsletter
+    setNewsletter(next)
+    updateProfile.mutate(
+      { newsletterOptIn: next },
+      {
+        onError: () => {
+          setNewsletter(!next)
+        },
+      },
+    )
+  }
+
+  if (isLoading || !user) {
+    return <div className="h-40 bg-muted animate-pulse rounded-none" />
+  }
 
   return (
-    <div>
-      <h1 className="font-display font-bold text-[28px] text-umber mb-8 lg:hidden">
-        My Modett
+    <div className="max-w-xl">
+      <h1 className="font-display font-bold text-[26px] text-umber mb-8">
+        Personal Details
       </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* Recent orders */}
-        <div className="bg-background border border-muted p-6">
-          <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
-            Recent Orders
-          </p>
-          {ordersQ.isLoading ? (
-            <LinesSkeleton />
-          ) : recentOrders.length === 0 ? (
-            <p className="font-body text-[14px] text-umber">No orders yet</p>
-          ) : (
-            <ul className="space-y-3">
-              {recentOrders.map((o) => {
-                const badge = getOrderStatusBadge(o)
-                const cur   = o.currency as CurrencyCode
-                return (
-                  <li key={o.id}>
-                    <Link
-                      href={`/account/orders/${encodeURIComponent(o.order_ref)}`}
-                      className="block hover:opacity-80 transition-opacity"
-                    >
-                      <div className="flex justify-between gap-2 items-start">
-                        <span className="font-body text-[13px] text-umber font-medium">
-                          {o.order_ref}
-                        </span>
-                        <span
-                          className={orderBadgeClassName(badge.className)}
-                        >
-                          {badge.label}
-                        </span>
-                      </div>
-                      <p className="font-body font-light text-[12px] text-muted-foreground mt-1">
-                        {o.placed_at
-                          ? new Date(o.placed_at).toLocaleDateString('en-GB')
-                          : '—'}
-                      </p>
-                      <p className="font-body text-[13px] text-umber mt-1">
-                        {formatMoney({ amount: o.total, currency: cur })}
-                      </p>
-                    </Link>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          <Link
-            href="/account/orders"
-            className="inline-block mt-4 font-body font-light text-[12px] uppercase tracking-[0.15em] text-umber hover:underline"
-          >
-            View all orders
-          </Link>
-        </div>
-
-        {/* Loyalty */}
-        <div className="bg-background border border-muted p-6">
-          <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
-            Loyalty Points
-          </p>
-          {loyaltyQ.isLoading ? (
-            <LinesSkeleton />
-          ) : loyalty ? (
-            <>
-              <p className="font-display font-bold text-[36px] text-umber leading-none mb-3">
-                {loyalty.balance.toLocaleString()}
-              </p>
-              <TierBadge tier={loyalty.tier} />
-              <Link
-                href="/account/loyalty"
-                className="inline-block mt-4 font-body font-light text-[12px] uppercase tracking-[0.15em] text-umber hover:underline"
-              >
-                View loyalty
-              </Link>
-            </>
-          ) : null}
-        </div>
-
-        {/* Wishlist */}
-        <div className="bg-background border border-muted p-6">
-          <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
-            Wishlist
-          </p>
-          {wishlistQ.isLoading ? (
-            <LinesSkeleton />
-          ) : wishlist.length === 0 ? (
-            <p className="font-body text-[14px] text-umber">No saved items</p>
-          ) : (
-            <>
-              <p className="font-body text-[14px] text-umber mb-3">
-                {wishlist.length} item{wishlist.length === 1 ? '' : 's'}
-              </p>
-              <div className="flex gap-2">
-                {wishlist.slice(0, 3).map((w) => (
-                  <div
-                    key={w.id}
-                    className="relative w-16 h-20 bg-muted overflow-hidden shrink-0"
-                  >
-                    <Image
-                      src={w.product.keyImage?.url ?? productImagePlaceholderUrl}
-                      alt={w.product.keyImage?.altText ?? w.product.displayName}
-                      fill
-                      className="object-cover"
-                      sizes="64px"
-                    />
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-          <Link
-            href="/account/wishlist"
-            className="inline-block mt-4 font-body font-light text-[12px] uppercase tracking-[0.15em] text-umber hover:underline"
-          >
-            View wishlist
-          </Link>
-        </div>
-
-        {/* Inbox */}
-        <div className="bg-background border border-muted p-6">
-          <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
-            Inbox
-          </p>
-          {inboxQ.isLoading ? (
-            <LinesSkeleton />
-          ) : !inbox || inbox.messages.length === 0 ? (
-            <p className="font-body text-[14px] text-umber">No messages</p>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="font-body text-[14px] text-umber">
-                  {inbox.unreadCount > 0
-                    ? `${inbox.unreadCount} unread`
-                    : 'All read'}
-                </span>
-                {inbox.unreadCount > 0 && (
-                  <span className="w-2 h-2 rounded-full bg-umber" aria-hidden />
+      <section>
+        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-5">
+          Your Details
+        </p>
+        <div className="mb-5">
+          <p className="font-body font-light text-[12px] text-umber mb-2">Title</p>
+          <div className="flex flex-wrap gap-2">
+            {TITLE_OPTIONS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTitlePreference(t)}
+                className={cn(
+                  'border px-4 py-2 cursor-pointer font-body font-light text-[12px] rounded-none transition-colors',
+                  titlePreference === t
+                    ? 'bg-umber text-background border-umber'
+                    : 'border-muted text-muted-foreground hover:border-umber',
                 )}
-              </div>
-              <p className="font-body font-light text-[13px] text-muted-foreground line-clamp-2">
-                {inbox.messages.find((m) => !m.is_read)?.title
-                  ?? inbox.messages[0]?.title}
-              </p>
-            </>
-          )}
-          <Link
-            href="/account/inbox"
-            className="inline-block mt-4 font-body font-light text-[12px] uppercase tracking-[0.15em] text-umber hover:underline"
-          >
-            View inbox
-          </Link>
+              >
+                {TITLE_LABELS[t]}
+              </button>
+            ))}
+          </div>
+          {/* TODO: wire when API supports title */}
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <Field
+            label="First name"
+            value={firstName}
+            onChange={setFirstName}
+            autoComplete="given-name"
+          />
+          <Field
+            label="Last name"
+            value={lastName}
+            onChange={setLastName}
+            autoComplete="family-name"
+          />
+        </div>
+
+        <div className="mb-2">
+          <label
+            htmlFor="account-dob"
+            className="font-body font-light text-[12px] text-umber block mb-1"
+          >
+            Date of birth (optional)
+          </label>
+          <input
+            id="account-dob"
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            className={cn(
+              'w-full h-12 border border-muted px-4 rounded-none',
+              'font-body font-light text-[14px] text-umber',
+              'outline-none focus:border-umber',
+            )}
+          />
+          <p className="font-body font-light text-[11px] text-muted-foreground mt-2">
+            By providing your date of birth you agree to our privacy policy.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={!dirty || updateProfile.isPending}
+          onClick={handleSaveProfile}
+          className={cn(
+            'mt-6 h-11 px-10 bg-deep text-background rounded-none',
+            'font-body font-light uppercase tracking-[0.2em] text-[12px]',
+            'hover:bg-ink transition-colors disabled:opacity-40',
+          )}
+        >
+          {updateProfile.isPending
+            ? 'Saving...'
+            : savedFlash
+              ? 'Saved ✓'
+              : 'Save Details'}
+        </button>
+      </section>
+
+      <div className="border-t border-muted my-8" />
+
+      <section>
+        <div className="flex items-center justify-between gap-4">
+          <p className="font-body font-light text-[13px] text-umber flex-1">
+            Receive news and exclusive offers by email
+          </p>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={newsletter}
+            onClick={handleNewsletterToggle}
+            className={cn(
+              'relative w-11 h-6 shrink-0 transition-colors duration-200 rounded-full p-0.5',
+              newsletter ? 'bg-umber' : 'bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'block w-5 h-5 bg-background rounded-full shadow-sm transition-transform duration-200',
+                newsletter ? 'translate-x-5' : 'translate-x-0',
+              )}
+            />
+          </button>
+        </div>
+      </section>
+
+      <div className="border-t border-muted my-8" />
+
+      <section>
+        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
+          Email address
+        </p>
+        <p className="font-body font-light text-[14px] text-umber">{user.email}</p>
+        <p className="font-body font-light text-[13px] text-muted-foreground mt-2">
+          To change your email address, visit{' '}
+          <Link href="/account/login" className="text-umber underline underline-offset-2">
+            Login Details
+          </Link>
+        </p>
+      </section>
+
+      <div className="pt-8 border-t border-muted mt-8">
+        <button
+          type="button"
+          onClick={() => {
+            setDeleteOpen(true)
+            setDeleteConfirm('')
+          }}
+          className="font-body font-light text-[12px] text-muted-foreground hover:text-red-500"
+        >
+          Delete my account
+        </button>
       </div>
+
+      <DeleteAccountModal
+        open={deleteOpen}
+        confirmText={deleteConfirm}
+        onConfirmChange={setDeleteConfirm}
+        onClose={() => {
+          setDeleteOpen(false)
+          setDeleteConfirm('')
+        }}
+      />
     </div>
   )
 }
 
-function TierBadge({ tier }: { tier: string }) {
-  const t = tier.toUpperCase()
-  const styles =
-    t === 'BRONZE'
-      ? 'bg-[#CD7F32]/10 text-[#8B5E3C]'
-      : t === 'SILVER'
-        ? 'bg-gray-100 text-gray-500'
-        : 'bg-highlight/15 text-umber'
+function Field({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  autoComplete,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  type?: string
+  autoComplete?: string
+}) {
   return (
-    <span
-      className={cn(
-        'inline-block px-3 py-1 text-[11px] font-body font-light uppercase tracking-[0.12em] rounded-none',
-        styles,
-      )}
-    >
-      {t}
-    </span>
+    <div>
+      <label className="font-body font-light text-[12px] text-umber block mb-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        autoComplete={autoComplete}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          'w-full h-12 border border-muted px-4 rounded-none',
+          'font-body font-light text-[14px] text-umber',
+          'outline-none focus:border-umber',
+        )}
+      />
+    </div>
   )
 }

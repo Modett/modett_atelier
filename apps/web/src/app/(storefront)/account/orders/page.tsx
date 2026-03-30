@@ -1,32 +1,53 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOrders, type OrderSummaryRow } from '@/hooks/useAccount'
-import { formatMoney } from '@/hooks/useCurrency'
-import type { CurrencyCode } from '@/types'
-import { getOrderStatusBadge, orderBadgeClassName } from '@/lib/orderDisplay'
+
+function formatOrderDate(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-GB', {
+    day:         'numeric',
+    month:       'short',
+    hour:        '2-digit',
+    minute:      '2-digit',
+  })
+}
+
+function formatTotalNumber(amount: string): string {
+  const n = Number(amount)
+  if (Number.isNaN(n)) return amount
+  return n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function paymentStatusLabel(paymentState: string): string {
+  const s = paymentState.toUpperCase()
+  if (s === 'PAID' || s === 'CAPTURED' || s === 'SUCCEEDED') return 'Paid'
+  if (s === 'FAILED' || s === 'REFUNDED') return 'Failed'
+  return 'Pending'
+}
+
+function fulfillmentStatusLabel(fulfillmentState: string): string {
+  const s = fulfillmentState.toUpperCase()
+  if (s === 'DELIVERED') return 'Fulfilled'
+  if (s === 'SHIPPED') return 'On its way'
+  if (s === 'CANCELLED') return 'Cancelled'
+  if (s === 'PACKED' || s === 'PROCESSING') return 'Processing'
+  return 'Processing'
+}
 
 export default function AccountOrdersPage() {
-  const router = useRouter()
   const [page, setPage] = useState(1)
-  const [rows, setRows] = useState<OrderSummaryRow[]>([])
   const { data, isLoading, isFetching } = useOrders(page)
 
-  useEffect(() => {
-    if (!data?.orders) return
-    if (page === 1) {
-      setRows(data.orders)
-      return
-    }
-    setRows((prev) => [...prev, ...data.orders])
-  }, [data, page])
+  const rows   = data?.orders ?? []
+  const limit  = data?.limit ?? 10
+  const total  = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / limit))
 
-  const hasMore = data ? page * data.limit < data.total : false
-
-  if (isLoading && page === 1 && rows.length === 0) {
+  if (isLoading && !data) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="h-8 w-48 bg-muted rounded-none" />
@@ -38,7 +59,7 @@ export default function AccountOrdersPage() {
   return (
     <div>
       <h1 className="font-display font-bold text-[24px] text-umber mb-6">
-        Orders
+        Order Details
       </h1>
 
       {rows.length === 0 ? (
@@ -59,118 +80,146 @@ export default function AccountOrdersPage() {
         </div>
       ) : (
         <>
-          <div className="hidden md:block border border-muted">
-            <table className="w-full text-left">
+          <div className="hidden md:block w-full overflow-x-auto">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-muted bg-surface-raised/30">
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground px-4 py-3">
+                <tr className="border-b border-muted">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 pr-2 text-left">
                     Order
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground px-4 py-3">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-left">
                     Date
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground px-4 py-3">
-                    Items
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-left">
+                    Payment status
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground px-4 py-3">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-left">
+                    Fulfillment status
+                  </th>
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-right">
                     Total
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground px-4 py-3">
-                    Status
-                  </th>
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 pl-2 text-right w-[1%] whitespace-nowrap" />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((o) => {
-                  const badge = getOrderStatusBadge(o)
-                  const cur   = o.currency as CurrencyCode
-                  const href  = `/account/orders/${encodeURIComponent(o.order_ref)}`
-                  return (
-                    <tr
-                      key={o.id}
-                      role="link"
-                      tabIndex={0}
-                      onClick={() => router.push(href)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') router.push(href)
-                      }}
-                      className="border-b border-muted last:border-0 cursor-pointer hover:bg-surface-raised/50 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-body text-[13px] text-umber">
-                        {o.order_ref}
-                      </td>
-                      <td className="px-4 py-3 font-body font-light text-[13px] text-muted-foreground">
-                        {o.placed_at
-                          ? new Date(o.placed_at).toLocaleDateString('en-GB')
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3 font-body font-light text-[13px] text-umber">
-                        {o.item_count}
-                      </td>
-                      <td className="px-4 py-3 font-body text-[13px] text-umber">
-                        {formatMoney({ amount: o.total, currency: cur })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={orderBadgeClassName(badge.className)}>
-                          {badge.label}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {rows.map((o) => (
+                  <OrderTableRow key={o.id} o={o} />
+                ))}
               </tbody>
             </table>
           </div>
 
-          <div className="md:hidden space-y-3">
-            {rows.map((o) => {
-              const badge = getOrderStatusBadge(o)
-              const cur   = o.currency as CurrencyCode
-              const href  = `/account/orders/${encodeURIComponent(o.order_ref)}`
-              return (
-                <Link
-                  key={o.id}
-                  href={href}
-                  className="block border border-muted p-4 hover:bg-surface-raised/40 transition-colors"
-                >
-                  <div className="flex justify-between gap-2">
-                    <span className="font-body font-medium text-[14px] text-umber">
-                      {o.order_ref}
-                    </span>
-                    <span className={orderBadgeClassName(badge.className)}>
-                      {badge.label}
-                    </span>
-                  </div>
-                  <p className="font-body font-light text-[12px] text-muted-foreground mt-2">
-                    {o.placed_at
-                      ? new Date(o.placed_at).toLocaleDateString('en-GB')
-                      : '—'}
-                  </p>
-                  <p className="font-body text-[14px] text-umber mt-2">
-                    {formatMoney({ amount: o.total, currency: cur })}
-                  </p>
-                </Link>
-              )
-            })}
+          <div className="md:hidden">
+            {rows.map((o) => (
+              <OrderMobileRow key={o.id} o={o} />
+            ))}
           </div>
 
-          {hasMore && (
-            <button
-              type="button"
-              disabled={isFetching}
-              onClick={() => setPage((p) => p + 1)}
-              className={cn(
-                'mt-8 w-full md:w-auto h-11 px-10 border border-umber text-umber',
-                'font-body font-light uppercase tracking-[0.25em] text-[12px] rounded-none',
-                'hover:bg-umber hover:text-background transition-all duration-200',
-                'disabled:opacity-40',
-              )}
+          {totalPages > 1 && (
+            <nav
+              className="mt-8 flex items-center gap-3 font-body text-[13px]"
+              aria-label="Order list pages"
             >
-              {isFetching ? 'Loading…' : 'Load more'}
-            </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPage(p)}
+                  disabled={isFetching}
+                  className={cn(
+                    p === page
+                      ? 'text-umber font-medium underline'
+                      : 'text-muted-foreground hover:text-umber',
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+              {page < totalPages && (
+                <button
+                  type="button"
+                  onClick={() => setPage((x) => x + 1)}
+                  disabled={isFetching}
+                  className="text-muted-foreground hover:text-umber p-0.5"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+            </nav>
           )}
         </>
       )}
+    </div>
+  )
+}
+
+function OrderTableRow({ o }: { o: OrderSummaryRow }) {
+  const href = `/account/orders/${encodeURIComponent(o.order_ref)}`
+  return (
+    <tr className="border-b border-muted last:border-0">
+      <td className="py-4 pr-2 align-top">
+        <Link
+          href={href}
+          className="font-body text-[13px] text-umber underline underline-offset-2 hover:text-ink"
+        >
+          {o.order_ref}
+        </Link>
+      </td>
+      <td className="py-4 px-2 font-body font-light text-[13px] text-muted-foreground align-top">
+        {formatOrderDate(o.placed_at)}
+      </td>
+      <td className="py-4 px-2 font-body font-light text-[13px] text-umber align-top">
+        {paymentStatusLabel(o.payment_state)}
+      </td>
+      <td className="py-4 px-2 font-body font-light text-[13px] text-umber align-top">
+        {fulfillmentStatusLabel(o.fulfillment_state)}
+      </td>
+      <td className="py-4 px-2 font-body text-[13px] text-umber text-right align-top tabular-nums">
+        {formatTotalNumber(o.total)}
+      </td>
+      <td className="py-4 pl-2 text-right align-top">
+        <Link
+          href={href}
+          className="font-body font-light text-[13px] text-umber underline underline-offset-2 hover:text-ink whitespace-nowrap"
+        >
+          View order
+        </Link>
+      </td>
+    </tr>
+  )
+}
+
+function OrderMobileRow({ o }: { o: OrderSummaryRow }) {
+  const href = `/account/orders/${encodeURIComponent(o.order_ref)}`
+  return (
+    <div className="border-b border-muted py-4">
+      <div className="flex justify-between gap-2 items-start">
+        <Link
+          href={href}
+          className="font-body text-[13px] text-umber underline underline-offset-2"
+        >
+          {o.order_ref}
+        </Link>
+        <span className="font-body font-light text-[12px] text-umber text-right shrink-0">
+          {fulfillmentStatusLabel(o.fulfillment_state)}
+        </span>
+      </div>
+      <p className="font-body font-light text-[12px] text-muted-foreground mt-2">
+        {formatOrderDate(o.placed_at)}
+      </p>
+      <div className="flex justify-end items-center gap-3 mt-2">
+        <span className="font-body text-[13px] text-umber tabular-nums">
+          {formatTotalNumber(o.total)}
+        </span>
+        <Link
+          href={href}
+          className="font-body font-light text-[13px] text-umber underline underline-offset-2"
+        >
+          View order →
+        </Link>
+      </div>
     </div>
   )
 }

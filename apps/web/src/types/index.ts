@@ -32,6 +32,7 @@ export interface User {
   email:           string
   newsletterOptIn: boolean
   createdAt:       string
+  dob?:            string | null
 }
 
 export interface Admin {

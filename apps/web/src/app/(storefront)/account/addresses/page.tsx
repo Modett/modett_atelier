@@ -10,13 +10,65 @@ import {
   type SavedAddressRow,
 } from '@/hooks/useAccount'
 import {
-  SharedAddressForm,
   addressSchema,
   makeEmptyAddressFormData,
   TITLE_OPTIONS,
+  ADDRESS_COUNTRIES,
   type AddressFormData,
 } from '@/components/checkout/steps/InformationStep'
 import type { TitleOption } from '@/store/checkout.store'
+
+const DIAL_OPTIONS: { prefix: string; label: string; countries: string[] }[] = [
+  { prefix: '+94',  label: '+94 LK', countries: ['LK'] },
+  { prefix: '+65',  label: '+65 SG', countries: ['SG'] },
+  { prefix: '+1',   label: '+1 US', countries: ['US'] },
+  { prefix: '+44',  label: '+44 GB', countries: ['GB'] },
+  { prefix: '+61',  label: '+61 AU', countries: ['AU'] },
+  { prefix: '+81',  label: '+81 JP', countries: ['JP'] },
+  { prefix: '+971', label: '+971 AE', countries: ['AE'] },
+  { prefix: '+91',  label: '+91 IN', countries: ['IN'] },
+  { prefix: '+33',  label: '+33 FR', countries: ['FR'] },
+  { prefix: '+49',  label: '+49 DE', countries: ['DE'] },
+]
+
+function defaultDialPrefix(countryCode: string): string {
+  const hit = DIAL_OPTIONS.find((o) => o.countries.includes(countryCode))
+  return hit?.prefix ?? '+94'
+}
+
+function splitPhoneForEdit(phone: string, countryCode: string): { prefix: string; national: string } {
+  const p = phone.replace(/\s/g, '')
+  if (!p) return { prefix: defaultDialPrefix(countryCode), national: '' }
+  const sorted = [...DIAL_OPTIONS].sort((a, b) => b.prefix.length - a.prefix.length)
+  for (const opt of sorted) {
+    if (p.startsWith(opt.prefix)) {
+      return { prefix: opt.prefix, national: p.slice(opt.prefix.length) }
+    }
+  }
+  if (p.startsWith('0')) {
+    return { prefix: defaultDialPrefix(countryCode), national: p }
+  }
+  return { prefix: defaultDialPrefix(countryCode), national: p }
+}
+
+function combinePhoneNumber(prefix: string, national: string): string {
+  const n = national.trim().replace(/\s/g, '')
+  if (n.startsWith('+')) return n
+  if (n.startsWith('0')) return n
+  const digits = n.replace(/\D/g, '')
+  return `${prefix}${digits}`
+}
+
+function countryName(code: string): string {
+  return ADDRESS_COUNTRIES.find((c) => c.code === code)?.name ?? code
+}
+
+const TITLE_LABELS: Record<TitleOption, string> = {
+  Mr:   'Mr.',
+  Ms:   'Ms.',
+  Miss: 'Miss',
+  Mrs:  'Mrs.',
+}
 
 export default function AccountAddressesPage() {
   const { data, isLoading }     = useSavedAddresses()
@@ -27,12 +79,19 @@ export default function AccountAddressesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [label, setLabel]       = useState('')
   const [form, setForm]         = useState<AddressFormData>(() => makeEmptyAddressFormData())
+  const [province, setProvince] = useState('')
+  const [phonePrefix, setPhonePrefix] = useState('+94')
+  const [phoneNational, setPhoneNational] = useState('')
   const [errors, setErrors]     = useState<Record<string, string>>({})
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null)
 
   const resetForm = useCallback(() => {
     setForm(makeEmptyAddressFormData())
     setLabel('')
+    setProvince('')
+    setPhonePrefix('+94')
+    setPhoneNational('')
     setErrors({})
     setEditingId(null)
     setMode('idle')
@@ -41,7 +100,11 @@ export default function AccountAddressesPage() {
   function openAdd() {
     setMode('add')
     setEditingId(null)
-    setForm(makeEmptyAddressFormData())
+    const empty = makeEmptyAddressFormData()
+    setForm(empty)
+    setPhonePrefix(defaultDialPrefix(empty.countryCode))
+    setPhoneNational('')
+    setProvince('')
     setLabel('')
     setErrors({})
   }
@@ -50,12 +113,23 @@ export default function AccountAddressesPage() {
     setMode('edit')
     setEditingId(row.id)
     setLabel(row.label ?? '')
-    setForm(savedJsonToForm(row.address_json, row.country_code))
+    const f = savedJsonToForm(row.address_json, row.country_code)
+    setForm(f)
+    setProvince(String(row.address_json.province ?? row.address_json.state ?? ''))
+    const sp = splitPhoneForEdit(String(f.phone ?? ''), row.country_code)
+    setPhonePrefix(sp.prefix)
+    setPhoneNational(sp.national)
     setErrors({})
   }
 
   function updateField(field: keyof AddressFormData, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }))
+    setForm((prev) => {
+      const next = { ...prev, [field]: value }
+      if (field === 'countryCode') {
+        setPhonePrefix(defaultDialPrefix(value))
+      }
+      return next
+    })
     setErrors((prev) => {
       const n = { ...prev }
       delete n[field]
@@ -64,7 +138,9 @@ export default function AccountAddressesPage() {
   }
 
   async function saveAddress() {
-    const parsed = addressSchema.safeParse(form)
+    const phoneFull = combinePhoneNumber(phonePrefix, phoneNational)
+    const merged: AddressFormData = { ...form, phone: phoneFull }
+    const parsed = addressSchema.safeParse(merged)
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {}
       parsed.error.errors.forEach((err) => {
@@ -78,11 +154,14 @@ export default function AccountAddressesPage() {
       title:        form.title,
       firstName:    form.firstName,
       lastName:     form.lastName,
-      phone:        form.phone,
+      phone:        phoneFull,
       addressLine1: form.addressLine1,
       addressLine2: form.addressLine2 || undefined,
       city:         form.city,
       postcode:     form.postcode,
+    }
+    if (province.trim()) {
+      addressJson.province = province.trim()
     }
 
     try {
@@ -107,6 +186,15 @@ export default function AccountAddressesPage() {
     }
   }
 
+  async function setAsDefault(id: string) {
+    setSettingDefaultId(id)
+    try {
+      await updateAddress.mutateAsync({ id, isDefault: true })
+    } finally {
+      setSettingDefaultId(null)
+    }
+  }
+
   if (isLoading) {
     return <div className="h-40 bg-muted animate-pulse rounded-none" />
   }
@@ -115,174 +203,285 @@ export default function AccountAddressesPage() {
 
   return (
     <div>
-      <h1 className="font-display font-bold text-[24px] text-umber mb-8">
-        Addresses
-      </h1>
-
-      {list.length === 0 && mode === 'idle' ? (
-        <div className="text-center py-12 border border-muted px-6 mb-6">
-          <p className="font-body font-light text-[14px] text-muted-foreground mb-6">
-            No saved addresses yet.
-          </p>
-          <button
-            type="button"
-            onClick={openAdd}
-            className={cn(
-              'h-11 px-10 bg-deep text-background rounded-none',
-              'font-body font-light uppercase tracking-[0.25em] text-[12px]',
-              'hover:bg-ink transition-colors',
-            )}
-          >
-            Add your first address
-          </button>
-        </div>
-      ) : (
-        <ul className="space-y-4 mb-8">
-          {list.map((row) => (
-            <li
-              key={row.id}
-              className="border border-muted p-5 relative"
-            >
-              {row.is_default && (
-                <span
-                  className={cn(
-                    'absolute top-4 right-4',
-                    'bg-surface-raised text-umber text-[11px] uppercase tracking-[0.1em] px-2 py-1',
-                  )}
-                >
-                  Default
-                </span>
-              )}
-              <p className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
-                {row.label ?? 'Saved address'}
-                {row.is_default && (
-                  <span className="text-umber ml-2" aria-label="Default address">
-                    ★
-                  </span>
-                )}
-              </p>
-              <SavedAddressLines json={row.address_json} countryCode={row.country_code} />
-              <div className="flex gap-4 mt-4">
-                <button
-                  type="button"
-                  onClick={() => openEdit(row)}
-                  className="font-body font-light text-[12px] text-umber underline"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeleteId(row.id)}
-                  className="font-body font-light text-[12px] text-muted-foreground hover:text-red-500"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {mode === 'idle' && list.length > 0 && (
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <h1 className="font-display font-bold text-[24px] text-umber">
+          Addresses
+        </h1>
         <button
           type="button"
           onClick={openAdd}
           className={cn(
-            'h-11 px-10 border border-umber text-umber rounded-none mb-6',
-            'font-body font-light uppercase tracking-[0.25em] text-[12px]',
-            'hover:bg-umber hover:text-background transition-all duration-200',
+            'h-10 px-6 bg-deep text-background rounded-none shrink-0 w-full sm:w-auto',
+            'font-body font-light uppercase tracking-[0.2em] text-[12px] hover:bg-ink transition-colors',
           )}
         >
-          Add New Address
+          Add Address
         </button>
+      </div>
+
+      {list.length === 0 && mode === 'idle' ? (
+        <p className="font-body font-light text-[14px] text-muted-foreground mb-8">
+          No saved addresses yet.
+        </p>
+      ) : (
+        <div className="mb-8">
+          {list.map((row) => (
+            <article key={row.id} className="border-b border-muted py-5">
+              <div className="flex items-start justify-between gap-2">
+                <p
+                  className={cn(
+                    'font-body text-[13px]',
+                    row.is_default
+                      ? 'font-medium text-umber'
+                      : 'font-light text-muted-foreground',
+                  )}
+                >
+                  {row.is_default ? 'Default address' : row.label ?? 'Saved address'}
+                </p>
+              </div>
+              <div className="mt-2">
+                <SavedAddressLines json={row.address_json} countryCode={row.country_code} />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-5">
+                <button
+                  type="button"
+                  onClick={() => openEdit(row)}
+                  className={cn(
+                    'font-body font-light text-[11px] uppercase tracking-[0.15em]',
+                    'text-umber underline underline-offset-2 hover:text-ink',
+                  )}
+                >
+                  Edit address
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteId(row.id)}
+                  className={cn(
+                    'font-body font-light text-[11px] uppercase tracking-[0.15em]',
+                    'text-muted-foreground underline underline-offset-2 hover:text-red-500',
+                  )}
+                >
+                  Delete
+                </button>
+                {!row.is_default && (
+                  <button
+                    type="button"
+                    disabled={settingDefaultId === row.id}
+                    onClick={() => setAsDefault(row.id)}
+                    className={cn(
+                      'font-body font-light text-[11px] uppercase tracking-[0.15em]',
+                      'text-muted-foreground underline underline-offset-2 hover:text-umber',
+                      'disabled:opacity-50',
+                    )}
+                  >
+                    {settingDefaultId === row.id ? 'Setting…' : 'Set as default'}
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
       )}
 
       {(mode === 'add' || mode === 'edit') && (
-        <div
-          className={cn(
-            'border border-muted overflow-hidden transition-all duration-300',
-            'max-h-[2000px]',
-          )}
-        >
-          <div className="p-6 space-y-6">
-            <h2 className="font-body font-medium text-[16px] text-umber">
-              {mode === 'add' ? 'New address' : 'Edit address'}
-            </h2>
-            <div>
-              <label className="font-body font-light text-[12px] text-umber block mb-2">
-                Label (optional)
-              </label>
-              <input
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="Home, Office…"
+        <div className="border-t border-muted pt-8">
+          <h2 className="font-body font-medium text-[15px] text-umber mb-5">
+            {mode === 'add' ? 'Enter new delivery address' : 'Edit address'}
+          </h2>
+          <p className="font-body font-light text-[11px] text-muted-foreground mb-4">
+            * Required fields
+          </p>
+
+          <div className="mb-5">
+            <label className="font-body font-light text-[12px] text-umber block mb-2">
+              Address label (optional)
+            </label>
+            <input
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Home, Office…"
+              className={cn(
+                'w-full h-12 px-4 border border-muted rounded-none',
+                'font-body font-light text-[14px] text-umber',
+                'outline-none focus:border-umber',
+              )}
+            />
+          </div>
+
+          <div className="mb-5">
+            <p className="font-body font-light text-[12px] text-umber mb-2">Title</p>
+            <div className="flex flex-wrap gap-2">
+              {TITLE_OPTIONS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => updateField('title', t)}
+                  className={cn(
+                    'border px-4 py-2 cursor-pointer font-body font-light text-[12px] rounded-none transition-colors',
+                    form.title === t
+                      ? 'bg-umber text-background border-umber'
+                      : 'border-muted text-muted-foreground hover:border-umber',
+                  )}
+                >
+                  {TITLE_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <FormInput
+              label="First name"
+              required
+              value={form.firstName}
+              onChange={(v) => updateField('firstName', v)}
+              autoComplete="given-name"
+              error={errors.firstName}
+            />
+            <FormInput
+              label="Last name"
+              required
+              value={form.lastName}
+              onChange={(v) => updateField('lastName', v)}
+              autoComplete="family-name"
+              error={errors.lastName}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="font-body font-light text-[12px] text-umber block mb-1">
+              Phone number <span className="text-red-400">*</span>
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={phonePrefix}
+                onChange={(e) => setPhonePrefix(e.target.value)}
                 className={cn(
-                  'w-full h-12 px-4 border border-muted rounded-none',
+                  'w-28 flex-shrink-0 h-12 px-2 border border-muted rounded-none bg-background',
+                  'font-body font-light text-[12px] text-umber',
+                  'outline-none focus:border-umber',
+                )}
+              >
+                {DIAL_OPTIONS.map((o) => (
+                  <option key={o.label} value={o.prefix}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                value={phoneNational}
+                onChange={(e) => setPhoneNational(e.target.value)}
+                className={cn(
+                  'flex-1 h-12 px-4 border border-muted rounded-none',
                   'font-body font-light text-[14px] text-umber',
                   'outline-none focus:border-umber',
                 )}
+                autoComplete="tel-national"
               />
             </div>
-            <div>
-              <p className="font-body font-light text-[12px] text-umber mb-2">
-                Title <span className="text-red-400">*</span>
-              </p>
-              <div className="flex flex-wrap gap-4">
-                {TITLE_OPTIONS.map((t) => (
-                  <label key={t} className="flex items-center gap-2 cursor-pointer">
-                    <span
-                      className={cn(
-                        'relative w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
-                        form.title === t ? 'border-umber' : 'border-muted-foreground',
-                      )}
-                    >
-                      {form.title === t && (
-                        <span className="w-2 h-2 rounded-full bg-umber" />
-                      )}
-                    </span>
-                    <input
-                      type="radio"
-                      name="addr-title"
-                      value={t}
-                      checked={form.title === t}
-                      onChange={() => updateField('title', t)}
-                      className="sr-only"
-                    />
-                    <span className="font-body font-light text-[13px] text-umber">{t}.</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <SharedAddressForm
-              data={form}
-              errors={errors}
-              onChange={updateField}
-              prefix="saved"
-            />
-            {errors.form && (
-              <p className="text-red-500 text-[12px] font-body">{errors.form}</p>
+            {errors.phone && (
+              <p className="font-body text-[11px] text-red-500 mt-1">{errors.phone}</p>
             )}
-            <div className="flex flex-wrap gap-4 items-center">
-              <button
-                type="button"
-                onClick={saveAddress}
-                disabled={addAddress.isPending || updateAddress.isPending}
-                className={cn(
-                  'h-11 px-8 bg-deep text-background rounded-none',
-                  'font-body font-light uppercase tracking-[0.2em] text-[12px]',
-                  'hover:bg-ink disabled:opacity-40',
-                )}
-              >
-                Save Address
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="font-body font-light text-[12px] text-muted-foreground hover:text-umber"
-              >
-                Cancel
-              </button>
-            </div>
+          </div>
+
+          <FormInput
+            label="Address"
+            required
+            value={form.addressLine1}
+            onChange={(v) => updateField('addressLine1', v)}
+            autoComplete="address-line1"
+            error={errors.addressLine1}
+            className="mb-4"
+          />
+
+          <FormInput
+            label="Building/Apartment/Villa"
+            value={form.addressLine2}
+            onChange={(v) => updateField('addressLine2', v)}
+            autoComplete="address-line2"
+            error={errors.addressLine2}
+            className="mb-4"
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <FormInput
+              label="Post code"
+              required
+              value={form.postcode}
+              onChange={(v) => updateField('postcode', v)}
+              autoComplete="postal-code"
+              error={errors.postcode}
+            />
+            <FormInput
+              label="City"
+              required
+              value={form.city}
+              onChange={(v) => updateField('city', v)}
+              autoComplete="address-level2"
+              error={errors.city}
+            />
+          </div>
+
+          <FormInput
+            label="Province/State"
+            value={province}
+            onChange={setProvince}
+            autoComplete="address-level1"
+            className="mb-4"
+          />
+
+          <div className="mb-4">
+            <label className="font-body font-light text-[12px] text-umber block mb-1">
+              Country/Region <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={form.countryCode}
+              onChange={(e) => updateField('countryCode', e.target.value)}
+              autoComplete="country"
+              className={cn(
+                'w-full h-12 px-4 border border-muted rounded-none bg-background',
+                'font-body font-light text-[14px] text-umber',
+                'outline-none focus:border-umber',
+                errors.countryCode ? 'border-red-400' : '',
+              )}
+            >
+              <option value="">Select country</option>
+              {ADDRESS_COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            {errors.countryCode && (
+              <p className="font-body text-[11px] text-red-500 mt-1">{errors.countryCode}</p>
+            )}
+          </div>
+
+          {errors.form && (
+            <p className="text-red-500 text-[12px] font-body mb-4">{errors.form}</p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-6">
+            <button
+              type="button"
+              onClick={saveAddress}
+              disabled={addAddress.isPending || updateAddress.isPending}
+              className={cn(
+                'h-11 px-8 bg-deep text-background rounded-none',
+                'font-body font-light uppercase tracking-[0.2em] text-[12px]',
+                'hover:bg-ink disabled:opacity-40',
+              )}
+            >
+              Save details
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="font-body font-light text-[12px] text-muted-foreground lowercase hover:text-umber"
+            >
+              cancel
+            </button>
           </div>
         </div>
       )}
@@ -325,6 +524,46 @@ export default function AccountAddressesPage() {
   )
 }
 
+function FormInput({
+  label,
+  required,
+  value,
+  onChange,
+  autoComplete,
+  error,
+  className,
+}: {
+  label: string
+  required?: boolean
+  value: string
+  onChange: (v: string) => void
+  autoComplete?: string
+  error?: string
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <label className="font-body font-light text-[12px] text-umber block mb-1">
+        {label}
+        {required && <span className="text-red-400 ml-0.5">*</span>}
+      </label>
+      <input
+        type="text"
+        value={value}
+        autoComplete={autoComplete}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          'w-full h-12 px-4 border border-muted rounded-none',
+          'font-body font-light text-[14px] text-umber',
+          'outline-none focus:border-umber',
+          error ? 'border-red-400' : '',
+        )}
+      />
+      {error && <p className="font-body text-[11px] text-red-500 mt-1">{error}</p>}
+    </div>
+  )
+}
+
 function savedJsonToForm(
   json: Record<string, unknown>,
   countryCode: string,
@@ -351,22 +590,20 @@ function SavedAddressLines({
   countryCode: string
 }) {
   const f = savedJsonToForm(json, countryCode)
-  const lines: string[] = []
-  if (f.firstName || f.lastName) {
-    lines.push(`${f.firstName} ${f.lastName}`.trim())
-  }
-  if (f.addressLine1) lines.push(f.addressLine1)
-  if (f.addressLine2) lines.push(f.addressLine2)
-  if (f.city || f.postcode) {
-    lines.push([f.city, f.postcode].filter(Boolean).join(', '))
-  }
-  if (f.phone) lines.push(f.phone)
-  lines.push(countryCode)
   return (
-    <div className="font-body font-light text-[13px] text-umber space-y-1">
-      {lines.map((line) => (
-        <p key={line}>{line}</p>
-      ))}
+    <div className="font-body font-light text-[13px] text-umber space-y-0.5">
+      {(f.firstName || f.lastName) && (
+        <p>{`${f.firstName} ${f.lastName}`.trim()}</p>
+      )}
+      {f.addressLine1 && <p>{f.addressLine1}</p>}
+      {f.addressLine2 && <p>{f.addressLine2}</p>}
+      {(f.city || f.postcode) && (
+        <p>{[f.city, f.postcode].filter(Boolean).join(' ')}</p>
+      )}
+      {json.province || json.state ? (
+        <p>{String(json.province ?? json.state)}</p>
+      ) : null}
+      <p>{countryName(countryCode)}</p>
     </div>
   )
 }
