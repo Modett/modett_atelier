@@ -123,13 +123,23 @@ function mapToCardProps(
     }
   }
 
+  const defaultColour =
+    variants.find((v) => v.stockStatus !== 'OUT_OF_STOCK')?.color
+    ?? variants[0]?.color
+    ?? null
+
   const sizeMap = new Map<string, boolean>()
   for (const v of variants) {
-    const existing = sizeMap.get(v.size)
-    if (!existing) {
-      sizeMap.set(v.size, v.stockStatus !== 'OUT_OF_STOCK')
-    } else if (v.stockStatus !== 'OUT_OF_STOCK') {
-      sizeMap.set(v.size, true)
+    if (!sizeMap.has(v.size)) {
+      const inStockForDefault =
+        defaultColour !== null &&
+        variants.some(
+          (vv) =>
+            vv.size === v.size &&
+            vv.color === defaultColour &&
+            vv.stockStatus !== 'OUT_OF_STOCK',
+        )
+      sizeMap.set(v.size, inStockForDefault)
     }
   }
 

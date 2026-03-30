@@ -3,10 +3,12 @@
 import { useState, useRef } from 'react'
 import { notFound } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useGeo } from '@/hooks/useCurrency'
 import { useProduct } from '@/hooks/useProduct'
 import { ProductBreadcrumb } from './ProductBreadcrumb'
 import { ProductImageGallery } from './ProductImageGallery'
 import { ProductInfoPanel } from './ProductInfoPanel'
+import { ProductReviews } from './ProductReviews'
 import { WearItWith } from './WearItWith'
 import { YouMayAlsoLike } from './YouMayAlsoLike'
 import { ProductDetailSkeleton } from './ProductDetailSkeleton'
@@ -17,6 +19,7 @@ interface ProductDetailPageProps {
 }
 
 export function ProductDetailPage({ slug }: ProductDetailPageProps) {
+  const { isReady }                        = useGeo()
   const { data: product, isLoading, error } = useProduct(slug)
 
   const [selectedColour, setSelectedColour] = useState<string | null>(null)
@@ -41,8 +44,37 @@ export function ProductDetailPage({ slug }: ProductDetailPageProps) {
     galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  if (isLoading) return <ProductDetailSkeleton />
-  if (error || !product) return notFound()
+  if (!isReady || isLoading) return <ProductDetailSkeleton />
+
+  if (!isLoading && !product && !error) return notFound()
+
+  if (error) {
+    const status =
+      typeof error === 'object' &&
+      error !== null &&
+      'status' in error &&
+      typeof (error as { status: unknown }).status === 'number'
+        ? (error as { status: number }).status
+        : undefined
+    if (status === 404) return notFound()
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="text-center">
+          <p className="font-body font-light text-[14px] text-muted-foreground mb-4">
+            Something went wrong loading this product.
+          </p>
+          <a
+            href={`/products/${slug}`}
+            className="font-body font-light text-[12px] uppercase tracking-[0.2em] text-umber underline underline-offset-2 hover:text-ink transition-colors duration-200"
+          >
+            Try again
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  if (!product) return notFound()
 
   const variantsByColour = groupVariantsByColour(product.variants)
   const sizesForColour = selectedColour
@@ -126,6 +158,11 @@ export function ProductDetailPage({ slug }: ProductDetailPageProps) {
       </div>
 
       {/* Sections hidden in full image mode */}
+      {!isFullImageMode && (
+        <div className="max-w-page mx-auto px-4 md:px-6 lg:px-8 py-14 md:py-20 border-t border-muted">
+          <ProductReviews key={product.id} productId={product.id} />
+        </div>
+      )}
       {!isFullImageMode && product.relations && product.relations.length > 0 && (
         <WearItWith relations={product.relations} />
       )}

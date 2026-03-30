@@ -189,3 +189,26 @@ export interface ShippingSettings {
   freeShippingLabel: string
   updatedAt:         string
 }
+
+// ── Reviews ───────────────────────────────────────
+export interface ProductReview {
+  id:        string
+  rating:    number
+  body:      string | null
+  createdAt: string
+  mediaUrls: string[]
+}
+
+export interface ReviewAggregate {
+  totalCount:    number
+  averageRating: number
+  breakdown:     Record<1 | 2 | 3 | 4 | 5, number>
+}
+
+export interface ProductReviewsResponse {
+  reviews:   ProductReview[]
+  aggregate: ReviewAggregate
+  page:      number
+  limit:     number
+  total:     number
+}
