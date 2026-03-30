@@ -122,6 +122,7 @@ export interface CartItem {
   id:           string
   variantId:    string
   qty:          number
+  productId:    string
   productSlug:  string
   displayName:  string
   shortName:    string

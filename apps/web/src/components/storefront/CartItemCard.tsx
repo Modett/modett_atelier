@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { QuantityStepper } from '@/components/shared/QuantityStepper'
 import { useUpdateCartQty, useRemoveFromCart } from '@/hooks/useCartMutations'
@@ -23,7 +23,7 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
   const updateQty      = useUpdateCartQty()
   const removeFromCart = useRemoveFromCart()
   const toggleWishlist = useToggleWishlist()
-  const isWishlisted   = useIsWishlisted(item.productSlug)
+  const isWishlisted   = useIsWishlisted(item.productId)
   const { isLoggedIn } = useSession()
   const { openPanel }  = useAuthPanel()
 
@@ -57,11 +57,8 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
       openPanel()
       return
     }
-    toggleWishlist.mutate(item.productSlug)
+    toggleWishlist.mutate(item.productId)
   }
-
-  void handleSaveForLater
-  void isWishlisted
 
   return (
     <div
@@ -138,7 +135,24 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
             >
               Edit
             </button>
-            {/* Save For Later — wire when feature is ready */}
+            <button
+              type="button"
+              onClick={handleSaveForLater}
+              className="flex items-center gap-1.5 font-body font-light text-[13px] transition-colors duration-200 text-muted-foreground hover:text-umber"
+              aria-label={isWishlisted
+                ? `Remove ${item.displayName} from wishlist`
+                : `Save ${item.displayName} for later`}
+            >
+              <Heart
+                className={cn(
+                  'w-4 h-4 transition-colors duration-200',
+                  isWishlisted
+                    ? 'fill-umber stroke-umber'
+                    : 'fill-none stroke-current',
+                )}
+              />
+              <span>{isWishlisted ? 'Saved' : 'Save for Later'}</span>
+            </button>
           </div>
         </div>
 
@@ -272,6 +286,24 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
                 className="font-body font-light text-[12px] text-umber underline underline-offset-4 hover:text-ink transition-colors duration-200"
               >
                 Edit
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveForLater}
+                aria-label={isWishlisted ? 'Remove from wishlist' : 'Save for later'}
+                className="flex items-center gap-1"
+              >
+                <Heart
+                  className={cn(
+                    'w-3.5 h-3.5 transition-colors duration-200',
+                    isWishlisted
+                      ? 'fill-umber stroke-umber'
+                      : 'fill-none stroke-muted-foreground',
+                  )}
+                />
+                <span className="font-body font-light text-[12px] text-muted-foreground">
+                  {isWishlisted ? 'Saved' : 'Save for Later'}
+                </span>
               </button>
             </div>
 
