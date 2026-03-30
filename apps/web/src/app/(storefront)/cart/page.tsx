@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShoppingBag, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -21,9 +21,32 @@ export default function CartPage() {
   } = useCart()
 
   const [editingItem, setEditingItem] = useState<CartItem | null>(null)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        clearTimeout(closeTimerRef.current)
+      }
+    }
+  }, [])
 
   function handleEditDrawerClose() {
-    setTimeout(() => setEditingItem(null), 320)
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current)
+    }
+    closeTimerRef.current = setTimeout(() => {
+      setEditingItem(null)
+      closeTimerRef.current = null
+    }, 320)
+  }
+
+  function handleEditOpen(item: CartItem) {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+    setEditingItem(item)
   }
 
   return (
@@ -63,7 +86,7 @@ export default function CartPage() {
                   <CartItemCard
                     key={item.id}
                     item={item}
-                    onEdit={() => setEditingItem(item)}
+                    onEdit={() => handleEditOpen(item)}
                   />
                 ))}
               </div>
