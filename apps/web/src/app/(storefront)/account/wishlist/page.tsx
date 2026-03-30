@@ -126,6 +126,7 @@ function wishlistToPseudoCartItem(w: WishlistItem): CartItem {
     id:           w.id,
     variantId:    v?.variantId ?? w.variantId ?? '',
     qty:          1,
+    productId:    w.product.id,
     productSlug:  w.product.slug,
     displayName:  w.product.displayName,
     shortName:    w.product.shortName,

@@ -5,15 +5,15 @@ import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const SIZE_CHART = [
-  { uk: '34', eu: '38', bust: '80–82',  waist: '62–64', hip: '88–90' },
-  { uk: '36', eu: '40', bust: '84–86',  waist: '66–68', hip: '92–94' },
-  { uk: '38', eu: '42', bust: '88–90',  waist: '70–72', hip: '96–98' },
-  { uk: '40', eu: '44', bust: '92–94',  waist: '74–76', hip: '100–102' },
-  { uk: '42', eu: '46', bust: '96–98',  waist: '78–80', hip: '104–106' },
-  { uk: '44', eu: '48', bust: '100–102', waist: '82–84', hip: '108–110' },
-  { uk: '48', eu: '52', bust: '104–106', waist: '86–88', hip: '112–114' },
-  { uk: '50', eu: '54', bust: '108–110', waist: '90–92', hip: '116–118' },
-  { uk: '52', eu: '56', bust: '112–114', waist: '94–96', hip: '120–122' },
+  { uk: 'UK 6',  eu: '34', bust: '80–82',   waist: '62–64', hip: '88–90'   },
+  { uk: 'UK 8',  eu: '36', bust: '84–86',   waist: '66–68', hip: '92–94'   },
+  { uk: 'UK 10', eu: '38', bust: '88–90',   waist: '70–72', hip: '96–98'   },
+  { uk: 'UK 12', eu: '40', bust: '92–94',   waist: '74–76', hip: '100–102' },
+  { uk: 'UK 14', eu: '42', bust: '96–98',   waist: '78–80', hip: '104–106' },
+  { uk: 'UK 16', eu: '44', bust: '100–102', waist: '82–84', hip: '108–110' },
+  { uk: 'UK 20', eu: '48', bust: '104–106', waist: '86–88', hip: '112–114' },
+  { uk: 'UK 22', eu: '50', bust: '108–110', waist: '90–92', hip: '116–118' },
+  { uk: 'UK 24', eu: '52', bust: '112–114', waist: '94–96', hip: '120–122' },
 ] as const
 
 const MEASUREMENTS = [
@@ -188,7 +188,7 @@ export function FitChartDrawer({
 
           {/* Model info */}
           <p className="font-body font-light text-[11px] text-muted-foreground italic pt-2 border-t border-muted">
-            Our model is 5&apos;10&quot; (178cm) and wears UK size 38.
+            Our model is 5&apos;10&quot; (178cm) and wears UK size 10.
           </p>
         </div>
       </div>

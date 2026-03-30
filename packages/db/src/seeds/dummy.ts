@@ -14,6 +14,9 @@
  *   nilusha@example.com  — Nilusha Bandara (SILVER,  950 pts)
  *   kavya@example.com    — Kavya Menon     (BRONZE,   50 pts)
  *
+ * SIZE FORMAT: UK sizing — 'UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16', 'UK 20'
+ * EU→UK mapping: 34→6, 36→8, 38→10, 40→12, 42→14, 44→16, 48→20
+ *
  * WARNING: This script WIPES all data. Never run on production.
  * ============================================================
  */
@@ -58,24 +61,24 @@ const CUSTOMER_5_ID = uuid() // kavya
 const OWNER_ADMIN_ID = uuid()
 const ADMIN_ADMIN_ID = uuid()
 
-const CAT_DRESSES_ID = uuid()
-const CAT_TOPS_ID = uuid()
-const CAT_BOTTOMS_ID = uuid()
+const CAT_DRESSES_ID   = uuid()
+const CAT_TOPS_ID      = uuid()
+const CAT_BOTTOMS_ID   = uuid()
 const CAT_OUTERWEAR_ID = uuid()
-const CAT_SKIRTS_ID = uuid()
-const CAT_SHORTS_ID = uuid()
+const CAT_SKIRTS_ID    = uuid()
+const CAT_SHORTS_ID    = uuid()
 
-const PROD_1_ID = uuid()  // Crispy Silk Midi Skirt
-const PROD_2_ID = uuid()  // Linen Column Dress
-const PROD_3_ID = uuid()  // Silk Wrap Dress
-const PROD_4_ID = uuid()  // Draped Midi Dress (SALE)
-const PROD_5_ID = uuid()  // Silk Charmeuse Blouse
-const PROD_6_ID = uuid()  // Cashmere Knit Top (SALE)
-const PROD_7_ID = uuid()  // Wide Leg Linen Trousers
-const PROD_8_ID = uuid()  // Straight Leg Trouser
-const PROD_9_ID = uuid()  // Oversized Wool Blazer
-const PROD_10_ID = uuid() // Tailored Cashmere Blazer
-const PROD_11_ID = uuid() // Linen Tailored Shorts
+const PROD_1_ID  = uuid()  // Crispy Silk Midi Skirt
+const PROD_2_ID  = uuid()  // Linen Column Dress
+const PROD_3_ID  = uuid()  // Silk Wrap Dress
+const PROD_4_ID  = uuid()  // Draped Midi Dress (SALE)
+const PROD_5_ID  = uuid()  // Silk Charmeuse Blouse
+const PROD_6_ID  = uuid()  // Cashmere Knit Top (SALE)
+const PROD_7_ID  = uuid()  // Wide Leg Linen Trousers
+const PROD_8_ID  = uuid()  // Straight Leg Trouser
+const PROD_9_ID  = uuid()  // Oversized Wool Blazer
+const PROD_10_ID = uuid()  // Tailored Cashmere Blazer
+const PROD_11_ID = uuid()  // Linen Tailored Shorts
 
 // ── R2 image URLs ─────────────────────────────────────────────────────────────
 const R2 = 'https://pub-8804bb39c26f4399a33c5a5d1c2182f9.r2.dev/product_images'
@@ -342,6 +345,12 @@ async function seedCategories(client: pg.PoolClient) {
 
 // ── Step 5: Products ──────────────────────────────────────────────────────────
 
+// UK size format: 'UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16', 'UK 20'
+// EU → UK: 34→6, 36→8, 38→10, 40→12, 42→14, 44→16, 48→20
+//
+// stockOverrides keys use UK size strings e.g. 'UK 10': 0
+// Default stock per variant is 8 units; override with 0 (OOS) or 2 (low stock)
+
 interface ProductDef {
   id: string
   categoryId: string
@@ -371,11 +380,12 @@ const PRODUCTS: ProductDef[] = [
     lkr: '310.00', sgd: '1.35', usd: '1.00',
     images: IMAGES.skirt1,
     colours: [
-      { name: 'IVORY', stockOverrides: { '34': 0, '36': 2 } },
+      // IVORY: UK 6 OOS, UK 8 low stock (2 units), rest normal
+      { name: 'IVORY', stockOverrides: { 'UK 6': 0, 'UK 8': 2 } },
       { name: 'SAGE' },
       { name: 'UMBER' },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
   {
     id: PROD_2_ID, categoryId: CAT_DRESSES_ID,
@@ -387,10 +397,11 @@ const PRODUCTS: ProductDef[] = [
     lkr: '465.00', sgd: '2.00', usd: '1.50',
     images: IMAGES.dress1,
     colours: [
-      { name: 'ECRU', stockOverrides: { '38': 2 } },
+      // ECRU: UK 10 low stock (2 units)
+      { name: 'ECRU', stockOverrides: { 'UK 10': 2 } },
       { name: 'SAND' },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
   {
     id: PROD_3_ID, categoryId: CAT_DRESSES_ID,
@@ -402,11 +413,12 @@ const PRODUCTS: ProductDef[] = [
     lkr: '620.00', sgd: '2.70', usd: '2.00',
     images: IMAGES.dress2,
     colours: [
-      { name: 'IVORY', stockOverrides: { '34': 0 } },
+      // IVORY: UK 6 OOS
+      { name: 'IVORY', stockOverrides: { 'UK 6': 0 } },
       { name: 'BLUSH' },
       { name: 'SLATE' },
     ],
-    sizes: ['34', '36', '38', '40', '42'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14'],
   },
   {
     id: PROD_4_ID, categoryId: CAT_DRESSES_ID,
@@ -422,7 +434,7 @@ const PRODUCTS: ProductDef[] = [
       { name: 'BLACK' },
       { name: 'SAGE' },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
   {
     id: PROD_5_ID, categoryId: CAT_TOPS_ID,
@@ -436,9 +448,10 @@ const PRODUCTS: ProductDef[] = [
     colours: [
       { name: 'IVORY' },
       { name: 'SLATE' },
-      { name: 'BLACK', stockOverrides: { '36': 0 } },
+      // BLACK: UK 8 OOS
+      { name: 'BLACK', stockOverrides: { 'UK 8': 0 } },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
   {
     id: PROD_6_ID, categoryId: CAT_TOPS_ID,
@@ -452,9 +465,10 @@ const PRODUCTS: ProductDef[] = [
     colours: [
       { name: 'IVORY' },
       { name: 'UMBER' },
-      { name: 'SAGE', stockOverrides: { '38': 2 } },
+      // SAGE: UK 10 low stock (2 units)
+      { name: 'SAGE', stockOverrides: { 'UK 10': 2 } },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
   {
     id: PROD_7_ID, categoryId: CAT_BOTTOMS_ID,
@@ -470,7 +484,8 @@ const PRODUCTS: ProductDef[] = [
       { name: 'BLACK' },
       { name: 'SAGE' },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44', '48'],
+    // Includes UK 20 (was EU 48) as an extended size
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16', 'UK 20'],
   },
   {
     id: PROD_8_ID, categoryId: CAT_BOTTOMS_ID,
@@ -486,7 +501,7 @@ const PRODUCTS: ProductDef[] = [
       { name: 'CAMEL' },
       { name: 'ECRU' },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
   {
     id: PROD_9_ID, categoryId: CAT_OUTERWEAR_ID,
@@ -502,7 +517,7 @@ const PRODUCTS: ProductDef[] = [
       { name: 'CHARCOAL' },
       { name: 'IVORY' },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
   {
     id: PROD_10_ID, categoryId: CAT_OUTERWEAR_ID,
@@ -514,11 +529,12 @@ const PRODUCTS: ProductDef[] = [
     lkr: '620.00', sgd: '2.70', usd: '2.00',
     images: IMAGES.blazer2,
     colours: [
-      { name: 'CAMEL', stockOverrides: { '40': 2 } },
+      // CAMEL: UK 12 low stock (2 units)
+      { name: 'CAMEL', stockOverrides: { 'UK 12': 2 } },
       { name: 'CHARCOAL' },
       { name: 'BLACK' },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
   {
     id: PROD_11_ID, categoryId: CAT_SHORTS_ID,
@@ -534,7 +550,7 @@ const PRODUCTS: ProductDef[] = [
       { name: 'BLACK' },
       { name: 'SAGE' },
     ],
-    sizes: ['34', '36', '38', '40', '42', '44'],
+    sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
 ]
 
@@ -580,11 +596,17 @@ async function seedProducts(client: pg.PoolClient) {
     `, [imageIds[0], p.id])
 
     // Variants + stock + inventory units
+    // Size stored exactly as the UK string e.g. 'UK 6', 'UK 8', 'UK 10'
     for (const colour of p.colours) {
-      const skuGroup = `${p.productCode}-${colour.name.slice(0, 3).toUpperCase()}`
+      // sku_group uses first 3 chars of colour and the numeric part of the UK size
+      // e.g. IVORY UK 6 → MOD-001-IVO-6
+      const colourCode = colour.name.slice(0, 3).toUpperCase()
       for (const size of p.sizes) {
         const variantId = uuid()
         const stockQty  = colour.stockOverrides?.[size] ?? 8
+
+        // sku_group: product code + colour code (no size — groups all sizes of same colour)
+        const skuGroup = `${p.productCode}-${colourCode}`
 
         await client.query(`
           INSERT INTO inventory.product_variants
@@ -600,8 +622,11 @@ async function seedProducts(client: pg.PoolClient) {
 
         totalVariants++
 
+        // Inventory units — barcode uses numeric size part for readability
+        // e.g. MOD-001-IVO-UK6-0001
+        const sizeCode = size.replace(' ', '')  // 'UK6', 'UK8', etc.
         for (let seq = 1; seq <= stockQty; seq++) {
-          const barcode = `${skuGroup}-${size}-${String(seq).padStart(4, '0')}`
+          const barcode = `${skuGroup}-${sizeCode}-${String(seq).padStart(4, '0')}`
           await client.query(`
             INSERT INTO inventory.inventory_units
               (id, variant_id, unit_sku, barcode_value, status, created_at, updated_at)
@@ -622,13 +647,13 @@ async function seedBestsellerList(client: pg.PoolClient) {
   console.log('⭐ Seeding bestseller list...')
 
   const bestsellers = [
-    { productId: PROD_2_ID, sortOrder: 1 },
-    { productId: PROD_1_ID, sortOrder: 2 },
-    { productId: PROD_9_ID, sortOrder: 3 },
-    { productId: PROD_5_ID, sortOrder: 4 },
+    { productId: PROD_2_ID,  sortOrder: 1 },
+    { productId: PROD_1_ID,  sortOrder: 2 },
+    { productId: PROD_9_ID,  sortOrder: 3 },
+    { productId: PROD_5_ID,  sortOrder: 4 },
     { productId: PROD_10_ID, sortOrder: 5 },
-    { productId: PROD_7_ID, sortOrder: 6 },
-    { productId: PROD_3_ID, sortOrder: 7 },
+    { productId: PROD_7_ID,  sortOrder: 6 },
+    { productId: PROD_3_ID,  sortOrder: 7 },
   ]
 
   for (const b of bestsellers) {
@@ -693,6 +718,7 @@ async function seedLoyalty(client: pg.PoolClient) {
 
 // ── Step 9: Orders ────────────────────────────────────────────────────────────
 
+// Orders reference UK sizes — must match what was seeded in product variants
 interface OrderSeed {
   orderId: string
   orderRef: string
@@ -700,7 +726,7 @@ interface OrderSeed {
   countryCode: string
   productId: string
   variantColour: string
-  variantSize: string
+  variantSize: string   // UK size string e.g. 'UK 10'
   amount: string
   snapshot: Record<string, unknown>
 }
@@ -709,30 +735,30 @@ const ORDER_SEEDS: OrderSeed[] = [
   {
     orderId: uuid(), orderRef: 'MOD-202600001',
     customerId: CUSTOMER_1_ID, countryCode: 'LK',
-    productId: PROD_2_ID, variantColour: 'ECRU', variantSize: '38',
+    productId: PROD_2_ID, variantColour: 'ECRU', variantSize: 'UK 10',
     amount: '465.00',
-    snapshot: { display_name: 'Linen Column Dress', short_name: 'Column Dress', color: 'ECRU', size: '38', product_code: 'MOD-002' },
+    snapshot: { display_name: 'Linen Column Dress', short_name: 'Column Dress', color: 'ECRU', size: 'UK 10', product_code: 'MOD-002' },
   },
   {
     orderId: uuid(), orderRef: 'MOD-202600002',
     customerId: CUSTOMER_2_ID, countryCode: 'SG',
-    productId: PROD_1_ID, variantColour: 'SAGE', variantSize: '36',
+    productId: PROD_1_ID, variantColour: 'SAGE', variantSize: 'UK 8',
     amount: '310.00',
-    snapshot: { display_name: 'Crispy Silk Midi Skirt', short_name: 'Silk Midi Skirt', color: 'SAGE', size: '36', product_code: 'MOD-001' },
+    snapshot: { display_name: 'Crispy Silk Midi Skirt', short_name: 'Silk Midi Skirt', color: 'SAGE', size: 'UK 8', product_code: 'MOD-001' },
   },
   {
     orderId: uuid(), orderRef: 'MOD-202600003',
     customerId: CUSTOMER_3_ID, countryCode: 'LK',
-    productId: PROD_9_ID, variantColour: 'CAMEL', variantSize: '38',
+    productId: PROD_9_ID, variantColour: 'CAMEL', variantSize: 'UK 10',
     amount: '620.00',
-    snapshot: { display_name: 'Oversized Wool Blazer', short_name: 'Wool Blazer', color: 'CAMEL', size: '38', product_code: 'MOD-009' },
+    snapshot: { display_name: 'Oversized Wool Blazer', short_name: 'Wool Blazer', color: 'CAMEL', size: 'UK 10', product_code: 'MOD-009' },
   },
   {
     orderId: uuid(), orderRef: 'MOD-202600004',
     customerId: CUSTOMER_4_ID, countryCode: 'LK',
-    productId: PROD_5_ID, variantColour: 'IVORY', variantSize: '36',
+    productId: PROD_5_ID, variantColour: 'IVORY', variantSize: 'UK 8',
     amount: '310.00',
-    snapshot: { display_name: 'Silk Charmeuse Blouse', short_name: 'Charmeuse Blouse', color: 'IVORY', size: '36', product_code: 'MOD-005' },
+    snapshot: { display_name: 'Silk Charmeuse Blouse', short_name: 'Charmeuse Blouse', color: 'IVORY', size: 'UK 8', product_code: 'MOD-005' },
   },
 ]
 
@@ -905,7 +931,6 @@ async function seedProductRelations(client: pg.PoolClient) {
 async function seedInboxMessages(client: pg.PoolClient) {
   console.log('📬 Seeding inbox messages...')
 
-  // inbox_messages uses `title` (not `subject`) per schema
   const messages = [
     {
       userId: CUSTOMER_1_ID,
@@ -974,6 +999,7 @@ async function seed() {
     console.log('\n✅ SEED COMPLETE')
     console.log('   11 products · 6 categories · 7 bestsellers')
     console.log('   4 completed orders · 4 reviews · 7 shipping methods')
+    console.log('   Sizes: UK 6 · UK 8 · UK 10 · UK 12 · UK 14 · UK 16 (+ UK 20 for linen trousers)')
     console.log('   Owner:  kumudikaj@modett.com / Modett@2025')
     console.log('   Admin:  dev@modett.com / DevAdmin@2025')
     console.log('   Customers (password: Test@12345):')

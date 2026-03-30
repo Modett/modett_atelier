@@ -5,7 +5,10 @@ import { cn } from '@/lib/utils'
 import { FitChartDrawer } from './FitChartDrawer'
 import type { ProductVariant } from '@/types'
 
-// Canonical EU numeric order — used for exact-match sort
+// Legacy EU size order — kept only as sort fallback.
+// All database sizes are now UK format ('UK 6', 'UK 8', etc.).
+// EU_SIZE_ORDER.indexOf() will always return -1 for UK strings,
+// which correctly falls through to the numeric extraction path.
 const EU_SIZE_ORDER = ['34', '36', '38', '40', '42', '44', '48', '50', '52']
 
 /**
@@ -64,8 +67,8 @@ export function SizeSelector({
   // keep the in-stock one so the button appears available.
   const sortedSizes = dedupeBySize([...sizesForColour].sort(sizeSort))
 
-  // Placeholder ghost sizes when no colour selected (shows EU defaults)
-  const ghostSizes = EU_SIZE_ORDER.slice(0, 6)
+  // Placeholder ghost sizes when no colour selected
+  const ghostSizes = ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16']
 
   const isSelectedOOS =
     selectedSize

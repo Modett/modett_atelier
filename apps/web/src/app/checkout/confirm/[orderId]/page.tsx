@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useCheckoutStore } from '@/store/checkout.store'
+import { CART_QUERY_KEY } from '@/hooks/useCart'
 import { useAuthPanel } from '@/components/providers/AuthProvider'
 
 interface PaymentStatusResponse {
@@ -31,6 +33,7 @@ export default function OrderConfirmationPage() {
   const email = useCheckoutStore((s) => s.email)
   const isGuest = useCheckoutStore((s) => s.isGuest)
   const clearCheckout = useCheckoutStore((s) => s.clearCheckout)
+  const queryClient = useQueryClient()
 
   const [state, setState] = useState<ConfirmState>('polling')
   const [orderRef, setOrderRef] = useState<string | null>(null)
@@ -65,6 +68,7 @@ export default function OrderConfirmationPage() {
         }
         setState('success')
         clearCheckout()
+        queryClient.removeQueries({ queryKey: CART_QUERY_KEY })
         return true
       }
 
@@ -77,7 +81,7 @@ export default function OrderConfirmationPage() {
     } catch {
       return false
     }
-  }, [orderId, email, isGuest, clearCheckout])
+  }, [orderId, email, isGuest, clearCheckout, queryClient])
 
   useEffect(() => {
     if (!orderId) return

@@ -32,7 +32,7 @@ export function ReservationTimer() {
 
   const handleReturnToBag = useCallback(() => {
     clearCheckout()
-    router.push('/cart')
+    router.push('/cart?expired=1')
   }, [clearCheckout, router])
 
   if (paymentSubmitted) return null

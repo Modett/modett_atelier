@@ -43,6 +43,7 @@ function normalizeCartItem(raw: ApiCartItem): CartItem {
     id:           raw.id,
     variantId:    raw.variantId,
     qty:          raw.qty,
+    productId:    raw.variant.productId,
     productSlug:  raw.product.slug,
     displayName:  raw.product.displayName,
     shortName:    raw.product.shortName,

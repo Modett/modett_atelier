@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ShoppingBag, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCart } from '@/hooks/useCart'
@@ -10,6 +10,19 @@ import { CartOrderSummary } from '@/components/storefront/CartOrderSummary'
 import { CartInterestedIn } from '@/components/storefront/CartInterestedIn'
 import { EditItemDrawer } from '@/components/storefront/EditItemDrawer'
 import type { CartItem } from '@/types'
+
+function ExpiredReservationBanner() {
+  const searchParams = useSearchParams()
+  if (searchParams.get('expired') !== '1') return null
+  return (
+    <div className="flex items-start gap-3 bg-highlight/10 border border-highlight/30 px-5 py-3 mt-4">
+      <p className="font-body font-light text-[13px] text-umber">
+        Your reservation expired — your items have been returned to your bag.
+        Complete checkout within 30 minutes to secure them again.
+      </p>
+    </div>
+  )
+}
 
 export default function CartPage() {
   const {
@@ -21,6 +34,33 @@ export default function CartPage() {
   } = useCart()
 
   const [editingItem, setEditingItem] = useState<CartItem | null>(null)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        clearTimeout(closeTimerRef.current)
+      }
+    }
+  }, [])
+
+  function handleEditDrawerClose() {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current)
+    }
+    closeTimerRef.current = setTimeout(() => {
+      setEditingItem(null)
+      closeTimerRef.current = null
+    }, 320)
+  }
+
+  function handleEditOpen(item: CartItem) {
+    if (closeTimerRef.current !== null) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+    setEditingItem(item)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -30,6 +70,10 @@ export default function CartPage() {
         <h1 className="font-display font-bold text-[28px] md:text-[32px] text-umber pb-4 border-b border-muted mb-0">
           Shopping Bag ({itemCount})
         </h1>
+
+        <Suspense fallback={null}>
+          <ExpiredReservationBanner />
+        </Suspense>
 
         {/* Two-column layout (desktop) / single column (mobile) */}
         <div className="flex flex-col lg:flex-row lg:gap-16 lg:items-start mt-0">
@@ -59,7 +103,7 @@ export default function CartPage() {
                   <CartItemCard
                     key={item.id}
                     item={item}
-                    onEdit={() => setEditingItem(item)}
+                    onEdit={() => handleEditOpen(item)}
                   />
                 ))}
               </div>
@@ -86,7 +130,7 @@ export default function CartPage() {
       {/* Edit item drawer */}
       <EditItemDrawer
         item={editingItem}
-        onClose={() => setEditingItem(null)}
+        onClose={handleEditDrawerClose}
       />
     </div>
   )

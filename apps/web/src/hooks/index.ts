@@ -19,6 +19,7 @@ export { useCategories, CATEGORIES_QUERY_KEY } from './useCategories'
 export { useProducts, flattenProducts }        from './useProducts'
 export { useProductSearch }                    from './useProductSearch'
 export { useProduct }                          from './useProduct'
+export { useProductReviews }                   from './useProductReviews'
 export { useHomepage }                         from './useHomepage'
 
 // Cart

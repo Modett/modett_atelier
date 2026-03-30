@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCheckoutStore } from '@/store/checkout.store'
 import { useSession } from '@/hooks/useSession'
+import { useCart } from '@/hooks/useCart'
 import { CheckoutStepper } from '@/components/checkout/CheckoutStepper'
 import { CheckoutSection } from '@/components/checkout/CheckoutSection'
 import { ReservationTimer } from '@/components/checkout/ReservationTimer'
@@ -18,6 +19,7 @@ export default function CheckoutPage() {
   const setStep = useCheckoutStore((s) => s.setStep)
   const setEmail = useCheckoutStore((s) => s.setEmail)
   const { isLoggedIn, user, isLoading } = useSession()
+  const { itemCount, isLoading: cartLoading } = useCart()
   const router = useRouter()
 
   useEffect(() => {
@@ -25,6 +27,13 @@ export default function CheckoutPage() {
       router.push('/cart')
     }
   }, [step, reservationId, router])
+
+  useEffect(() => {
+    if (cartLoading) return
+    if (step === 'email' && itemCount === 0) {
+      router.push('/cart')
+    }
+  }, [cartLoading, step, itemCount, router])
 
   useEffect(() => {
     if (!isLoading && isLoggedIn && user && step === 'email') {

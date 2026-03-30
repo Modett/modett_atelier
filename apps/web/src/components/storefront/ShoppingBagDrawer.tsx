@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { X, ShoppingBag, Trash2 } from 'lucide-react'
+import { X, ShoppingBag, Trash2, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCart } from '@/hooks/useCart'
 import { useUpdateCartQty, useRemoveFromCart } from '@/hooks/useCartMutations'
@@ -11,10 +11,17 @@ import { formatMoney } from '@/hooks/useCurrency'
 import { useUIStore } from '@/store/ui.store'
 import { QuantityStepper } from '@/components/shared/QuantityStepper'
 import type { CartItem } from '@/types'
+import { useCheckoutGuard } from '@/hooks/useCheckoutGuard'
 
 export function ShoppingBagDrawer() {
   const { bagOpen, closeBag } = useUIStore()
   const router                = useRouter()
+
+  const {
+    proceedToCheckout,
+    isNavigating,
+    guardError,
+  } = useCheckoutGuard()
 
   const {
     items,
@@ -43,9 +50,9 @@ export function ShoppingBagDrawer() {
     return () => document.removeEventListener('keydown', onKey)
   }, [bagOpen, closeBag])
 
-  function handleCheckout() {
+  async function handleCheckout() {
     closeBag()
-    router.push('/checkout')
+    await proceedToCheckout()
   }
 
   function handleViewBag() {
@@ -190,7 +197,7 @@ export function ShoppingBagDrawer() {
             {/* Proceed to Checkout */}
             <button
               onClick={handleCheckout}
-              disabled={hasOutOfStockItems}
+              disabled={hasOutOfStockItems || isNavigating || itemCount === 0}
               className={cn(
                 'w-full h-13',
                 'bg-deep text-background',
@@ -201,8 +208,21 @@ export function ShoppingBagDrawer() {
               )}
               aria-label="Proceed to checkout"
             >
-              Proceed to Checkout
+              {isNavigating ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking...
+                </span>
+              ) : (
+                'Proceed to Checkout'
+              )}
             </button>
+
+            {guardError && (
+              <p className="font-body font-light text-[11px] text-red-400 text-center mt-2">
+                {guardError}
+              </p>
+            )}
 
             {/* Divider */}
             <div className="flex items-center gap-3 my-4">
