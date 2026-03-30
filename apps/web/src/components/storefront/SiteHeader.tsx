@@ -1,9 +1,9 @@
 'use client'
 
 import { SiteHeader as SiteHeaderUI } from '@modett/ui'
-import { useCartStore } from '@/store/cart.store'
-import { useAuthStore } from '@/store/auth.store'
-import { useCurrencyStore } from '@/store/currency.store'
+import { useCartCount } from '@/hooks/useCartCount'
+import { useSession } from '@/hooks/useSession'
+import { useGeo } from '@/hooks/useCurrency'
 
 export interface StorefrontSiteHeaderProps {
   variant?: 'transparent' | 'solid'
@@ -16,19 +16,19 @@ export function SiteHeader({
   bannerMessage,
   bannerLink,
 }: StorefrontSiteHeaderProps) {
-  const cartCount = useCartStore((s) => s.itemCount)
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const { currency, countryName } = useCurrencyStore()
+  const count = useCartCount()
+  const { isLoggedIn } = useSession()
+  const { currency } = useGeo()
 
   return (
     <SiteHeaderUI
       variant={variant}
       bannerMessage={bannerMessage}
       bannerLink={bannerLink}
-      cartCount={cartCount}
-      isAuthenticated={isAuthenticated}
+      cartCount={count}
+      isAuthenticated={isLoggedIn}
       currency={currency}
-      countryName={countryName}
+      countryName="Sri Lanka"
       logoSrc="/images/modett-logo-white.svg"
       solidLogoSrc="/images/logo.png"
     />
