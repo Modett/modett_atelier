@@ -1,7 +1,8 @@
 'use client'
 
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { CART_QUERY_KEY } from './useCart'
 import { useInvalidateSession } from './useSession'
 import type { User } from '@/types'
 
@@ -15,6 +16,7 @@ interface RegisterInput {
 
 export function useRegister() {
   const invalidateSession = useInvalidateSession()
+  const queryClient         = useQueryClient()
 
   return useMutation({
     mutationFn: async (input: RegisterInput) => {
@@ -23,6 +25,7 @@ export function useRegister() {
     },
     onSuccess: () => {
       invalidateSession()
+      void queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY })
     },
   })
 }

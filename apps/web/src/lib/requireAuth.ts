@@ -26,7 +26,7 @@ export async function requireAuth(nextPath?: string) {
   }
 
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+    const res = await fetch(`${API_BASE_URL}/me`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
