@@ -16,21 +16,23 @@ import {
 } from '../../middleware/rateLimit'
 import { requireAuth, requireAdmin, requireOwner } from '../../middleware/auth'
 import { mergeCartsOnLogin } from '../cart'
+import {
+  crossOriginCookieAttributes,
+  clearSidCookie,
+  setCidCookie,
+} from '../../lib/crossOriginCookies'
 import * as iamService from './iam.service'
 
 const router = Router()
 
-// Cookie helpers
+const _cookieBase = crossOriginCookieAttributes()
 const CUSTOMER_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: true,
-  sameSite: 'lax' as const,
-  path: '/',
+  ..._cookieBase,
+  path: '/' as const,
 }
 const ADMIN_COOKIE_OPTIONS = {
-  ...CUSTOMER_COOKIE_OPTIONS,
-  sameSite: 'strict' as const,
-  path: '/admin',
+  ..._cookieBase,
+  path: '/admin' as const,
 }
 
 type AuthRequest = Request & { user?: { id: string }; sessionId?: string }
@@ -172,13 +174,7 @@ router.post(
         guestSessionId: req.cookies?.cid ?? '',
       })
       if (mergeResult) {
-        res.cookie('cid', mergeResult.sessionId, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 21 * 24 * 60 * 60 * 1000,
-          path: '/',
-        })
+        setCidCookie(res, mergeResult.sessionId)
       }
     } catch (err) {
       console.error('Cart merge on login failed', err)
@@ -200,7 +196,7 @@ router.post(
 router.post('/auth/logout', async (req: Request, res: Response) => {
   const sid = req.cookies?.sid
   if (sid) await iamService.logout({ sessionId: sid })
-  res.clearCookie('sid', { path: '/' })
+  clearSidCookie(res, '/')
   res.status(200).json({ data: { ok: true } })
 })
 
@@ -320,7 +316,7 @@ router.patch(
       currentPassword: body.currentPassword,
       newPassword: body.newPassword,
     })
-    res.clearCookie('sid', { path: '/' })
+    clearSidCookie(res, '/')
     res.cookie('sid', sessionId, { ...CUSTOMER_COOKIE_OPTIONS, maxAge: 24 * 60 * 60 * 1000 })
     res.status(200).json({ data: { ok: true } })
   },
@@ -553,7 +549,7 @@ router.delete(
  *               password: { type: string }
  *     responses:
  *       200:
- *         description: Login successful. Sets admin sid cookie (SameSite=Strict, Path=/admin).
+ *         description: Login successful. Sets admin sid cookie (Path=/admin, cross-origin attrs in production).
  *         content:
  *           application/json:
  *             schema:
@@ -595,7 +591,7 @@ router.post(
 router.post('/admin/auth/logout', requireAdmin, async (req: AdminRequest, res: Response) => {
   const sid = req.cookies?.sid
   if (sid) await iamService.adminLogout({ sessionId: sid })
-  res.clearCookie('sid', { path: '/admin' })
+  clearSidCookie(res, '/admin')
   res.status(200).json({ data: { ok: true } })
 })
 

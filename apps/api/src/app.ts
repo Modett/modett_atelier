@@ -22,12 +22,15 @@ export const app: Express = express()
 // Railway sits behind a reverse proxy — required for correct req.ip and secure cookies
 app.set('trust proxy', 1)
 
-const ALLOWED_ORIGINS = [
+const rawAllowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   process.env.FRONTEND_URL,
   process.env.FRONTEND_URL_WWW,
-].filter(Boolean) as string[]
+  process.env.FRONTEND_URL?.replace(/^https:\/\//, 'https://www.'),
+].filter((o): o is string => typeof o === 'string' && o.length > 0)
+
+const ALLOWED_ORIGINS = [...new Set(rawAllowedOrigins)]
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -35,12 +38,27 @@ app.use(cors({
     if (ALLOWED_ORIGINS.includes(origin)) {
       return callback(null, true)
     }
+    console.warn(`[CORS] Blocked origin: ${origin}`)
     return callback(new Error(`CORS: origin ${origin} not allowed`))
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Cookie',
+    'X-Requested-With',
+  ],
+  exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 200,
 }))
+
+app.use((_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  next()
+})
+
 app.use(express.json())
 app.use(cookieParser())
 

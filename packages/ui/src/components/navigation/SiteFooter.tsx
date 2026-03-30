@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { cn } from '../../lib/utils'
 import { SocialIcon } from './SocialIcons'
@@ -68,8 +69,8 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
   {
     heading: 'Term of Use',
     links: [
-      { label: 'Terms and Conditions', href: '#' },
-      { label: 'Privacy Policy', href: '#' },
+      { label: 'Terms of Sale', href: '/terms' },
+      { label: 'Privacy Policy', href: '/privacy' },
       { label: 'Shipping and Returns', href: '#' },
     ],
   },
@@ -274,14 +275,30 @@ export function SiteFooter({
           )}
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-foreground/20" />
-
-        {/* Copyright */}
-        <div className="py-6 md:py-8">
-          <p className="font-body text-xs font-normal text-foreground text-center">
-            {copyrightText ?? `Copyright© ${new Date().getFullYear()} Modett Atelier (Pvt) Ltd.`}
+        <div className="border-t border-foreground/10 mt-12 pt-6 pb-6 md:pb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="font-body font-light text-[11px] text-muted-foreground uppercase tracking-[0.15em] text-center md:text-left">
+            {copyrightText ?? `© ${new Date().getFullYear()} Modett. All rights reserved.`}
           </p>
+          <div className="flex items-center gap-6 flex-wrap justify-center">
+            <Link
+              href="/privacy"
+              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-200"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              href="/terms"
+              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-200"
+            >
+              Terms of Sale
+            </Link>
+            <Link
+              href="/contact"
+              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-200"
+            >
+              Contact
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
