@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { z } from 'zod'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
 import { useLogin } from '@/hooks/useLogin'
 import { AuthInput } from './AuthInput'
 import type { ApiError } from '@/types'
@@ -19,11 +20,33 @@ const ERROR_MESSAGES: Record<string, string> = {
   RATE_LIMIT_EXCEEDED:  'Too many attempts. Please wait 15 minutes.',
 }
 
+type LoginView = 'login' | 'forgot' | 'forgot-sent'
+
+const primaryButtonClass = cn(
+  'w-full h-13',
+  'bg-umber text-background',
+  'font-body font-light uppercase tracking-[0.25em] text-[13px]',
+  'rounded-none border-0',
+  'hover:bg-ink transition-colors duration-200',
+  'disabled:opacity-40 disabled:cursor-not-allowed',
+)
+
+const backLinkClass = cn(
+  'font-body font-light text-[12px]',
+  'text-umber underline hover:text-ink',
+  'transition-colors duration-200',
+)
+
 export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   const [email, setEmail]           = useState('')
   const [password, setPassword]     = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [errors, setErrors]         = useState<Record<string, string>>({})
+  const [loginView, setLoginView]   = useState<LoginView>('login')
+  const [resetEmail, setResetEmail] = useState('')
+  const [forgotEmailError, setForgotEmailError] = useState('')
+  const [forgotFormError, setForgotFormError]   = useState('')
+  const [forgotSending, setForgotSending]       = useState(false)
   const login = useLogin()
 
   function handleSubmit(e: React.FormEvent) {
@@ -53,6 +76,113 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
           setErrors({ form: message })
         },
       },
+    )
+  }
+
+  function handleForgotSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setForgotFormError('')
+    setForgotEmailError('')
+
+    const result = z
+      .string()
+      .email('Please enter a valid email address')
+      .safeParse(resetEmail.trim())
+    if (!result.success) {
+      const msg = result.error.errors[0]?.message ?? 'Please enter a valid email address'
+      setForgotEmailError(msg)
+      return
+    }
+
+    setForgotSending(true)
+    void api
+      .post('/auth/forgot-password', { email: result.data })
+      .then(() => {
+        setLoginView('forgot-sent')
+      })
+      .catch(() => {
+        setForgotFormError('Something went wrong. Please try again.')
+      })
+      .finally(() => {
+        setForgotSending(false)
+      })
+  }
+
+  function goBackToLogin() {
+    setLoginView('login')
+    setForgotFormError('')
+    setForgotEmailError('')
+  }
+
+  if (loginView === 'forgot-sent') {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h2 className="font-display font-bold text-[28px] text-umber leading-tight mb-2">
+            Check your email
+          </h2>
+          <p className="font-body font-light text-[13px] text-muted-foreground leading-relaxed">
+            If an account exists for{' '}
+            <span className="font-semibold text-ink">{resetEmail.trim()}</span>
+            , you&apos;ll receive a reset link shortly.
+          </p>
+        </div>
+        <button type="button" onClick={goBackToLogin} className={cn(backLinkClass, 'text-left w-fit')}>
+          Back to login
+        </button>
+      </div>
+    )
+  }
+
+  if (loginView === 'forgot') {
+    return (
+      <form onSubmit={handleForgotSubmit} noValidate className="flex flex-col gap-6">
+        <div>
+          <h2 className="font-display font-bold text-[28px] text-umber leading-tight mb-2">
+            Reset your password
+          </h2>
+          <p className="font-body font-light text-[13px] text-muted-foreground leading-relaxed">
+            Enter your email and we&apos;ll send you a reset link.
+          </p>
+        </div>
+
+        <AuthInput
+          label="Email"
+          name="forgot-email"
+          type="email"
+          required
+          autoComplete="email"
+          value={resetEmail}
+          onChange={(e) => setResetEmail(e.target.value)}
+          error={forgotEmailError}
+        />
+
+        {forgotFormError && (
+          <p className="font-body text-[12px] text-red-500">
+            {forgotFormError}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-3 pt-2">
+          <button
+            type="submit"
+            disabled={forgotSending}
+            className={primaryButtonClass}
+          >
+            {forgotSending ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Sending...
+              </span>
+            ) : (
+              'Send reset link'
+            )}
+          </button>
+          <button type="button" onClick={goBackToLogin} className={cn(backLinkClass, 'text-left w-fit')}>
+            ← Back to login
+          </button>
+        </div>
+      </form>
     )
   }
 
@@ -102,6 +232,12 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         <div className="flex justify-end mt-1">
           <button
             type="button"
+            onClick={() => {
+              setResetEmail(email)
+              setLoginView('forgot')
+              setForgotFormError('')
+              setForgotEmailError('')
+            }}
             className={cn(
               'font-body font-light text-[12px]',
               'text-umber underline hover:text-ink',
@@ -152,14 +288,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         <button
           type="submit"
           disabled={login.isPending}
-          className={cn(
-            'w-full h-13',
-            'bg-umber text-background',
-            'font-body font-light uppercase tracking-[0.25em] text-[13px]',
-            'rounded-none border-0',
-            'hover:bg-ink transition-colors duration-200',
-            'disabled:opacity-40 disabled:cursor-not-allowed',
-          )}
+          className={primaryButtonClass}
         >
           {login.isPending ? (
             <span className="flex items-center justify-center gap-2">

@@ -10,8 +10,14 @@ export function useSession() {
   const { data, isLoading } = useQuery({
     queryKey: SESSION_QUERY_KEY,
     queryFn: async () => {
-      const res = await api.get<{ data: { user: User | null } }>('/auth/session')
-      return res.data.user
+      try {
+        const res = await api.get<{ data: { user: User | null } }>('/auth/me')
+        return res.data.user
+      } catch (err: unknown) {
+        const apiErr = err as { status?: number }
+        if (apiErr?.status === 401) return null
+        throw err
+      }
     },
     staleTime:            5 * 60 * 1000,
     retry:                false,
