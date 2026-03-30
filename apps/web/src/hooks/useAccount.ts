@@ -357,8 +357,10 @@ export function useUpdateProfile() {
   const invalidateSession = useInvalidateSession()
   return useMutation({
     mutationFn: async (data: {
-      firstName?: string
-      lastName?: string
+      firstName?:       string
+      lastName?:        string
+      dob?:             string | null
+      dobConsent?:      boolean
       newsletterOptIn?: boolean
     }) => {
       const res = await api.patch<{ data: { user: User } }>('/me', data)

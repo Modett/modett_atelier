@@ -38,25 +38,28 @@ export default function AccountWishlistPage() {
     [router],
   )
 
-  const tryAddToBag = useCallback(
-    (w: WishlistItem) => {
+  const handleQuickAddToCart = useCallback(
+    (productId: string, colourValue: string, sizeValue: string) => {
+      const w = (data ?? []).find((i) => i.productId === productId)
+      if (!w) return
       const variants = w.product.variants ?? []
-      const colours  = new Set(variants.map((v) => v.color))
-      const sizes    = new Set(variants.map((v) => v.size))
-      if (colours.size <= 1 && sizes.size <= 1) {
-        const v = variants[0]
-        if (!v || v.stockStatus === 'OUT_OF_STOCK') return
+      const v = variants.find(
+        (vv) => vv.color === colourValue && vv.size === sizeValue,
+      )
+      if (v && v.stockStatus !== 'OUT_OF_STOCK') {
         addToCart.mutate({ variantId: v.variantId, qty: 1 })
         return
       }
-      setDrawerItem(wishlistToPseudoCartItem(w))
+      if (variants.length > 1) {
+        setDrawerItem(wishlistToPseudoCartItem(w))
+      }
     },
-    [addToCart],
+    [addToCart, data],
   )
 
   if (isLoading) {
     return (
-      <div className="animate-pulse grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="animate-pulse grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-80 bg-muted rounded-none" />
         ))}
@@ -64,51 +67,49 @@ export default function AccountWishlistPage() {
     )
   }
 
+  const list = data ?? []
+
   return (
     <div>
       <h1 className="font-display font-bold text-[24px] text-umber mb-8">
         Wishlist
       </h1>
 
-      {(data ?? []).length === 0 ? (
-        <div className="text-center py-20 border border-muted px-6">
+      {list.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center px-4">
           <Heart
-            className="w-14 h-14 mx-auto text-muted-foreground/40 mb-4"
+            className="w-16 h-16 text-muted-foreground/30"
             strokeWidth={1}
             aria-hidden
           />
-          <p className="font-body font-light text-[14px] text-muted-foreground mb-6">
+          <p className="font-display font-bold text-[22px] text-umber mt-6">
             Your wishlist is empty
+          </p>
+          <p className="font-body font-light text-[14px] text-muted-foreground mt-2 max-w-sm">
+            Save pieces you love and come back to them anytime.
           </p>
           <Link
             href="/collections"
             className={cn(
-              'inline-flex h-11 px-10 items-center justify-center',
-              'bg-deep text-background font-body font-light uppercase tracking-[0.25em] text-[12px]',
-              'rounded-none hover:bg-ink transition-colors duration-200',
+              'mt-8 inline-flex h-11 px-10 items-center justify-center',
+              'border border-umber text-umber font-body font-light uppercase tracking-[0.2em] text-[12px]',
+              'rounded-none hover:bg-umber hover:text-background transition-all',
             )}
           >
-            Continue Shopping
+            Explore the Collection
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-5">
-          {(data ?? []).map((w) => (
-            <div key={w.id} className="flex flex-col">
-              <ProductCard
-                {...mapProductSummaryToCardProps(w.product, wishlistIds)}
-                isWishlisted
-                onWishlistToggle={handleWishlistToggle}
-                onCardClick={handleCardClick}
-              />
-              <button
-                type="button"
-                onClick={() => tryAddToBag(w)}
-                className="mt-3 font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber hover:underline text-center"
-              >
-                Add to Bag
-              </button>
-            </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+          {list.map((w) => (
+            <ProductCard
+              key={w.id}
+              {...mapProductSummaryToCardProps(w.product, wishlistIds)}
+              isWishlisted
+              onWishlistToggle={handleWishlistToggle}
+              onCardClick={handleCardClick}
+              onQuickAddToCart={handleQuickAddToCart}
+            />
           ))}
         </div>
       )}
@@ -126,7 +127,7 @@ function wishlistToPseudoCartItem(w: WishlistItem): CartItem {
     id:           w.id,
     variantId:    v?.variantId ?? w.variantId ?? '',
     qty:          1,
-    productId:    w.product.id,
+    productId:    w.productId,
     productSlug:  w.product.slug,
     displayName:  w.product.displayName,
     shortName:    w.product.shortName,
