@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import type { User, ApiError } from '@/types'
+import type { User } from '@/types'
 
 export const SESSION_QUERY_KEY = ['session'] as const
 
@@ -10,14 +10,8 @@ export function useSession() {
   const { data, isLoading } = useQuery({
     queryKey: SESSION_QUERY_KEY,
     queryFn: async () => {
-      try {
-        const res = await api.get<{ data: { user: User } }>('/me')
-        return res.data.user
-      } catch (err: unknown) {
-        const apiErr = err as ApiError
-        if (apiErr?.status === 401) return null
-        throw err
-      }
+      const res = await api.get<{ data: { user: User | null } }>('/auth/session')
+      return res.data.user
     },
     staleTime:            5 * 60 * 1000,
     retry:                false,

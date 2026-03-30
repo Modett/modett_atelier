@@ -15,10 +15,10 @@ import crypto from 'crypto'
 import { validate } from '../../middleware/validate'
 import { optionalAuth } from '../../middleware/auth'
 import type { AuthRequest } from '../../middleware/auth'
+import { setCidCookie } from '../../lib/crossOriginCookies'
 import * as cartService from './cart.service'
 
 const router = Router()
-const CID_MAX_AGE_MS = 21 * 24 * 60 * 60 * 1000 // 21 days
 
 export type CartIdentityRequest = Request & {
   cartUserId?: string
@@ -27,16 +27,6 @@ export type CartIdentityRequest = Request & {
 
 function cartReq(req: Request): CartIdentityRequest {
   return req as CartIdentityRequest
-}
-
-function setCidCookie(res: Response, sessionId: string): void {
-  res.cookie('cid', sessionId, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: CID_MAX_AGE_MS,
-    path: '/',
-  })
 }
 
 function resolveCartIdentity(
