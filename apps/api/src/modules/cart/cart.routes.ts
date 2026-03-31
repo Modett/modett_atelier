@@ -38,9 +38,6 @@ function resolveCartIdentity(
   const cartReq = req as CartIdentityRequest
   cartReq.cartUserId = authReq.user?.id
   cartReq.cartSession = req.cookies?.cid ?? crypto.randomUUID()
-  if (!req.cookies?.cid) {
-    setCidCookie(res, cartReq.cartSession)
-  }
   next()
 }
 

@@ -20,11 +20,12 @@ export function useCart() {
       return normalizeCartResponse(res.data)
     },
     enabled:              isReady,
-    staleTime:            30 * 1000,
+    staleTime:            5 * 60 * 1000,
     // No retries: repeated GET /cart can create or hit the wrong cart; surface error once via query.error.
     retry:                false,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnMount:       true,
+    refetchInterval:      false,
   })
 
   const summary   = query.data?.summary ?? null
