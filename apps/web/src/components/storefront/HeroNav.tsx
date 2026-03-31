@@ -97,7 +97,7 @@ export function HeroNav() {
               <SearchIcon size={16} />
             </Link>
             <Link
-              href="/wishlist"
+              href="/account/wishlist"
               aria-label="Wishlist"
               className="text-background/80 hover:text-background transition-colors duration-200"
             >

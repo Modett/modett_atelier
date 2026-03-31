@@ -24,7 +24,7 @@ export interface FooterColumn {
 /** Social media link with platform and URL */
 export interface SocialLink {
   /** Platform name */
-  platform: 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'youtube'
+  platform: 'facebook' | 'instagram' | 'tiktok' | 'linkedin'
   /** Profile URL */
   href: string
 }
@@ -59,7 +59,7 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
     heading: 'General Information',
     links: [
       { label: 'Brand Philosophy', href: '#' },
-      { label: 'Contact Us', href: '#' },
+      { label: 'Contact Us', href: '/contact' },
       { label: 'Modett Muse Club', href: '#' },
       { label: 'Size Guide', href: '#' },
       { label: 'Journal', href: '#' },
@@ -77,11 +77,10 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
 ]
 
 const DEFAULT_SOCIAL_LINKS: SocialLink[] = [
-  { platform: 'facebook', href: '#' },
-  { platform: 'instagram', href: '#' },
-  { platform: 'tiktok', href: '#' },
-  { platform: 'linkedin', href: '#' },
-  { platform: 'youtube', href: '#' },
+  { platform: 'facebook', href: 'https://www.facebook.com/modett' },
+  { platform: 'instagram', href: 'https://www.instagram.com/modett' },
+  { platform: 'tiktok', href: 'https://www.tiktok.com/@modett' },
+  { platform: 'linkedin', href: 'https://www.linkedin.com/company/modett' },
 ]
 
 function ChevronDownIcon({ className }: { className?: string }) {
