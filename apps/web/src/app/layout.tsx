@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Playfair_Display, Raleway } from 'next/font/google'
-import { Analytics }    from '@vercel/analytics/react'
-import { SpeedInsights } from '@vercel/speed-insights/next'
+import { Analytics } from '@vercel/analytics/react'
 import { QueryProvider } from '@/components/providers/QueryProvider'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { ShoppingBagDrawer } from '@/components/storefront/ShoppingBagDrawer'
@@ -60,7 +59,6 @@ export default function RootLayout({
           </AuthProvider>
         </QueryProvider>
         <Analytics />
-        <SpeedInsights />
       </body>
     </html>
   )

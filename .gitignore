@@ -13,8 +13,11 @@ build/
 .env.local
 .env.production
 .env.*.local
+.env.example
 apps/api/.env
+apps/api/.env.example
 apps/web/.env.local
+apps/web/.env.example
 
 # Keep .env.example files (they have no real secrets)
 !.env.example
