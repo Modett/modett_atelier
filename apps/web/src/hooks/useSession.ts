@@ -27,7 +27,8 @@ export function useSession() {
   return {
     user:       data ?? null,
     isLoading,
-    isLoggedIn: data !== null && data !== undefined && !isLoading,
+    /** User is authenticated — uses cached query data; login/register set this immediately via setQueryData. */
+    isLoggedIn: data != null,
   }
 }
 
