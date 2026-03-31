@@ -5,49 +5,48 @@ import { Mail, MapPin, Phone } from 'lucide-react'
 import { FilledButton, TextInput } from '@modett/ui'
 import { api } from '@/lib/api'
 import { CONTACT } from '@/lib/contact'
-import type { ApiError } from '@/types'
-
-function isValidEmail(value: string): boolean {
-  const trimmed = value.trim()
-  if (!trimmed) return false
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
-}
 
 export function ContactForm() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [formError, setFormError] = useState('')
   const [isPending, setIsPending] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [submitError, setSubmitError] = useState('')
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setSubmitError('')
 
-    if (!isValidEmail(email)) {
-      setEmailError('Please enter a valid email address.')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email.trim()) {
+      setEmailError('Email is required.')
+      setFormError('')
       return
     }
-    setEmailError('')
+    if (!emailRegex.test(email.trim())) {
+      setEmailError('Please enter a valid email address.')
+      setFormError('')
+      return
+    }
+    if (!message.trim()) {
+      setFormError('Please enter a message.')
+      return
+    }
 
+    setEmailError('')
+    setFormError('')
     setIsPending(true)
+
     try {
       await api.post('/messaging/contact', {
-        name,
+        name: name.trim(),
         email: email.trim(),
-        message,
+        message: message.trim(),
       })
       setSubmitted(true)
-    } catch (err) {
-      // TODO: wire to real backend when /messaging/contact exists
-      const status = (err as ApiError)?.status
-      if (status === 404) {
-        setSubmitted(true)
-        return
-      }
-      setSubmitError('Something went wrong. Please try again.')
+    } catch {
+      setFormError('Something went wrong. Please try again.')
     } finally {
       setIsPending(false)
     }
@@ -111,7 +110,10 @@ export function ContactForm() {
                   placeholder="Message"
                   rows={5}
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => {
+                  setMessage(e.target.value)
+                  if (formError) setFormError('')
+                }}
                   className="w-full font-body font-normal text-text
                              bg-background border border-muted-foreground/60
                              rounded-sm px-4 py-3 text-base
@@ -135,9 +137,9 @@ export function ContactForm() {
                 >
                   Send Message
                 </FilledButton>
-                {submitError ? (
+                {formError ? (
                   <p className="font-body font-light text-[13px] text-red-500 mt-2">
-                    {submitError}
+                    {formError}
                   </p>
                 ) : null}
               </div>

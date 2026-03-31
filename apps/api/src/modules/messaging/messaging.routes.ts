@@ -7,7 +7,13 @@ import { Router, type Request, type Response, type IRouter } from 'express'
 import { z } from 'zod'
 import { requireAuth, requireAdmin, optionalAuth } from '../../middleware/auth'
 import type { AuthRequest, AdminRequest } from '../../middleware/auth'
-import { validate, validateQuery } from '../../middleware/validate'
+import { validate, validateQuery, type ValidatedBody } from '../../middleware/validate'
+import { rateLimit } from '../../middleware/rateLimit'
+import { sendEmail, CONTACT_INBOX } from '../../infrastructure/email/email.service'
+import {
+  contactNotificationEmail,
+  contactConfirmationEmail,
+} from '../../infrastructure/email/templates'
 import * as messagingService from './messaging.service'
 
 const router: IRouter = Router()
@@ -217,6 +223,58 @@ router.post(
       sessionId: body.sessionId,
     })
     res.status(200).json({ data: { ok: true } })
+  },
+)
+
+// —— Public: POST /messaging/contact (Resend — not queued) ——
+
+const contactBodySchema = z.object({
+  name: z.string().max(200).optional().default(''),
+  email: z.string().email('Invalid email address'),
+  message: z.string().min(1, 'Message is required').max(5000),
+})
+
+router.post(
+  '/messaging/contact',
+  rateLimit({
+    name: 'contact-form',
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    key: (req) => req.ip ?? 'unknown',
+  }),
+  validate(contactBodySchema),
+  async (req: Request, res: Response) => {
+    const body = (req as ValidatedBody<typeof contactBodySchema>).body
+
+    res.status(200).json({ data: { ok: true } })
+
+    const notification = contactNotificationEmail({
+      name: body.name,
+      email: body.email,
+      message: body.message,
+    })
+
+    const confirmation = contactConfirmationEmail({
+      name: body.name,
+    })
+
+    Promise.all([
+      sendEmail({
+        to: CONTACT_INBOX,
+        subject: notification.subject,
+        html: notification.html,
+        text: notification.text,
+        replyTo: body.email,
+      }),
+      sendEmail({
+        to: body.email,
+        subject: confirmation.subject,
+        html: confirmation.html,
+        text: confirmation.text,
+      }),
+    ]).catch((err: unknown) => {
+      console.error('[contact-form] Email delivery failed:', err)
+    })
   },
 )
 
