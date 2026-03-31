@@ -8,9 +8,24 @@ import { Resend } from 'resend'
 const apiKey = process.env.RESEND_API_KEY
 const resend = apiKey?.startsWith('re_') ? new Resend(apiKey) : null
 
-const FROM = process.env.EMAIL_FROM ?? 'noreply@modett.com'
+/**
+ * From header for Resend. Prefer EMAIL_FROM (bare address → wrapped as Modett <…>).
+ * Falls back to RESEND_FROM (full string, same as password reset).
+ */
+function getResendFromHeader(): string {
+  const emailFrom = process.env.EMAIL_FROM?.trim()
+  if (emailFrom) {
+    if (emailFrom.includes('<')) return emailFrom
+    return `Modett <${emailFrom}>`
+  }
+  const resendFrom = process.env.RESEND_FROM?.trim()
+  if (resendFrom) return resendFrom
+  return 'Modett <onboarding@resend.dev>'
+}
+
+/** Where contact-form staff notifications are delivered (not the sender). */
 export const CONTACT_INBOX =
-  process.env.EMAIL_CONTACT_INBOX ?? 'hello@modett.com'
+  process.env.EMAIL_CONTACT_INBOX?.trim() || 'hello@modett.com'
 
 export async function sendEmail({
   to,
@@ -31,7 +46,7 @@ export async function sendEmail({
   }
 
   const { error } = await resend.emails.send({
-    from: `Modett <${FROM}>`,
+    from: getResendFromHeader(),
     to: Array.isArray(to) ? to : [to],
     subject,
     html,
