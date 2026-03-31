@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { getCurrencyCookie } from '@/hooks/useCurrency'
 import { useSession } from './useSession'
 import type { WishlistItem } from '@/types'
 
@@ -14,7 +15,8 @@ export function useWishlist() {
     queryKey: WISHLIST_QUERY_KEY,
     queryFn: async () => {
       const res = await api.get<{ data: { wishlist: WishlistItem[] } }>(
-        '/account/wishlist'
+        '/me/wishlist',
+        { params: { currency: getCurrencyCookie() } },
       )
       return res.data.wishlist
     },
@@ -39,10 +41,10 @@ export function useToggleWishlist() {
       ) ?? false
 
       if (isInWishlist) {
-        await api.delete(`/account/wishlist/${productId}`)
+        await api.delete(`/me/wishlist/${productId}`)
         return { action: 'removed' as const, productId }
       } else {
-        await api.post(`/account/wishlist/${productId}`)
+        await api.post(`/me/wishlist/${productId}`)
         return { action: 'added' as const, productId }
       }
     },

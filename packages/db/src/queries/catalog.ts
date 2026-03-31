@@ -53,6 +53,13 @@ export interface ProductListItemRow {
   variants: ProductListVariantRow[]
 }
 
+/** Active storefront list row with category + key image metadata (wishlist, etc.) */
+export interface ProductListItemRowWithCategory extends ProductListItemRow {
+  categoryId: string | null
+  keyImageId: string | null
+  keyImageSortOrder: number
+}
+
 export interface VariantWithStockRow {
   variantId: string
   color: string
@@ -226,6 +233,64 @@ export async function listProducts({
     variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
   }))
   return { products, total }
+}
+
+export async function listActiveProductListRowsByIds({
+  ids,
+}: {
+  ids: string[]
+}): Promise<ProductListItemRowWithCategory[]> {
+  if (ids.length === 0) return []
+
+  const listResult = await db.execute(sql`
+    SELECT
+      v.id,
+      v.slug,
+      v.display_name AS "displayName",
+      v.short_name AS "shortName",
+      v.is_sale AS "isSale",
+      v.category_id AS "categoryId",
+      img.id AS "keyImageId",
+      img.sort_order AS "keyImageSortOrder",
+      img.url AS "keyImageUrl",
+      img.alt_text AS "keyImageAltText",
+      v.lkr_amount AS "lkrAmount",
+      v.sgd_amount AS "sgdAmount",
+      v.usd_amount AS "usdAmount",
+      COALESCE(agg.stock_status, 'OUT_OF_STOCK') AS "stockStatus",
+      COALESCE(var_agg.variants, '[]'::json) AS variants
+    FROM catalog.active_products_with_prices v
+    LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
+    LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+        json_build_object(
+          'variantId', va.variant_id,
+          'color', va.color,
+          'size', va.size,
+          'availableQty', va.available_qty,
+          'stockStatus', va.stock_status
+        ) ORDER BY va.color, va.size
+      ) AS variants
+      FROM inventory.variant_availability va
+      WHERE va.product_id = v.id
+    ) var_agg ON true
+    WHERE v.id IN (${sql.join(
+      ids.map((id) => sql`${id}`),
+      sql`, `,
+    )})
+  `)
+
+  const rows =
+    (listResult.rows as unknown as Array<
+      Omit<ProductListItemRowWithCategory, 'variants'> & {
+        variants: ProductListVariantRow[] | string
+      }
+    >) ?? []
+  return rows.map((r) => ({
+    ...r,
+    variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : (r.variants ?? []),
+  }))
 }
 
 export async function searchProducts({

@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthPanel } from '@/components/providers/AuthProvider'
 import { useSession } from '@/hooks/useSession'
+import { storePostAuthPath } from '@/lib/postAuthRedirect'
 import { NAV_LINKS } from '@/lib/nav-links'
 import { ModettLogo } from '@/components/shared/ModettLogo'
 import { CartButton } from '@/components/shared/CartButton'
@@ -27,6 +28,11 @@ export function HeroNav() {
 
   const openMenu = useCallback(() => setMobileMenuOpen(true), [])
   const closeMenu = useCallback(() => setMobileMenuOpen(false), [])
+
+  const handleAccountIconClick = useCallback(() => {
+    storePostAuthPath('/account')
+    openPanel()
+  }, [openPanel])
 
   return (
     <>
@@ -112,7 +118,7 @@ export function HeroNav() {
             ) : (
               <button
                 type="button"
-                onClick={openPanel}
+                onClick={handleAccountIconClick}
                 aria-label="Sign in or create account"
                 className="text-background/80 hover:text-background transition-colors duration-200"
               >
