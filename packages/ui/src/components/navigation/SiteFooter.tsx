@@ -59,7 +59,7 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
     heading: 'General Information',
     links: [
       { label: 'Brand Philosophy', href: '#' },
-      { label: 'Contact Us', href: '#' },
+      { label: 'Contact Us', href: '/contact' },
       { label: 'Modett Muse Club', href: '#' },
       { label: 'Size Guide', href: '#' },
       { label: 'Journal', href: '#' },
