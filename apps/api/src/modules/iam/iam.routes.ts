@@ -207,7 +207,31 @@ router.post(
   validate(forgotPasswordSchema),
   async (req: Request, res: Response) => {
     const body = (req as { body: z.infer<typeof forgotPasswordSchema> }).body
-    console.log(`[forgot-password] Reset requested for: ${body.email}`)
+    await iamService.requestPasswordReset({ email: body.email })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8).max(100),
+})
+
+router.post(
+  '/auth/reset-password',
+  rateLimit({
+    name: 'auth-reset-password',
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    key: (req) => req.ip ?? 'unknown',
+  }),
+  validate(resetPasswordSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof resetPasswordSchema> }).body
+    await iamService.completePasswordReset({
+      token: body.token,
+      password: body.password,
+    })
     res.status(200).json({ data: { ok: true } })
   },
 )

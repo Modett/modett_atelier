@@ -7,7 +7,9 @@ import * as crypto from 'node:crypto'
 import * as bcrypt from 'bcryptjs'
 import type { CurrencyCode } from '@modett/types'
 import { AppError } from '../../lib/errors'
+import { sendPasswordResetEmail } from '../../lib/sendPasswordResetEmail'
 import {
+  redis,
   getUserByEmail,
   getUserById,
   createUser,
@@ -49,6 +51,8 @@ import { createLoyaltyAccount } from '../loyalty'
 import { createNotificationPreferences } from '../messaging'
 
 const BCRYPT_ROUNDS = 12
+const PASSWORD_RESET_REDIS_PREFIX = 'pwdreset:'
+const PASSWORD_RESET_TTL_SECONDS = 60 * 60
 const DUMMY_HASH =
   '$2a$12$dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.dummy.u'
 
@@ -143,6 +147,59 @@ export async function login({
 
 export async function logout({ sessionId }: { sessionId: string }): Promise<void> {
   await invalidateSession({ sessionId })
+}
+
+export async function requestPasswordReset({ email }: { email: string }): Promise<void> {
+  const normalisedEmail = email.toLowerCase().trim()
+  const user = await getUserByEmail({ email: normalisedEmail })
+  if (!user || user.deletedAt) return
+
+  const rawToken = crypto.randomBytes(32).toString('hex')
+  const key = `${PASSWORD_RESET_REDIS_PREFIX}${rawToken}`
+  await redis.set(key, user.id, 'EX', PASSWORD_RESET_TTL_SECONDS)
+
+  const base = process.env.FRONTEND_URL ?? 'http://localhost:3000'
+  const resetUrl = `${base.replace(/\/$/, '')}/auth/reset-password?token=${encodeURIComponent(rawToken)}`
+
+  const { sent, reason } = await sendPasswordResetEmail({
+    to: user.email,
+    resetUrl,
+  })
+  if (!sent) {
+    console.warn('[iam] password reset email not sent:', reason)
+  }
+}
+
+export async function completePasswordReset({
+  token,
+  password,
+}: {
+  token: string
+  password: string
+}): Promise<void> {
+  const trimmed = token.trim()
+  if (!trimmed) throw new AppError('INVALID_OR_EXPIRED_RESET_TOKEN', 400)
+
+  const key = `${PASSWORD_RESET_REDIS_PREFIX}${trimmed}`
+  const userId = await redis.get(key)
+  if (!userId) throw new AppError('INVALID_OR_EXPIRED_RESET_TOKEN', 400)
+
+  const user = await getUserById({ id: userId })
+  if (!user || user.deletedAt) {
+    await redis.del(key)
+    throw new AppError('USER_NOT_FOUND', 404)
+  }
+
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+  const updated = await updateUser({ id: user.id, data: { passwordHash } })
+  if (!updated) throw new AppError('USER_NOT_FOUND', 404)
+
+  await redis.del(key)
+
+  const sessions = await getActiveSessionsByUserId({ userId: user.id })
+  for (const s of sessions) {
+    if (s.kind === 'CUSTOMER') await invalidateSession({ sessionId: s.id })
+  }
 }
 
 // —— Me ——

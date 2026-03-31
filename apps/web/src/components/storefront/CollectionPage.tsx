@@ -145,8 +145,19 @@ export function CollectionPage({
 
   const cardProps: ProductCardProps[] = useMemo(
     () =>
-      products.map((p) => mapProductSummaryToCardProps(p, wishlistIds)),
-    [products, wishlistIds],
+      products.map((p) => ({
+        ...mapProductSummaryToCardProps(p, wishlistIds),
+        onWishlistToggle: handleWishlistToggle,
+        onCardClick: handleCardClick,
+        onQuickAddToCart: handleQuickAddToCart,
+      })),
+    [
+      products,
+      wishlistIds,
+      handleWishlistToggle,
+      handleCardClick,
+      handleQuickAddToCart,
+    ],
   )
 
   function updateURL(updates: Record<string, string | null>) {
