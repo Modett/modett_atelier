@@ -19,14 +19,12 @@ function useCartCacheUpdater() {
   }
 }
 
-/** Response body updates cache immediately; invalidate refetches GET /cart after Set-Cookie applies. */
+/** Writes mutation response into the cart query cache. Do not invalidate — refetch races cross-origin `cid` Set-Cookie. */
 function useCommitCartMutationResult() {
-  const queryClient   = useQueryClient()
-  const updateCache   = useCartCacheUpdater()
+  const updateCache = useCartCacheUpdater()
 
   return (data: NormalizedCartResponse) => {
     updateCache(data)
-    void queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY })
   }
 }
 

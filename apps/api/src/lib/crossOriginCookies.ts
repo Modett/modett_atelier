@@ -2,11 +2,15 @@
  * Cookie attributes for browser clients on a different origin than the API
  * (e.g. Vercel storefront → Railway API). SameSite=Lax does not send cookies
  * on cross-origin XHR/fetch; production uses SameSite=None + Secure.
+ *
+ * `cid` uses a manual Set-Cookie line in production so we can append `Partitioned`
+ * (CHIPS) for Chrome 115+; Express 4’s res.cookie typings omit `partitioned`.
  */
 
 import type { Response } from 'express'
 
 const CID_MAX_AGE_MS = 21 * 24 * 60 * 60 * 1000 // 21 days
+const CID_MAX_AGE_SEC = Math.floor(CID_MAX_AGE_MS / 1000)
 
 export function crossOriginCookieAttributes(): {
   httpOnly: true
@@ -21,9 +25,22 @@ export function crossOriginCookieAttributes(): {
   }
 }
 
+function encodeCookieValue(value: string): string {
+  return encodeURIComponent(value)
+}
+
 export function setCidCookie(res: Response, sessionId: string): void {
+  const attrs = crossOriginCookieAttributes()
+  if (attrs.sameSite === 'none' && attrs.secure) {
+    const v = encodeCookieValue(sessionId)
+    res.append(
+      'Set-Cookie',
+      `cid=${v}; Path=/; Max-Age=${CID_MAX_AGE_SEC}; HttpOnly; Secure; SameSite=None; Partitioned`,
+    )
+    return
+  }
   res.cookie('cid', sessionId, {
-    ...crossOriginCookieAttributes(),
+    ...attrs,
     maxAge: CID_MAX_AGE_MS,
     path:   '/',
   })
