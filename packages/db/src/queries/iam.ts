@@ -13,6 +13,7 @@ import {
   sessions,
   savedAddresses,
   savedPaymentMethods,
+  wishlists,
 } from '../schema/iam.schema'
 import type {
   User,
@@ -552,4 +553,53 @@ export async function deleteSavedPaymentMethod({
         eq(savedPaymentMethods.userId, userId),
       ),
     )
+}
+
+// —— Wishlist ——
+
+export async function getWishlistByUserId({
+  userId,
+}: {
+  userId: string
+}) {
+  return db
+    .select()
+    .from(wishlists)
+    .where(eq(wishlists.userId, userId))
+    .orderBy(desc(wishlists.createdAt))
+}
+
+export async function addToWishlist({
+  userId,
+  productId,
+  variantId,
+}: {
+  userId: string
+  productId: string
+  variantId?: string | null
+}) {
+  const existing = await db
+    .select()
+    .from(wishlists)
+    .where(and(eq(wishlists.userId, userId), eq(wishlists.productId, productId)))
+    .limit(1)
+  if (existing[0]) return existing[0]
+  const [row] = await db
+    .insert(wishlists)
+    .values({ userId, productId, variantId: variantId ?? null })
+    .returning()
+  if (!row) throw new Error('addToWishlist: no row returned')
+  return row
+}
+
+export async function removeFromWishlist({
+  userId,
+  productId,
+}: {
+  userId: string
+  productId: string
+}): Promise<void> {
+  await db
+    .delete(wishlists)
+    .where(and(eq(wishlists.userId, userId), eq(wishlists.productId, productId)))
 }

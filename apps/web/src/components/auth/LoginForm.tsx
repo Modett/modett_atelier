@@ -123,7 +123,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
           </h2>
           <p className="font-body font-light text-[13px] text-muted-foreground leading-relaxed">
             If an account exists for{' '}
-            <span className="font-semibold text-ink">{resetEmail.trim()}</span>
+            <span className="text-umber font-medium">{resetEmail.trim()}</span>
             , you&apos;ll receive a reset link shortly.
           </p>
         </div>
@@ -166,7 +166,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         <div className="flex flex-col gap-3 pt-2">
           <button
             type="submit"
-            disabled={forgotSending}
+            disabled={forgotSending || !resetEmail.trim()}
             className={primaryButtonClass}
           >
             {forgotSending ? (

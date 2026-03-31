@@ -5,6 +5,7 @@
 
 import * as crypto from 'node:crypto'
 import * as bcrypt from 'bcryptjs'
+import type { CurrencyCode } from '@modett/types'
 import { AppError } from '../../lib/errors'
 import {
   getUserByEmail,
@@ -32,8 +33,18 @@ import {
   listSavedPaymentMethods,
   createSavedPaymentMethod,
   deleteSavedPaymentMethod,
+  getWishlistByUserId,
+  addToWishlist,
+  removeFromWishlist,
+  listActiveProductListRowsByIds,
 } from '@modett/db'
-import type { User, Admin, SavedAddress, SavedPaymentMethod } from '@modett/db'
+import type {
+  User,
+  Admin,
+  SavedAddress,
+  SavedPaymentMethod,
+  ProductListItemRowWithCategory,
+} from '@modett/db'
 import { createLoyaltyAccount } from '../loyalty'
 import { createNotificationPreferences } from '../messaging'
 
@@ -259,6 +270,114 @@ export async function deleteSavedAddressForUser({
   userId: string
 }): Promise<void> {
   await deleteSavedAddress({ id, userId })
+}
+
+// —— Wishlist ——
+
+function resolveWishlistPrice({
+  row,
+  currency,
+}: {
+  row: ProductListItemRowWithCategory
+  currency: CurrencyCode
+}): { amount: string; currency: CurrencyCode } {
+  const amount =
+    currency === 'LKR'
+      ? String(row.lkrAmount)
+      : currency === 'SGD'
+        ? String(row.sgdAmount)
+        : String(row.usdAmount)
+  return { amount, currency }
+}
+
+function rowToWishlistProductSummary(
+  row: ProductListItemRowWithCategory,
+  currency: CurrencyCode,
+) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    displayName: row.displayName,
+    shortName: row.shortName,
+    isSale: row.isSale,
+    categoryId: row.categoryId,
+    keyImage:
+      row.keyImageUrl != null
+        ? {
+            id: row.keyImageId ?? '',
+            url: row.keyImageUrl,
+            altText: row.keyImageAltText,
+            sortOrder: row.keyImageSortOrder ?? 0,
+          }
+        : null,
+    price: resolveWishlistPrice({ row, currency }),
+    variants: row.variants.map((v) => ({
+      variantId: v.variantId,
+      color: v.color,
+      size: v.size,
+      availableQty: v.availableQty,
+      stockStatus: v.stockStatus,
+    })),
+  }
+}
+
+export async function getWishlist({
+  userId,
+  currency = 'LKR',
+}: {
+  userId: string
+  currency?: CurrencyCode
+}) {
+  const rows = await getWishlistByUserId({ userId })
+  if (rows.length === 0) return []
+  const productIds = [...new Set(rows.map((r) => r.productId))]
+  const products = await listActiveProductListRowsByIds({ ids: productIds })
+  const productMap = new Map(products.map((p) => [p.id, p]))
+  const out: Array<{
+    id: string
+    productId: string
+    variantId: string | null
+    createdAt: Date
+    product: ReturnType<typeof rowToWishlistProductSummary>
+  }> = []
+  for (const r of rows) {
+    const p = productMap.get(r.productId)
+    if (!p) continue
+    out.push({
+      id: r.id,
+      productId: r.productId,
+      variantId: r.variantId ?? null,
+      createdAt: r.createdAt,
+      product: rowToWishlistProductSummary(p, currency),
+    })
+  }
+  return out
+}
+
+export async function wishlistAdd({
+  userId,
+  productId,
+}: {
+  userId: string
+  productId: string
+}) {
+  const row = await addToWishlist({ userId, productId })
+  return {
+    id: row.id,
+    productId: row.productId,
+    variantId: row.variantId ?? null,
+    createdAt: row.createdAt,
+  }
+}
+
+export async function wishlistRemove({
+  userId,
+  productId,
+}: {
+  userId: string
+  productId: string
+}): Promise<void> {
+  await removeFromWishlist({ userId, productId })
 }
 
 // —— Payment methods ——

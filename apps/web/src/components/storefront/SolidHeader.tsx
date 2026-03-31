@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthPanel } from '@/components/providers/AuthProvider'
 import { useSession } from '@/hooks/useSession'
+import { storePostAuthPath } from '@/lib/postAuthRedirect'
 import { NAV_LINKS } from '@/lib/nav-links'
 import { ModettLogo } from '@/components/shared/ModettLogo'
 import { CartButton } from '@/components/shared/CartButton'
@@ -24,6 +25,11 @@ export function SolidHeader() {
 
   const openMenu = useCallback(() => setMobileOpen(true), [])
   const closeMenu = useCallback(() => setMobileOpen(false), [])
+
+  const handleAccountIconClick = useCallback(() => {
+    storePostAuthPath('/account')
+    openPanel()
+  }, [openPanel])
 
   return (
     <>
@@ -99,7 +105,7 @@ export function SolidHeader() {
               ) : (
                 <button
                   type="button"
-                  onClick={openPanel}
+                  onClick={handleAccountIconClick}
                   aria-label="Sign in or create account"
                   className="text-umber hover:text-ink transition-colors duration-200"
                 >

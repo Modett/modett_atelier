@@ -42,6 +42,15 @@ type AdminRequest = Request & {
   sessionId?: string
 }
 
+const storefrontCurrencySchema = z.enum(['LKR', 'SGD', 'USD'])
+
+function storefrontCurrencyFromRequest(req: Request): z.infer<typeof storefrontCurrencySchema> {
+  const raw =
+    (req.query.currency as string | undefined) ?? req.cookies?.currency ?? 'LKR'
+  const parsed = storefrontCurrencySchema.safeParse(raw)
+  return parsed.success ? parsed.data : 'LKR'
+}
+
 // —— Check email (checkout flow) ——
 
 const checkEmailQuerySchema = z.object({
@@ -180,6 +189,26 @@ router.post(
       console.error('Cart merge on login failed', err)
     }
     res.status(200).json({ data: { user } })
+  },
+)
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+})
+
+router.post(
+  '/auth/forgot-password',
+  rateLimit({
+    name: 'auth-forgot-password',
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    key: (req) => req.ip ?? 'unknown',
+  }),
+  validate(forgotPasswordSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof forgotPasswordSchema> }).body
+    console.log(`[forgot-password] Reset requested for: ${body.email}`)
+    res.status(200).json({ data: { ok: true } })
   },
 )
 
@@ -491,6 +520,43 @@ router.delete(
     await iamService.deleteSavedAddressForUser({
       id: req.params.addressId!,
       userId: req.user!.id,
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
+// —— Wishlist ——
+
+router.get('/me/wishlist', requireAuth, async (req: AuthRequest, res: Response) => {
+  const currency = storefrontCurrencyFromRequest(req)
+  const wishlist = await iamService.getWishlist({
+    userId: req.user!.id,
+    currency,
+  })
+  res.status(200).json({ data: { wishlist } })
+})
+
+router.post(
+  '/me/wishlist/:productId',
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    const { productId } = req.params as { productId: string }
+    const item = await iamService.wishlistAdd({
+      userId: req.user!.id,
+      productId,
+    })
+    res.status(201).json({ data: { item } })
+  },
+)
+
+router.delete(
+  '/me/wishlist/:productId',
+  requireAuth,
+  async (req: AuthRequest, res: Response) => {
+    const { productId } = req.params as { productId: string }
+    await iamService.wishlistRemove({
+      userId: req.user!.id,
+      productId,
     })
     res.status(200).json({ data: { ok: true } })
   },
