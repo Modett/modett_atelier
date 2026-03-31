@@ -19,9 +19,16 @@ function useCartCacheUpdater() {
   }
 }
 
-// Do not invalidate cart queries after mutations: the response body is authoritative.
-// An immediate GET /cart refetch can run before/with a different cid (cross-origin
-// cookie timing) and overwrite the cache with an empty cart.
+/** Response body updates cache immediately; invalidate refetches GET /cart after Set-Cookie applies. */
+function useCommitCartMutationResult() {
+  const queryClient   = useQueryClient()
+  const updateCache   = useCartCacheUpdater()
+
+  return (data: NormalizedCartResponse) => {
+    updateCache(data)
+    void queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY })
+  }
+}
 
 // ── ADD TO CART ──────────────────────────────────────
 interface AddToCartInput {
@@ -30,8 +37,8 @@ interface AddToCartInput {
 }
 
 export function useAddToCart() {
-  const updateCache   = useCartCacheUpdater()
-  const openBag       = useUIStore(s => s.openBag)
+  const commitResult = useCommitCartMutationResult()
+  const openBag      = useUIStore(s => s.openBag)
 
   return useMutation({
     mutationFn: async (input: AddToCartInput) => {
@@ -39,7 +46,7 @@ export function useAddToCart() {
       return normalizeCartResponse(res.data)
     },
     onSuccess: (data) => {
-      updateCache(data)
+      commitResult(data)
       openBag()
     },
   })
@@ -52,7 +59,7 @@ interface UpdateQtyInput {
 }
 
 export function useUpdateCartQty() {
-  const updateCache = useCartCacheUpdater()
+  const commitResult = useCommitCartMutationResult()
 
   return useMutation({
     mutationFn: async ({ variantId, qty }: UpdateQtyInput) => {
@@ -63,14 +70,14 @@ export function useUpdateCartQty() {
       return normalizeCartResponse(res.data)
     },
     onSuccess: (data) => {
-      updateCache(data)
+      commitResult(data)
     },
   })
 }
 
 // ── REMOVE FROM CART ─────────────────────────────────
 export function useRemoveFromCart() {
-  const updateCache = useCartCacheUpdater()
+  const commitResult = useCommitCartMutationResult()
 
   return useMutation({
     mutationFn: async (variantId: string) => {
@@ -80,14 +87,14 @@ export function useRemoveFromCart() {
       return normalizeCartResponse(res.data)
     },
     onSuccess: (data) => {
-      updateCache(data)
+      commitResult(data)
     },
   })
 }
 
 // ── CLEAR CART ───────────────────────────────────────
 export function useClearCart() {
-  const updateCache = useCartCacheUpdater()
+  const commitResult = useCommitCartMutationResult()
 
   return useMutation({
     mutationFn: async () => {
@@ -95,7 +102,7 @@ export function useClearCart() {
       return normalizeCartResponse(res.data)
     },
     onSuccess: (data) => {
-      updateCache(data)
+      commitResult(data)
     },
   })
 }

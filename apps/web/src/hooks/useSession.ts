@@ -11,7 +11,7 @@ export function useSession() {
     queryKey: SESSION_QUERY_KEY,
     queryFn: async () => {
       try {
-        const res = await api.get<{ data: { user: User | null } }>('/auth/me')
+        const res = await api.get<{ data: { user: User | null } }>('/auth/session')
         return res.data.user
       } catch (err: unknown) {
         const apiErr = err as { status?: number }
