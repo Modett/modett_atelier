@@ -84,7 +84,7 @@ export function SolidHeader() {
                 <SearchIcon size={20} />
               </Link>
               <Link
-                href="/wishlist"
+                href="/account/wishlist"
                 aria-label="Wishlist"
                 className="hidden md:flex text-umber hover:text-ink transition-colors duration-200"
               >
