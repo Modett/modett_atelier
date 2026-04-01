@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import tailwindcssAnimate from 'tailwindcss-animate'
 
 /*
  * MODETT DESIGN SYSTEM — TAILWIND CONFIG
@@ -73,6 +74,19 @@ const config: Config = {
         sage:               '#C1D2CC',
         umber:              '#765C4D',
         'hero-border':      'rgba(248, 245, 242, 0.25)',
+
+        // shadcn/ui (admin) — maps to CSS variables in globals.css :root
+        card:                   'var(--card)',
+        'card-foreground':      'var(--card-foreground)',
+        popover:                'var(--popover)',
+        'popover-foreground':     'var(--popover-foreground)',
+        primary:                'var(--primary)',
+        'primary-foreground':   'var(--primary-foreground)',
+        secondary:              'var(--secondary)',
+        'secondary-foreground': 'var(--secondary-foreground)',
+        destructive:            'var(--destructive)',
+        input:                  'var(--input)',
+        ring:                   'var(--ring)',
       },
 
       fontFamily: {
@@ -166,7 +180,7 @@ const config: Config = {
     },
   },
 
-  plugins: [],
+  plugins: [tailwindcssAnimate],
 }
 
 export default config
