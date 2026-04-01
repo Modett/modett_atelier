@@ -8,7 +8,15 @@ import { cn } from '@/lib/utils'
 import { useCart } from '@/hooks/useCart'
 import { useGeo, formatMoney } from '@/hooks/useCurrency'
 import { useShippingEstimate } from '@/hooks/useShippingEstimate'
-import type { Money, CartItem, ShippingEstimate, ShippingMethodEstimate } from '@/types'
+import { useCheckoutStore } from '@/store/checkout.store'
+import { PromoCodeInput } from './PromoCodeInput'
+import type {
+  CurrencyCode,
+  Money,
+  CartItem,
+  ShippingEstimate,
+  ShippingMethodEstimate,
+} from '@/types'
 
 interface CheckoutOrderSummaryProps {
   countryCode?: string | null
@@ -21,6 +29,7 @@ export function CheckoutOrderSummary({
   selectedMethodId,
   className,
 }: CheckoutOrderSummaryProps) {
+  const store = useCheckoutStore()
   const { items, summary, itemCount } = useCart()
   const { currency, countryCode: geoCountry, isReady: geoReady } = useGeo()
 
@@ -111,6 +120,29 @@ export function CheckoutOrderSummary({
         />
       </div>
 
+      {store.orderId && (
+        <div className="py-4 border-b border-muted">
+          <PromoCodeInput />
+        </div>
+      )}
+
+      {store.promoCode && store.promoDiscount && (
+        <div className="flex justify-between items-baseline
+                        py-3 border-b border-muted">
+          <span className="font-body font-light text-[13px]
+                           text-[#4A7C59]">
+            Discount ({store.promoCode})
+          </span>
+          <span className="font-body font-light text-[13px]
+                           text-[#4A7C59]">
+            −{formatMoney({
+              amount:   store.promoDiscount,
+              currency: currency as CurrencyCode,
+            })}
+          </span>
+        </div>
+      )}
+
       <div className="flex justify-between items-baseline pt-4">
         <div className="flex items-baseline gap-1">
           <span className="font-display font-bold text-[24px] text-umber">
@@ -121,11 +153,16 @@ export function CheckoutOrderSummary({
           </span>
         </div>
         <span className="font-body font-light text-[20px] text-umber">
-          {total
-            ? formatMoney(total)
-            : summary
-              ? formatMoney(summary.subtotal)
-              : '—'}
+          {store.orderTotal
+            ? formatMoney({
+                amount:   store.orderTotal,
+                currency: currency as CurrencyCode,
+              })
+            : total
+              ? formatMoney(total)
+              : summary
+                ? formatMoney(summary.subtotal)
+                : '—'}
         </span>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react'
 import { QueryProvider } from '@/components/providers/QueryProvider'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { ShoppingBagDrawer } from '@/components/storefront/ShoppingBagDrawer'
+import { NewsletterPopup } from '@/components/storefront/NewsletterPopup'
 import './globals.css'
 
 const playfairDisplay = Playfair_Display({
@@ -56,6 +57,7 @@ export default function RootLayout({
             {children}
             {/* Global overlays — rendered at root level */}
             <ShoppingBagDrawer />
+            <NewsletterPopup />
           </AuthProvider>
         </QueryProvider>
         <Analytics />
