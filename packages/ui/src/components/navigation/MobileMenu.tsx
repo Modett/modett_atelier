@@ -16,10 +16,30 @@ export interface MobileMenuProps {
   countryName: string
   navLinks: Array<{ label: string; href: string }>
   prefersReducedMotion?: boolean
+  isAuthenticated?: boolean
+  unreadInboxCount?: number
 }
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+function InboxMenuIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M2 7l10 7 10-7" />
+    </svg>
+  )
+}
 
 export function MobileMenu({
   isOpen,
@@ -27,6 +47,8 @@ export function MobileMenu({
   countryName,
   navLinks,
   prefersReducedMotion = false,
+  isAuthenticated = false,
+  unreadInboxCount = 0,
 }: MobileMenuProps) {
   const transition = prefersReducedMotion
     ? { duration: 0 }
@@ -156,6 +178,26 @@ export function MobileMenu({
                   <WishlistIcon size={18} className="shrink-0 text-background/70" />
                   Wishlist
                 </a>
+                {isAuthenticated && (
+                  <a
+                    href="/account/inbox"
+                    onClick={onClose}
+                    className="relative flex items-center gap-x-3 font-body text-sm font-light text-background/70"
+                    aria-label={
+                      unreadInboxCount > 0
+                        ? `Inbox — ${unreadInboxCount} unread`
+                        : 'Inbox'
+                    }
+                  >
+                    <InboxMenuIcon className="h-[18px] w-[18px] shrink-0 text-background/70" />
+                    Inbox
+                    {unreadInboxCount > 0 && (
+                      <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-highlight px-1.5 font-body text-[10px] font-bold text-white">
+                        {unreadInboxCount > 9 ? '9+' : unreadInboxCount}
+                      </span>
+                    )}
+                  </a>
+                )}
                 <a
                   href="/account"
                   onClick={onClose}

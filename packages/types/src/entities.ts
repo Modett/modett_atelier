@@ -23,8 +23,6 @@ import type {
   PaymentStatus,
   ReturnType,
   ReturnRequestStatus,
-  ReviewStatus,
-  ReviewMediaType,
   LedgerType,
   TierLevel,
   MessagingChannel,
@@ -463,50 +461,6 @@ export interface ReturnEvent {
 }
 
 // -----------------------------------------------------------------------------
-// Reviews
-// -----------------------------------------------------------------------------
-
-export interface ReviewRequestToken {
-  id: string
-  order_item_id: string
-  token_hash: string
-  expires_at: string
-  used_at?: string | null
-}
-
-export interface Review {
-  id: string
-  user_id: string
-  order_id: string
-  order_item_id: string
-  product_id: string
-  variant_id?: string | null
-  rating: number
-  body?: string | null
-  status: ReviewStatus
-  created_at: string
-  updated_at: string
-}
-
-export interface ReviewMedia {
-  id: string
-  review_id: string
-  url: string
-  type: ReviewMediaType
-  sort_order: number
-}
-
-export interface ReviewFlag {
-  id: string
-  review_id: string
-  reason: string
-  auto_flagged: boolean
-  created_at: string
-  resolved_at?: string | null
-  resolved_by_admin_id?: string | null
-}
-
-// -----------------------------------------------------------------------------
 // Loyalty
 // -----------------------------------------------------------------------------
 
@@ -517,6 +471,7 @@ export interface LoyaltyAccount {
   tier: TierLevel
   tier_evaluated_at: string
   last_activity_at: string
+  composite_score: string
 }
 
 export interface LoyaltyLedgerEntry {
@@ -538,6 +493,11 @@ export interface LoyaltyRules {
   min_redeem: number
   max_redeem_percent: number
   no_stack_with_sale: boolean
+  frequency_weight: string
+  spend_weight: string
+  spend_normalisation_factor: number
+  evaluation_window_months: number
+  points_expiry_months: number
   updated_by_admin_id?: string | null
   updated_at: string
 }

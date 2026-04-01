@@ -1,12 +1,10 @@
 /**
- * Reviews route handlers — storefront product reviews, customer submit/mine/token-status,
- * admin moderation (flagged list, hide/show, flag, resolve). Success: { data: T }.
- * No try/catch — errors propagate to global handler.
+ * Reviews routes — storefront, account, admin moderation. Success: { data: T }.
  */
 
 import { Router, type Request, type Response, type IRouter } from 'express'
 import { z } from 'zod'
-import { requireAuth, requireAdmin } from '../../middleware/auth'
+import { requireAuth, requireAdmin, optionalAuth } from '../../middleware/auth'
 import type { AuthRequest, AdminRequest } from '../../middleware/auth'
 import { validate, validateQuery } from '../../middleware/validate'
 import { reviewPhotoUpload } from '../../infrastructure/upload/multer.config'
@@ -14,11 +12,9 @@ import * as reviewsService from './reviews.service'
 
 const router: IRouter = Router()
 
-// —— Storefront: GET /products/:productId/reviews (no auth) ——
-
 const productReviewsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().max(50).default(20),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
 })
 
 router.get(
@@ -32,32 +28,12 @@ router.get(
       page: query.page,
       limit: query.limit,
     })
-    res.status(200).json({
-      data: {
-        reviews: result.reviews,
-        aggregate: {
-          totalCount: result.aggregate.totalCount,
-          averageRating: result.aggregate.averageRating,
-          breakdown: {
-            5: result.aggregate.fiveStar,
-            4: result.aggregate.fourStar,
-            3: result.aggregate.threeStar,
-            2: result.aggregate.twoStar,
-            1: result.aggregate.oneStar,
-          },
-        },
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-      },
-    })
+    res.status(200).json({ data: result })
   },
 )
 
-// —— Customer: POST /reviews ——
-
 const submitReviewBodySchema = z.object({
-  token: z.string().uuid(),
+  token: z.string().min(1),
   orderItemId: z.string().uuid(),
   rating: z.number().int().min(1).max(5),
   body: z.string().max(2000).optional(),
@@ -65,7 +41,7 @@ const submitReviewBodySchema = z.object({
 })
 
 const submitReviewMultipartSchema = z.object({
-  token: z.string().uuid(),
+  token: z.string().min(1),
   orderItemId: z.string().uuid(),
   rating: z.coerce.number().int().min(1).max(5),
   body: z.string().max(2000).optional(),
@@ -82,7 +58,7 @@ router.post(
         { name: 'orderItemId', maxCount: 1 },
         { name: 'rating', maxCount: 1 },
         { name: 'body', maxCount: 1 },
-        { name: 'photos', maxCount: 3 },
+        { name: 'photos', maxCount: 5 },
       ])
       return multerHandler(
         req as unknown as Parameters<typeof multerHandler>[0],
@@ -149,71 +125,119 @@ router.post(
   },
 )
 
-// —— Customer: GET /reviews/mine ——
-
-const mineQuerySchema = z.object({
+const accountReviewsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().max(50).default(20),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
 })
 
 router.get(
-  '/reviews/mine',
+  '/account/reviews',
   requireAuth,
-  validateQuery(mineQuerySchema),
+  validateQuery(accountReviewsQuerySchema),
   async (req: Request, res: Response) => {
     const authReq = req as AuthRequest
-    const query = (req as Request & { validatedQuery: z.infer<typeof mineQuerySchema> })
+    const query = (req as Request & { validatedQuery: z.infer<typeof accountReviewsQuerySchema> })
       .validatedQuery
     const result = await reviewsService.getMyReviews({
       userId: authReq.user.id,
       page: query.page,
       limit: query.limit,
     })
-    res.status(200).json({
-      data: {
-        reviews: result.reviews,
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-      },
-    })
+    res.status(200).json({ data: result })
   },
 )
 
-// —— Customer: GET /reviews/token-status ——
+router.get(
+  '/reviews/mine',
+  requireAuth,
+  validateQuery(accountReviewsQuerySchema),
+  async (req: Request, res: Response) => {
+    const authReq = req as AuthRequest
+    const query = (req as Request & { validatedQuery: z.infer<typeof accountReviewsQuerySchema> })
+      .validatedQuery
+    const result = await reviewsService.getMyReviews({
+      userId: authReq.user.id,
+      page: query.page,
+      limit: query.limit,
+    })
+    res.status(200).json({ data: result })
+  },
+)
 
 const tokenStatusQuerySchema = z.object({
+  token: z.string().min(1),
   orderItemId: z.string().uuid(),
 })
 
 router.get(
   '/reviews/token-status',
-  requireAuth,
+  optionalAuth,
   validateQuery(tokenStatusQuerySchema),
   async (req: Request, res: Response) => {
-    const authReq = req as AuthRequest
     const query = (req as Request & { validatedQuery: z.infer<typeof tokenStatusQuerySchema> })
       .validatedQuery
-    const result = await reviewsService.getReviewTokenStatus({
-      userId: authReq.user.id,
+    const result = await reviewsService.getTokenStatus({
+      token: query.token,
       orderItemId: query.orderItemId,
     })
-    res.status(200).json({
-      data: {
-        hasToken: result.hasToken,
-        isUsed: result.isUsed,
-        expiresAt: result.expiresAt,
-        hasReview: result.hasReview,
-      },
-    })
+    res.status(200).json({ data: result })
   },
 )
 
-// —— Admin: GET /admin/reviews/flagged ——
+const reviewUploadUrlQuerySchema = z.object({
+  filename: z.string().min(1).max(255),
+  contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+})
+
+router.get(
+  '/reviews/upload-url',
+  requireAuth,
+  validateQuery(reviewUploadUrlQuerySchema),
+  async (req: Request, res: Response) => {
+    const authReq = req as AuthRequest
+    const query = (req as Request & { validatedQuery: z.infer<typeof reviewUploadUrlQuerySchema> })
+      .validatedQuery
+    const result = await reviewsService.getReviewUploadUrl({
+      userId: authReq.user.id,
+      filename: query.filename,
+      contentType: query.contentType,
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+const adminReviewsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(['VISIBLE', 'HIDDEN']).optional(),
+  flagged: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  productId: z.string().uuid().optional(),
+})
+
+router.get(
+  '/admin/reviews',
+  requireAdmin,
+  validateQuery(adminReviewsQuerySchema),
+  async (req: Request, res: Response) => {
+    const query = (req as Request & { validatedQuery: z.infer<typeof adminReviewsQuerySchema> })
+      .validatedQuery
+    const result = await reviewsService.adminListReviews({
+      page: query.page,
+      limit: query.limit,
+      status: query.status,
+      flagged: query.flagged ?? false,
+      productId: query.productId,
+    })
+    res.status(200).json({ data: result })
+  },
+)
 
 const flaggedQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 })
 
 router.get(
@@ -227,23 +251,31 @@ router.get(
       page: query.page,
       limit: query.limit,
     })
-    res.status(200).json({
-      data: {
-        reviews: result.reviews,
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-      },
-    })
+    res.status(200).json({ data: result })
   },
 )
 
-// —— Admin: GET /admin/products/:productId/reviews ——
-
 const adminProductReviewsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 })
+
+router.get(
+  '/admin/reviews/products/:productId',
+  requireAdmin,
+  validateQuery(adminProductReviewsQuerySchema),
+  async (req: Request, res: Response) => {
+    const query = (req as Request & {
+      validatedQuery: z.infer<typeof adminProductReviewsQuerySchema>
+    }).validatedQuery
+    const result = await reviewsService.adminGetProductReviews({
+      productId: req.params.productId as string,
+      page: query.page,
+      limit: query.limit,
+    })
+    res.status(200).json({ data: result })
+  },
+)
 
 router.get(
   '/admin/products/:productId/reviews',
@@ -258,29 +290,9 @@ router.get(
       page: query.page,
       limit: query.limit,
     })
-    res.status(200).json({
-      data: {
-        reviews: result.reviews,
-        aggregate: {
-          totalCount: result.aggregate.totalCount,
-          averageRating: result.aggregate.averageRating,
-          breakdown: {
-            5: result.aggregate.fiveStar,
-            4: result.aggregate.fourStar,
-            3: result.aggregate.threeStar,
-            2: result.aggregate.twoStar,
-            1: result.aggregate.oneStar,
-          },
-        },
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-      },
-    })
+    res.status(200).json({ data: result })
   },
 )
-
-// —— Admin: POST /admin/reviews/:reviewId/hide ——
 
 router.post(
   '/admin/reviews/:reviewId/hide',
@@ -295,8 +307,6 @@ router.post(
   },
 )
 
-// —— Admin: POST /admin/reviews/:reviewId/show ——
-
 router.post(
   '/admin/reviews/:reviewId/show',
   requireAdmin,
@@ -309,8 +319,6 @@ router.post(
     res.status(200).json({ data: { ok: true } })
   },
 )
-
-// —— Admin: POST /admin/reviews/:reviewId/flag ——
 
 const flagBodySchema = z.object({
   reason: z.string().min(1).max(500),
@@ -331,8 +339,6 @@ router.post(
     res.status(200).json({ data: { ok: true } })
   },
 )
-
-// —— Admin: POST /admin/reviews/:reviewId/resolve-flag ——
 
 router.post(
   '/admin/reviews/:reviewId/resolve-flag',

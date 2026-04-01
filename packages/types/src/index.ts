@@ -67,6 +67,21 @@ export {
   RATE_TYPES,
 } from './enums'
 
+// Admin inventory (stock, movements, reconciliation)
+export type {
+  StockStatus,
+  AdminInventoryUnit,
+  AdminVariantStock,
+  InventoryVariantRow,
+  RestockResult,
+  MovementReason,
+  AdminInventoryMovement,
+  AdminReconciliationLog,
+  AdminInventoryListResponse,
+  AdminVariantStockDetail,
+  ManualReconcileResult,
+} from './inventory'
+
 // Admin catalog (storefront catalog types live in entities where mirrored)
 export type {
   AdminCategory,
@@ -91,6 +106,34 @@ export type {
   AdminReturnDetailPayload,
   AdminReturnsListResponse,
 } from './returns'
+
+export type {
+  RatingAggregate,
+  ReviewMedia,
+  ReviewFlag,
+  Review,
+  AdminReview,
+  ReviewTokenStatus,
+  ProductReviewsResponse,
+  AdminReviewsListResponse,
+  ReviewRequestToken,
+} from './reviews'
+
+export type { CampaignContent } from './messaging'
+export { DEFAULT_CAMPAIGN_CONTENT } from './messaging'
+
+export type {
+  EarnRateEntry,
+  RedemptionRateEntry,
+  LoyaltyRulesPublic,
+  LoyaltyAccountPublic,
+  LedgerEntryPublic,
+  LoyaltyGrantPublic,
+  LoyaltyAccountDetail,
+  AdminUserLoyaltySummary,
+  AdminLoyaltySearchRow,
+  AdminTopLoyaltyUserRow,
+} from './loyalty'
 
 export type {
   User,
@@ -129,10 +172,6 @@ export type {
   ReturnRequest,
   ReturnRequestItem,
   ReturnEvent,
-  ReviewRequestToken,
-  Review,
-  ReviewMedia,
-  ReviewFlag,
   LoyaltyAccount,
   LoyaltyLedgerEntry,
   LoyaltyRules,

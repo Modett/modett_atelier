@@ -4,7 +4,7 @@
  */
 
 import crypto from 'node:crypto'
-import { eq, and, asc, desc, sql } from 'drizzle-orm'
+import { eq, and, asc, desc, inArray, sql } from 'drizzle-orm'
 import { db } from '../client'
 import { redis } from '../redis'
 import { MessagingError } from '../errors'
@@ -809,4 +809,231 @@ export async function getScheduledCampaignsDue(): Promise<Campaign[]> {
     ORDER BY scheduled_at ASC
   `)
   return (result.rows ?? []) as Campaign[]
+}
+
+// —— Inbox unread (lightweight count for header badge) ——
+
+export async function getInboxUnreadCount({
+  userId,
+}: {
+  userId: string
+}): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COUNT(*)::int AS cnt
+    FROM messaging.inbox_messages
+    WHERE user_id = ${userId} AND is_read = false
+  `)
+  const row = result.rows[0] as { cnt: number } | undefined
+  return row?.cnt ?? 0
+}
+
+// —— Campaign send-now queue (atomic) ——
+
+export async function queueCampaignForImmediateDelivery({
+  id,
+}: {
+  id: string
+}): Promise<boolean> {
+  const result = await db.execute(sql`
+    UPDATE messaging.campaigns
+    SET    status       = 'SCHEDULED',
+           scheduled_at = now(),
+           updated_at   = now()
+    WHERE  id     = ${id}
+      AND  status IN ('DRAFT', 'SCHEDULED')
+    RETURNING id
+  `)
+  return (result.rows?.length ?? 0) > 0
+}
+
+// —— Campaign deliveries ——
+
+export async function countDeliveriesByCampaignIds({
+  campaignIds,
+}: {
+  campaignIds: string[]
+}): Promise<Map<string, number>> {
+  const map = new Map<string, number>()
+  if (campaignIds.length === 0) return map
+  const rows = await db
+    .select({
+      campaignId: campaignDeliveries.campaign_id,
+      cnt: sql<number>`count(*)::int`,
+    })
+    .from(campaignDeliveries)
+    .where(inArray(campaignDeliveries.campaign_id, campaignIds))
+    .groupBy(campaignDeliveries.campaign_id)
+  for (const row of rows) {
+    map.set(row.campaignId, row.cnt)
+  }
+  return map
+}
+
+export async function countDeliveriesForCampaign({
+  campaignId,
+}: {
+  campaignId: string
+}): Promise<number> {
+  const rows = await db
+    .select({ cnt: sql<number>`count(*)::int` })
+    .from(campaignDeliveries)
+    .where(eq(campaignDeliveries.campaign_id, campaignId))
+  return rows[0]?.cnt ?? 0
+}
+
+export async function insertCampaignDeliveryRows({
+  rows,
+}: {
+  rows: Array<{
+    campaignId: string
+    userId: string
+    channel: 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH'
+  }>
+}): Promise<void> {
+  if (rows.length === 0) return
+  await db.insert(campaignDeliveries).values(
+    rows.map((r) => ({
+      campaign_id: r.campaignId,
+      user_id: r.userId,
+      channel: r.channel,
+      status: 'QUEUED' as const,
+    })),
+  )
+}
+
+export async function updateCampaignDeliveryStatus({
+  campaignId,
+  userId,
+  channel,
+  status,
+  fromStatus,
+}: {
+  campaignId: string
+  userId: string
+  channel: 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH'
+  status: 'QUEUED' | 'SENT' | 'FAILED' | 'BOUNCED'
+  fromStatus: 'QUEUED' | 'SENT' | 'FAILED' | 'BOUNCED'
+}): Promise<boolean> {
+  const result = await db.execute(sql`
+    UPDATE messaging.campaign_deliveries
+    SET    status = ${status}
+    WHERE  campaign_id = ${campaignId}
+      AND  user_id     = ${userId}
+      AND  channel     = ${channel}
+      AND  status      = ${fromStatus}
+    RETURNING id
+  `)
+  return (result.rows?.length ?? 0) > 0
+}
+
+// —— Campaign audience resolution ——
+
+function audienceJoinAndExtraWhere(filter: Record<string, unknown>): {
+  join: ReturnType<typeof sql>
+  whereExtra: ReturnType<typeof sql>
+} {
+  const tier = filter.loyaltyTier
+  const tierOk =
+    tier === 'GOLD' || tier === 'SILVER' || tier === 'BRONZE'
+  const noLoyalty = filter.noLoyaltyAccount === true
+
+  if (tierOk) {
+    return {
+      join: sql`
+        INNER JOIN loyalty.loyalty_accounts la
+          ON la.user_id = u.id AND la.tier = ${tier}::loyalty.tier_level`,
+      whereExtra: sql``,
+    }
+  }
+  if (noLoyalty) {
+    return {
+      join: sql`
+        LEFT JOIN loyalty.loyalty_accounts la ON la.user_id = u.id`,
+      whereExtra: sql`AND la.user_id IS NULL`,
+    }
+  }
+  return {
+    join: sql`
+      LEFT JOIN loyalty.loyalty_accounts la ON la.user_id = u.id`,
+    whereExtra: sql``,
+  }
+}
+
+function purchasedAfterClause(
+  filter: Record<string, unknown>,
+): ReturnType<typeof sql> {
+  const raw = filter.purchasedAfter
+  if (typeof raw !== 'string' || raw.length === 0) return sql``
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return sql``
+  return sql`AND EXISTS (
+    SELECT 1 FROM orders.orders o
+    WHERE o.user_id = u.id
+      AND o.placed_at IS NOT NULL
+      AND o.placed_at >= ${d}
+  )`
+}
+
+export async function resolveCampaignAudienceRecipients({
+  audienceFilterJson,
+}: {
+  audienceFilterJson: Record<string, unknown>
+}): Promise<Array<{ id: string; email: string }>> {
+  const filter = audienceFilterJson ?? {}
+  const { join, whereExtra } = audienceJoinAndExtraWhere(filter)
+  const purchased = purchasedAfterClause(filter)
+
+  const result = await db.execute(sql`
+    SELECT u.id, u.email
+    FROM iam.users u
+    JOIN messaging.notification_preferences np ON np.user_id = u.id
+    ${join}
+    WHERE np.email_opt_in = true
+      AND u.deleted_at IS NULL
+      ${whereExtra}
+      ${purchased}
+  `)
+  return (result.rows ?? []) as Array<{ id: string; email: string }>
+}
+
+export async function countCampaignAudienceRecipients({
+  audienceFilterJson,
+}: {
+  audienceFilterJson: Record<string, unknown>
+}): Promise<number> {
+  const filter = audienceFilterJson ?? {}
+  const { join, whereExtra } = audienceJoinAndExtraWhere(filter)
+  const purchased = purchasedAfterClause(filter)
+
+  const result = await db.execute(sql`
+    SELECT COUNT(*)::int AS cnt
+    FROM iam.users u
+    JOIN messaging.notification_preferences np ON np.user_id = u.id
+    ${join}
+    WHERE np.email_opt_in = true
+      AND u.deleted_at IS NULL
+      ${whereExtra}
+      ${purchased}
+  `)
+  const row = result.rows[0] as { cnt: number } | undefined
+  return row?.cnt ?? 0
+}
+
+/** Atomically claim a scheduled due campaign as SENT (single winner). */
+export async function claimCampaignForSending({
+  id,
+}: {
+  id: string
+}): Promise<boolean> {
+  const result = await db.execute(sql`
+    UPDATE messaging.campaigns
+    SET    status     = 'SENT',
+           sent_at    = now(),
+           updated_at = now()
+    WHERE  id     = ${id}
+      AND  status = 'SCHEDULED'
+      AND  scheduled_at <= now()
+    RETURNING id
+  `)
+  return (result.rows?.length ?? 0) > 0
 }

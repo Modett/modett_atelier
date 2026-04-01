@@ -65,6 +65,7 @@ function resolveCountryFromCurrency(currency: CurrencyCode): string {
 
 function buildProductSnapshot(item: CartItemDetail): Record<string, unknown> {
   return {
+    productId: item.variant.productId,
     displayName: item.product.displayName,
     shortName: item.product.shortName,
     slug: item.product.slug,

@@ -22,6 +22,52 @@ export { useProducts, flattenProducts }        from './useProducts'
 export { useProductSearch }                    from './useProductSearch'
 export { useProduct }                          from './useProduct'
 export { useProductReviews }                   from './useProductReviews'
+export {
+  useReviewTokenStatus,
+  useMyReviews,
+  useSubmitReview,
+} from './useReviews'
+export type { SubmitReviewInput } from './useReviews'
+export {
+  useAdminReviewsList,
+  useHideReview,
+  useShowReview,
+  useFlagReview,
+  useResolveFlag,
+  ADMIN_REVIEWS_KEYS,
+} from './useAdminReviews'
+export type { AdminReviewsListParams } from './useAdminReviews'
+export {
+  useAdminCampaignsList,
+  useAdminCampaignDetail,
+  useAudienceEstimate,
+  useCreateCampaign,
+  useUpdateCampaign,
+  useScheduleCampaign,
+  useCancelCampaign,
+  useSendTestEmail,
+  useSendCampaignNow,
+  useUploadCampaignAsset,
+  ADMIN_CAMPAIGNS_KEYS,
+} from './useAdminMessaging'
+export type {
+  AdminCampaignRow,
+  AdminCampaignsListParams,
+  CampaignStatusFilter,
+  UploadAssetResponse,
+} from './useAdminMessaging'
+export {
+  useAdminLoyaltyUserSearch,
+  useAdminUserLoyalty,
+  useAdminLoyaltyRules,
+  useAdminLoyaltyTopUsers,
+  useGrantPoints,
+  useAdjustPoints,
+  useReEvaluateTier,
+  useReconcileBalance,
+  useUpdateLoyaltyRules,
+  ADMIN_LOYALTY_KEYS,
+} from './useAdminLoyalty'
 export { useHomepage }                         from './useHomepage'
 
 // Cart
@@ -59,7 +105,10 @@ export {
   useLoyalty,
   useLoyaltyLedger,
   useInbox,
+  useUnreadCount,
   useMarkMessageRead,
+  useMarkAllRead,
+  INBOX_UNREAD_COUNT_KEY,
   useUpdateProfile,
   useChangePassword,
   useSubmitReturn,

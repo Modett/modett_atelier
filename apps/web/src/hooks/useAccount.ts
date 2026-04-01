@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useSession, useInvalidateSession } from './useSession'
 import type { ApiError, User } from '@/types'
+import type { LoyaltyAccountDetail, LedgerEntryPublic } from '@modett/types'
 
 const ORDER_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -214,24 +215,24 @@ export function useDeleteAddress() {
 
 // ── Loyalty ─────────────────────────────────────────────────────────────────
 
-export interface LoyaltyAccountData {
-  balance:            number
-  tier:               string
-  lifetimeEarned:     number
-  earned12m:          number
-  nextTier:           { tier: string; pointsNeeded: number } | null
-  minRedeem:          number
-  maxRedeemPercent:   number
+/** @deprecated Use LoyaltyAccountDetail from @modett/types */
+export type LoyaltyAccountData = LoyaltyAccountDetail
+
+export type LoyaltyLedgerRow = LedgerEntryPublic & {
+  user_id?: string
+  order_id?: string | null
+  metadata_json?: Record<string, unknown>
+  created_at?: string
 }
 
-export interface LoyaltyLedgerRow {
-  id:              string
-  user_id:         string
-  type:            string
-  points:          number
-  order_id:        string | null
-  metadata_json:   Record<string, unknown>
-  created_at:      string
+function mapLedgerToLegacy(row: LedgerEntryPublic): LoyaltyLedgerRow {
+  return {
+    ...row,
+    user_id: row.userId,
+    order_id: row.orderId,
+    metadata_json: row.metadataJson,
+    created_at: row.createdAt,
+  }
 }
 
 export function useLoyalty() {
@@ -239,7 +240,7 @@ export function useLoyalty() {
   return useQuery({
     queryKey: ['loyalty'],
     queryFn: async () => {
-      const res = await api.get<{ data: LoyaltyAccountData }>('/loyalty/account')
+      const res = await api.get<{ data: LoyaltyAccountDetail }>('/account/loyalty')
       return res.data
     },
     enabled:   isLoggedIn,
@@ -254,15 +255,22 @@ export function useLoyaltyLedger(page = 1) {
     queryFn: async () => {
       const res = await api.get<{
         data: {
-          ledger: LoyaltyLedgerRow[]
-          page:   number
-          limit:  number
-          total:  number
+          entries: LedgerEntryPublic[]
+          ledger?: LedgerEntryPublic[]
+          page: number
+          limit: number
+          total: number
         }
-      }>('/loyalty/ledger', {
+      }>('/account/loyalty/ledger', {
         params: { page: String(page), limit: '20' },
       })
-      return res.data
+      const raw = res.data.entries.length ? res.data.entries : (res.data.ledger ?? [])
+      return {
+        ledger: raw.map(mapLedgerToLegacy),
+        page: res.data.page,
+        limit: res.data.limit,
+        total: res.data.total,
+      }
     },
     enabled:   isLoggedIn,
     staleTime: 2 * 60 * 1000,
@@ -284,10 +292,22 @@ export interface InboxMessageRow {
   created_at:      string
 }
 
-export function useInbox(page = 1) {
+export interface UseInboxParams {
+  page?: number
+  limit?: number
+  unreadOnly?: boolean
+}
+
+export function useInbox(params: UseInboxParams | number = {}) {
   const { isLoggedIn } = useSession()
+  const page =
+    typeof params === 'number' ? params : (params.page ?? 1)
+  const limit = typeof params === 'number' ? 20 : (params.limit ?? 20)
+  const unreadOnly =
+    typeof params === 'number' ? false : Boolean(params.unreadOnly)
+
   return useQuery({
-    queryKey: ['inbox', page],
+    queryKey: ['inbox', { page, limit, unreadOnly }],
     queryFn: async () => {
       const res = await api.get<{
         data: {
@@ -298,13 +318,35 @@ export function useInbox(page = 1) {
           total:        number
         }
       }>('/inbox', {
-        params: { page: String(page), limit: '50' },
+        params: {
+          page: String(page),
+          limit: String(limit),
+          unreadOnly: unreadOnly ? 'true' : 'false',
+        },
       })
       return res.data
     },
     enabled:                isLoggedIn,
     staleTime:              30 * 1000,
     refetchOnWindowFocus:   true,
+  })
+}
+
+export const INBOX_UNREAD_COUNT_KEY = ['inbox-unread-count'] as const
+
+export function useUnreadCount() {
+  const { isLoggedIn } = useSession()
+  return useQuery({
+    queryKey: INBOX_UNREAD_COUNT_KEY,
+    queryFn: async () => {
+      const res = await api.get<{ data: { count: number } }>(
+        '/inbox/unread-count',
+      )
+      return res.data
+    },
+    enabled:              isLoggedIn,
+    staleTime:            30 * 1000,
+    refetchInterval:      60 * 1000,
   })
 }
 
@@ -323,7 +365,10 @@ export function useMarkMessageRead() {
       api.post(`/inbox/${messageId}/read`, {}),
     onMutate: async (messageId) => {
       await qc.cancelQueries({ queryKey: ['inbox'] })
-      const snapshots = qc.getQueriesData<InboxQueryData>({ queryKey: ['inbox'] })
+      const snapshots = qc.getQueriesData<InboxQueryData>({
+        queryKey: ['inbox'],
+        exact: false,
+      })
       snapshots.forEach(([queryKey, data]) => {
         if (!data) return
         const wasUnread = data.messages.some((m) => m.id === messageId && !m.is_read)
@@ -345,7 +390,19 @@ export function useMarkMessageRead() {
       })
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['inbox'] })
+      void qc.invalidateQueries({ queryKey: ['inbox'] })
+      void qc.invalidateQueries({ queryKey: INBOX_UNREAD_COUNT_KEY })
+    },
+  })
+}
+
+export function useMarkAllRead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post('/inbox/read-all', {}),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['inbox'] })
+      void qc.invalidateQueries({ queryKey: INBOX_UNREAD_COUNT_KEY })
     },
   })
 }

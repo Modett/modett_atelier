@@ -52,6 +52,33 @@ export const videoUpload = multer({
   },
 })
 
+/** Campaign builder: hero image (direct upload) or video metadata (presigned flow). */
+export const campaignAssetUpload = multer({
+  storage,
+  limits: {
+    fileSize: 100 * 1024 * 1024,
+    files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowed = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'video/mp4',
+      'video/quicktime',
+    ]
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true)
+    } else {
+      cb(
+        new Error(
+          `Invalid file type: ${file.mimetype}. Allowed: JPEG, PNG, WebP, MP4, MOV`,
+        ),
+      )
+    }
+  },
+})
+
 /** Review photos: max 3 images, 5MB each. */
 export const reviewPhotoUpload = multer({
   storage,

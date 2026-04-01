@@ -11,6 +11,9 @@ export const ACCOUNT_LINKS = [
   { href: '/account',           label: 'Personal Details' },
   { href: '/account/addresses', label: 'Addresses' },
   { href: '/account/orders',    label: 'Order Details' },
+  { href: '/account/loyalty',   label: 'Loyalty' },
+  { href: '/account/inbox',     label: 'Inbox' },
+  { href: '/account/reviews',   label: 'Reviews' },
   { href: '/account/wishlist',  label: 'Wishlist' },
   { href: '/account/login',     label: 'Login Details' },
 ] as const

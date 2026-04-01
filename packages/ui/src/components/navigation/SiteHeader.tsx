@@ -24,6 +24,8 @@ export interface SiteHeaderProps {
   cartCount?: number
   /** Whether user is logged in */
   isAuthenticated?: boolean
+  /** Unread account inbox messages (storefront header badge) */
+  unreadInboxCount?: number
   /** Current currency code */
   currency?: 'LKR' | 'SGD' | 'USD'
   /** Current country name for display */
@@ -51,6 +53,7 @@ export function SiteHeader({
   bannerLink,
   cartCount = 0,
   isAuthenticated = false,
+  unreadInboxCount = 0,
   currency = 'USD',
   countryName = 'Sri Lanka',
   logoSrc,
@@ -156,6 +159,24 @@ export function SiteHeader({
               >
                 <SearchIcon size={20} className="md:size-5" />
               </a>
+              {isAuthenticated && (
+                <a
+                  href="/account/inbox"
+                  className="relative flex min-h-[44px] min-w-[44px] items-center justify-center text-background transition-opacity hover:opacity-70"
+                  aria-label={
+                    unreadInboxCount > 0
+                      ? `Inbox — ${unreadInboxCount} unread`
+                      : 'Inbox'
+                  }
+                >
+                  <InboxEnvelopeIcon className="size-5" />
+                  {unreadInboxCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-highlight px-1 font-body text-[10px] font-bold text-white">
+                      {unreadInboxCount > 9 ? '9+' : unreadInboxCount}
+                    </span>
+                  )}
+                </a>
+              )}
               <a
                 href="/wishlist"
                 className="hidden min-h-[44px] min-w-[44px] items-center justify-center text-background transition-opacity hover:opacity-70 md:flex"
@@ -280,6 +301,24 @@ export function SiteHeader({
               >
                 <SearchIcon size={18} className="text-foreground" />
               </a>
+              {isAuthenticated && (
+                <a
+                  href="/account/inbox"
+                  className="relative flex min-h-[44px] min-w-[44px] items-center justify-center text-foreground transition-opacity hover:opacity-70"
+                  aria-label={
+                    unreadInboxCount > 0
+                      ? `Inbox — ${unreadInboxCount} unread`
+                      : 'Inbox'
+                  }
+                >
+                  <InboxEnvelopeIcon className="h-[18px] w-[18px]" />
+                  {unreadInboxCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-highlight px-1 font-body text-[10px] font-bold text-white">
+                      {unreadInboxCount > 9 ? '9+' : unreadInboxCount}
+                    </span>
+                  )}
+                </a>
+              )}
               <a
                 href="/wishlist"
                 className="hidden min-h-[44px] min-w-[44px] items-center justify-center text-foreground transition-opacity hover:opacity-70 md:flex"
@@ -317,8 +356,28 @@ export function SiteHeader({
         countryName={countryName}
         navLinks={navLinks}
         prefersReducedMotion={prefersReducedMotion}
+        isAuthenticated={isAuthenticated}
+        unreadInboxCount={unreadInboxCount}
       />
     </>
+  )
+}
+
+function InboxEnvelopeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M2 7l10 7 10-7" />
+    </svg>
   )
 }
 

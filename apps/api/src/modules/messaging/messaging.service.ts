@@ -21,12 +21,17 @@ import {
   recordNotifyMeEvent,
   getNotifyMeDemand as getNotifyMeDemandQuery,
   getInboxForUser,
+  getInboxUnreadCount,
   markInboxMessageRead,
   markAllInboxRead,
   createCampaign,
   getCampaignById,
   listCampaigns,
   getCampaignCount,
+  countDeliveriesByCampaignIds,
+  countDeliveriesForCampaign,
+  queueCampaignForImmediateDelivery,
+  countCampaignAudienceRecipients,
   updateCampaign,
   scheduleCampaign,
   cancelCampaign,
@@ -36,6 +41,10 @@ import {
   deletePromoCodeById,
 } from '@modett/db'
 import type { NotificationPreferences } from '@modett/db'
+import type { CampaignContent } from '@modett/types'
+import { sendEmail } from '../../infrastructure/email/email.service'
+import { renderCampaignEmail } from './campaign-renderer'
+import { deliverCampaignById } from '../../workers/campaign-delivery.worker'
 
 type Channel = 'EMAIL' | 'SMS' | 'WHATSAPP' | 'PUSH'
 
@@ -323,7 +332,7 @@ export async function notifyLoyaltyPointsEarned({
       title: `You earned ${points} points`,
       body: `Your loyalty balance is now ${newBalance} points.`,
       ctaLabel: 'View Balance',
-      ctaUrl: '/loyalty',
+      ctaUrl: '/account/loyalty',
     },
   })
 }
@@ -522,6 +531,14 @@ export async function markAllRead({ userId }: { userId: string }): Promise<void>
   await markAllInboxRead({ userId })
 }
 
+export async function getMyInboxUnreadCount({
+  userId,
+}: {
+  userId: string
+}): Promise<number> {
+  return getInboxUnreadCount({ userId })
+}
+
 // —— Admin campaigns ——
 
 export async function adminCreateCampaign({
@@ -598,17 +615,97 @@ export async function adminListCampaigns({
     listCampaigns({ page, limit, status }),
     getCampaignCount({ status }),
   ])
-  return { campaigns: campaignsList, page, limit, total }
+  const ids = campaignsList.map((c) => c.id)
+  const deliveryCounts = await countDeliveriesByCampaignIds({
+    campaignIds: ids,
+  })
+  const campaigns = campaignsList.map((c) => ({
+    ...c,
+    delivery_count: deliveryCounts.get(c.id) ?? 0,
+  }))
+  return { campaigns, page, limit, total }
 }
 
 export async function adminGetCampaign({
   id,
 }: {
   id: string
-}): Promise<Awaited<ReturnType<typeof getCampaignById>>> {
+}): Promise<
+  NonNullable<Awaited<ReturnType<typeof getCampaignById>>> & {
+    delivery_count: number
+  }
+> {
   const campaign = await getCampaignById({ id })
   if (!campaign) throw new AppError('CAMPAIGN_NOT_FOUND', 404)
-  return campaign
+  const deliveryCount = await countDeliveriesForCampaign({ campaignId: id })
+  return { ...campaign, delivery_count: deliveryCount }
+}
+
+export async function adminAudienceEstimate({
+  audienceFilterJson,
+}: {
+  audienceFilterJson: Record<string, unknown>
+}): Promise<{ count: number }> {
+  const count = await countCampaignAudienceRecipients({
+    audienceFilterJson,
+  })
+  return { count }
+}
+
+export async function adminSendTestEmail({
+  campaignId,
+  recipientEmail,
+}: {
+  campaignId: string
+  recipientEmail: string
+}): Promise<void> {
+  const campaign = await getCampaignById({ id: campaignId })
+  if (!campaign) throw new AppError('CAMPAIGN_NOT_FOUND', 404)
+  const content = campaign.content_json as CampaignContent
+  const html = renderCampaignEmail({
+    subject: content.subject ?? '',
+    preheader: content.preheader,
+    heroImageUrl: content.heroImageUrl,
+    heroVideoUrl: content.heroVideoUrl,
+    heading: content.heading ?? '',
+    body: content.body ?? '',
+    ctaLabel: content.ctaLabel,
+    ctaUrl: content.ctaUrl,
+    footerNote: content.footerNote,
+  })
+  const subjectBase = content.subject?.trim() || 'Modett Atelier'
+  await sendEmail({
+    to: recipientEmail,
+    subject: `[TEST] ${subjectBase}`,
+    html,
+  })
+}
+
+export async function adminSendCampaignNow({
+  campaignId,
+}: {
+  campaignId: string
+}): Promise<{ recipientCount: number; sentCount: number }> {
+  const existing = await getCampaignById({ id: campaignId })
+  if (!existing) throw new AppError('CAMPAIGN_NOT_FOUND', 404)
+  if (existing.status === 'SENT') {
+    throw new AppError('CAMPAIGN_ALREADY_SENT', 409)
+  }
+  if (existing.status === 'CANCELLED') {
+    throw new AppError('CAMPAIGN_ALREADY_SENT', 409)
+  }
+
+  const queued = await queueCampaignForImmediateDelivery({ id: campaignId })
+  if (!queued) {
+    const again = await getCampaignById({ id: campaignId })
+    if (!again) throw new AppError('CAMPAIGN_NOT_FOUND', 404)
+    if (again.status === 'SENT') {
+      throw new AppError('CAMPAIGN_ALREADY_SENT', 409)
+    }
+    throw new AppError('CAMPAIGN_NOT_DRAFT', 409)
+  }
+
+  return deliverCampaignById(campaignId)
 }
 
 function generateNewsletterPromoCode(): string {

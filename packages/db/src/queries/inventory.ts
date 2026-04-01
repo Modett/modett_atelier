@@ -470,3 +470,356 @@ export async function markReconciliationResolved({
     .returning()
   return rows[0] ?? null
 }
+
+// —— Admin inventory (list, counts, movements with admin, bulk status) ——
+
+export interface AdminInventoryListRow {
+  variantId: string
+  productId: string
+  productName: string
+  productCode: string
+  keyImageUrl: string | null
+  color: string
+  colorHex: string | null
+  size: string
+  skuGroup: string
+  inStockQty: number
+  heldQty: number
+  availableQty: number
+  lowStockThreshold: number
+  stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  stockUpdatedAt: Date
+}
+
+function adminInventoryFilterFragments({
+  productId,
+  stockStatus,
+  search,
+}: {
+  productId?: string
+  stockStatus?: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  search?: string
+}): { productCond: ReturnType<typeof sql>; stockCond: ReturnType<typeof sql>; searchCond: ReturnType<typeof sql> } {
+  const productCond =
+    productId != null && productId !== ''
+      ? sql`AND p.id = ${productId}`
+      : sql``
+  const stockCond =
+    stockStatus != null
+      ? sql`AND va.stock_status = ${stockStatus}`
+      : sql``
+  const q = search?.trim()
+  const searchCond =
+    q != null && q.length > 0
+      ? sql`AND (
+          p.display_name ILIKE ${`%${q}%`}
+          OR p.product_code ILIKE ${`%${q}%`}
+          OR pv.sku_group ILIKE ${`%${q}%`}
+        )`
+      : sql``
+  return { productCond, stockCond, searchCond }
+}
+
+export async function getAdminInventoryVariantById({
+  variantId,
+}: {
+  variantId: string
+}): Promise<AdminInventoryListRow | null> {
+  const result = await db.execute(sql`
+    SELECT
+      va.variant_id AS "variantId",
+      p.id AS "productId",
+      p.display_name AS "productName",
+      p.product_code AS "productCode",
+      img.url AS "keyImageUrl",
+      pv.color AS "color",
+      pv.color_hex AS "colorHex",
+      pv.size AS "size",
+      pv.sku_group AS "skuGroup",
+      va.in_stock_qty AS "inStockQty",
+      va.held_qty AS "heldQty",
+      va.available_qty AS "availableQty",
+      va.low_stock_threshold AS "lowStockThreshold",
+      va.stock_status AS "stockStatus",
+      vs.updated_at AS "stockUpdatedAt"
+    FROM inventory.variant_availability va
+    INNER JOIN inventory.product_variants pv
+      ON pv.id = va.variant_id AND pv.deleted_at IS NULL
+    INNER JOIN catalog.products p
+      ON p.id = va.product_id AND p.deleted_at IS NULL
+    LEFT JOIN catalog.product_images img ON img.id = p.key_image_id
+    INNER JOIN inventory.variant_stock vs ON vs.variant_id = va.variant_id
+    WHERE va.variant_id = ${variantId}
+    LIMIT 1
+  `)
+  const row = result.rows[0] as unknown as AdminInventoryListRow | undefined
+  return row ?? null
+}
+
+export async function listAdminInventoryVariants({
+  productId,
+  stockStatus,
+  search,
+  limit,
+  offset,
+}: {
+  productId?: string
+  stockStatus?: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  search?: string
+  limit: number
+  offset: number
+}): Promise<AdminInventoryListRow[]> {
+  const { productCond, stockCond, searchCond } = adminInventoryFilterFragments({
+    productId,
+    stockStatus,
+    search,
+  })
+  const result = await db.execute(sql`
+    SELECT
+      va.variant_id AS "variantId",
+      p.id AS "productId",
+      p.display_name AS "productName",
+      p.product_code AS "productCode",
+      img.url AS "keyImageUrl",
+      pv.color AS "color",
+      pv.color_hex AS "colorHex",
+      pv.size AS "size",
+      pv.sku_group AS "skuGroup",
+      va.in_stock_qty AS "inStockQty",
+      va.held_qty AS "heldQty",
+      va.available_qty AS "availableQty",
+      va.low_stock_threshold AS "lowStockThreshold",
+      va.stock_status AS "stockStatus",
+      vs.updated_at AS "stockUpdatedAt"
+    FROM inventory.variant_availability va
+    INNER JOIN inventory.product_variants pv
+      ON pv.id = va.variant_id AND pv.deleted_at IS NULL
+    INNER JOIN catalog.products p
+      ON p.id = va.product_id AND p.deleted_at IS NULL
+    LEFT JOIN catalog.product_images img ON img.id = p.key_image_id
+    INNER JOIN inventory.variant_stock vs ON vs.variant_id = va.variant_id
+    WHERE 1 = 1
+      ${productCond}
+      ${stockCond}
+      ${searchCond}
+    ORDER BY p.product_code ASC, pv.sku_group ASC, pv.size ASC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `)
+  return (result.rows as unknown as AdminInventoryListRow[]) ?? []
+}
+
+export async function countAdminInventoryVariants({
+  productId,
+  stockStatus,
+  search,
+}: {
+  productId?: string
+  stockStatus?: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
+  search?: string
+}): Promise<number> {
+  const { productCond, stockCond, searchCond } = adminInventoryFilterFragments({
+    productId,
+    stockStatus,
+    search,
+  })
+  const result = await db.execute(sql`
+    SELECT COUNT(*)::int AS c
+    FROM inventory.variant_availability va
+    INNER JOIN inventory.product_variants pv
+      ON pv.id = va.variant_id AND pv.deleted_at IS NULL
+    INNER JOIN catalog.products p
+      ON p.id = va.product_id AND p.deleted_at IS NULL
+    WHERE 1 = 1
+      ${productCond}
+      ${stockCond}
+      ${searchCond}
+  `)
+  const row = result.rows[0] as { c: number } | undefined
+  return row?.c ?? 0
+}
+
+export async function countAllInventoryUnitsForVariant({
+  variantId,
+}: {
+  variantId: string
+}): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COUNT(*)::int AS c
+    FROM inventory.inventory_units
+    WHERE variant_id = ${variantId}
+  `)
+  const row = result.rows[0] as { c: number } | undefined
+  return row?.c ?? 0
+}
+
+export async function countUnitsByStatusForVariant({
+  variantId,
+}: {
+  variantId: string
+}): Promise<Partial<Record<string, number>>> {
+  const result = await db.execute(sql`
+    SELECT status, COUNT(*)::int AS c
+    FROM inventory.inventory_units
+    WHERE variant_id = ${variantId}
+    GROUP BY status
+  `)
+  const m: Partial<Record<string, number>> = {}
+  for (const row of result.rows as { status: string; c: number }[]) {
+    m[row.status] = row.c
+  }
+  return m
+}
+
+export interface MovementWithAdminRow {
+  id: string
+  variant_id: string
+  delta_qty: number
+  reason: string
+  reference_type: string | null
+  reference_id: string | null
+  created_by_admin_id: string | null
+  created_at: Date
+  admin_first_name: string | null
+  admin_last_name: string | null
+}
+
+export async function listInventoryMovementsWithAdmin({
+  variantId,
+  limit,
+  offset,
+}: {
+  variantId: string
+  limit: number
+  offset: number
+}): Promise<MovementWithAdminRow[]> {
+  const result = await db.execute(sql`
+    SELECT
+      m.id,
+      m.variant_id,
+      m.delta_qty,
+      m.reason,
+      m.reference_type,
+      m.reference_id,
+      m.created_by_admin_id,
+      m.created_at,
+      u.first_name AS admin_first_name,
+      u.last_name AS admin_last_name
+    FROM inventory.inventory_movements m
+    LEFT JOIN iam.admins a ON a.id = m.created_by_admin_id
+    LEFT JOIN iam.users u ON u.id = a.user_id
+    WHERE m.variant_id = ${variantId}
+    ORDER BY m.created_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `)
+  return (result.rows as unknown as MovementWithAdminRow[]) ?? []
+}
+
+export async function countInventoryMovementsForVariant({
+  variantId,
+}: {
+  variantId: string
+}): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COUNT(*)::int AS c
+    FROM inventory.inventory_movements
+    WHERE variant_id = ${variantId}
+  `)
+  const row = result.rows[0] as { c: number } | undefined
+  return row?.c ?? 0
+}
+
+export interface ReconciliationLogEnrichedRow {
+  id: string
+  variant_id: string
+  actual_count: number
+  aggregate_count: number
+  delta: number
+  detected_at: Date
+  resolved_at: Date | null
+  resolved_note: string | null
+  product_name: string
+  color: string
+  size: string
+  sku_group: string
+}
+
+export async function listUnresolvedReconciliationLogEnriched({
+  variantId,
+}: {
+  variantId?: string
+}): Promise<ReconciliationLogEnrichedRow[]> {
+  const variantCond =
+    variantId != null && variantId !== ''
+      ? sql`AND log.variant_id = ${variantId}`
+      : sql``
+  const result = await db.execute(sql`
+    SELECT
+      log.id,
+      log.variant_id,
+      log.actual_count,
+      log.aggregate_count,
+      log.delta,
+      log.detected_at,
+      log.resolved_at,
+      log.resolved_note,
+      p.display_name AS product_name,
+      pv.color,
+      pv.size,
+      pv.sku_group
+    FROM inventory.inventory_reconciliation_log log
+    INNER JOIN inventory.product_variants pv ON pv.id = log.variant_id
+    INNER JOIN catalog.products p ON p.id = pv.product_id
+    WHERE log.resolved_at IS NULL
+      ${variantCond}
+    ORDER BY log.detected_at DESC
+  `)
+  return (result.rows as unknown as ReconciliationLogEnrichedRow[]) ?? []
+}
+
+export async function atomicDecrementInStock({
+  variantId,
+  qty,
+  tx,
+}: {
+  variantId: string
+  qty: number
+  tx: TransactionClient
+}): Promise<boolean> {
+  const result = await tx.execute(sql`
+    UPDATE inventory.variant_stock
+    SET in_stock_qty = in_stock_qty - ${qty},
+        updated_at = now()
+    WHERE variant_id = ${variantId}
+      AND in_stock_qty >= ${qty}
+    RETURNING variant_id
+  `)
+  return result.rows.length > 0
+}
+
+export async function updateInStockUnitsToStatus({
+  variantId,
+  unitIds,
+  newStatus,
+  tx,
+}: {
+  variantId: string
+  unitIds: string[]
+  newStatus: 'DAMAGED' | 'ADJUSTED_OUT'
+  tx: TransactionClient
+}): Promise<string[]> {
+  if (unitIds.length === 0) return []
+  const result = await tx.execute(sql`
+    UPDATE inventory.inventory_units
+    SET status = ${newStatus}, updated_at = now()
+    WHERE variant_id = ${variantId}
+      AND status = 'IN_STOCK'
+      AND id IN (${sql.join(
+        unitIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})
+    RETURNING id
+  `)
+  return (result.rows as { id: string }[]).map((r) => r.id)
+}
