@@ -1,5 +1,6 @@
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { ScrolledNavbar } from '@/components/storefront/ScrolledNavbar'
+import { NewsletterPopup } from '@/components/storefront/NewsletterPopup'
 import { SiteFooter } from '@modett/ui'
 
 export default function StorefrontLayout({
@@ -16,6 +17,7 @@ export default function StorefrontLayout({
         {children}
       </main>
       <SiteFooter logoUrl="/images/modett-logo-foreground.png" />
+      <NewsletterPopup />
     </>
   )
 }

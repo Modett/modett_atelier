@@ -9,7 +9,6 @@ import {
 } from 'react'
 import { X }                      from 'lucide-react'
 import { cn }                     from '@/lib/utils'
-import { usePathname }            from 'next/navigation'
 import { useNewsletterSubscribe } from '@/hooks/useNewsletterSubscribe'
 
 const LAST_SHOWN_KEY    = 'modett_newsletter_last_shown'
@@ -55,10 +54,7 @@ function markSubscribed(): void {
   } catch { /* ignore */ }
 }
 
-const BLOCKED_PATHS = ['/checkout', '/password', '/admin']
-
 export function NewsletterPopup() {
-  const pathname                    = usePathname()
   const [isOpen, setIsOpen]         = useState(false)
   const [email, setEmail]           = useState('')
   const [emailError, setEmailError] = useState('')
@@ -73,16 +69,11 @@ export function NewsletterPopup() {
     isSuccess,
   } = useNewsletterSubscribe()
 
-  const isBlockedPath = BLOCKED_PATHS.some(
-    (p) => pathname.startsWith(p),
-  )
-
   const handleClose = useCallback(() => {
     setIsOpen(false)
   }, [])
 
   useEffect(() => {
-    if (isBlockedPath) return
     if (!shouldShowPopup()) return
 
     timerRef.current = setTimeout(() => {
@@ -93,7 +84,7 @@ export function NewsletterPopup() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [isBlockedPath])
+  }, [])
 
   useEffect(() => {
     if (isOpen && !isSuccess) {
