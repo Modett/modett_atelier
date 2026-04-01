@@ -1,47 +1,47 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// ── Site-wide password protection ─────────────────────────
-// Controlled by the SITE_PASSWORD environment variable.
-// Set it in Railway/Vercel frontend service variables.
-// Delete the variable entirely to open the site publicly.
-// ──────────────────────────────────────────────────────────
+const COOKIE_NAME = 'site_access'
+const PUBLIC_PATHS = [
+  '/password',
+  '/_next',
+  '/favicon.ico',
+  '/images',
+  '/api',
+]
 
-function isAuthenticated(request: NextRequest): boolean {
-  const sitePassword = process.env.SITE_PASSWORD
-  if (!sitePassword) return true // no var set = open access
-
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Basic ')) return false
-
-  const base64 = authHeader.slice(6)
-  const decoded = atob(base64)
-  // username is ignored — only password is checked
-  const [, password] = decoded.split(':')
-  return password === sitePassword
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some((p) => pathname.startsWith(p))
 }
 
 export function middleware(request: NextRequest) {
-  if (!isAuthenticated(request)) {
-    return new NextResponse('Site under maintenance', {
-      status: 401,
-      headers: {
-        'WWW-Authenticate': 'Basic realm="Modett — Coming Soon"',
-      },
-    })
+  const sitePassword = process.env.SITE_PASSWORD
+
+  // No password set = site is open, skip all checks
+  if (!sitePassword) return NextResponse.next()
+
+  const { pathname } = request.nextUrl
+
+  // Always allow public paths through
+  if (isPublicPath(pathname)) return NextResponse.next()
+
+  // Check if visitor has the access cookie
+  const accessCookie = request.cookies.get(COOKIE_NAME)
+  if (accessCookie?.value === sitePassword) {
+    return NextResponse.next()
   }
-  return NextResponse.next()
+
+  // Not verified — redirect to password page
+  const url = request.nextUrl.clone()
+  url.pathname = '/password'
+  // Preserve the intended destination so we can redirect
+  // back after successful login
+  url.searchParams.set('next', pathname)
+  return NextResponse.redirect(url)
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths EXCEPT:
-     * - _next/static  (Next.js static assets)
-     * - _next/image   (Next.js image optimisation)
-     * - favicon.ico
-     * - /images/      (public image folder)
-     */
     '/((?!_next/static|_next/image|favicon.ico|images/).*)',
   ],
 }
