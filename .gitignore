@@ -8,7 +8,7 @@ dist/
 out/
 build/
 
-# Environment files — NEVER commit these
+# Environment files — NEVER commit thesegit add .gitignore
 .env
 .env.local
 .env.production
