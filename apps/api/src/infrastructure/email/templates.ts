@@ -100,3 +100,66 @@ export function contactConfirmationEmail({ name }: { name: string }) {
     text: `${textGreeting}\n\nThank you for reaching out to Modett. We've received your message and will get back to you within 1-2 business days.\n\n— The Modett Team\nhttps://modett.com`,
   }
 }
+
+// ── Newsletter welcome with promo code ───────────────────
+
+export function newsletterWelcomeEmail({ promoCode }: { promoCode: string }) {
+  const safeCode = escapeHtml(promoCode)
+
+  return {
+    subject: 'Your 15% off — welcome to Modett',
+    html: `
+        <div style="font-family:sans-serif;max-width:600px;
+                    margin:0 auto;padding:24px;color:#3D2E26;">
+          <img src="https://modett.com/images/logo.png"
+               alt="Modett"
+               style="height:40px;margin-bottom:32px;" />
+          <h1 style="font-size:28px;font-weight:500;
+                     margin-bottom:8px;letter-spacing:0.02em;">
+            Welcome to Modett
+          </h1>
+          <p style="font-size:14px;color:#888;
+                    margin-bottom:32px;line-height:1.6;">
+            Thank you for signing up. Here's your exclusive
+            15% off your first order.
+          </p>
+          <div style="background:#F0F4F2;padding:24px;
+                      text-align:center;margin-bottom:32px;">
+            <p style="font-size:12px;letter-spacing:0.2em;
+                      text-transform:uppercase;color:#888;
+                      margin-bottom:8px;">
+              Your promo code
+            </p>
+            <p style="font-size:28px;font-weight:700;
+                      letter-spacing:0.15em;color:#3D2E26;
+                      margin:0;">
+              ${safeCode}
+            </p>
+          </div>
+          <p style="font-size:13px;color:#888;
+                    margin-bottom:24px;line-height:1.6;">
+            Enter this code at checkout to receive
+            15% off your first order. Valid for one
+            use only.
+          </p>
+          <a href="https://modett.com/collections"
+             style="display:inline-block;padding:14px 32px;
+                    background:#3D2E26;color:#fff;
+                    text-decoration:none;font-size:12px;
+                    letter-spacing:0.2em;
+                    text-transform:uppercase;">
+            Shop Now
+          </a>
+          <hr style="border:none;border-top:1px solid #E5E0D8;
+                     margin:32px 0 16px;" />
+          <p style="font-size:11px;color:#aaa;line-height:1.6;">
+            Modett Atelier · 345 Galle Road, Colombo 00300,
+            Sri Lanka<br/>
+            <a href="https://modett.com"
+               style="color:#aaa;">modett.com</a>
+          </p>
+        </div>
+      `,
+    text: `Welcome to Modett!\n\nYour 15% off promo code: ${promoCode}\n\nEnter at checkout for 15% off your first order. Valid for one use only.\n\nhttps://modett.com/collections`,
+  }
+}

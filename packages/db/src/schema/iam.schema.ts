@@ -107,6 +107,17 @@ export const wishlists = iam.table(
   (t) => [unique('uq_wishlist_user_product').on(t.userId, t.productId)],
 )
 
+export const newsletterSubscribers = iam.table('newsletter_subscribers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique('uq_newsletter_email'),
+  promoCodeId: uuid('promo_code_id'),
+  subscribedAt: timestamp('subscribed_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  ipAddress: text('ip_address'),
+  source: text('source').notNull().default('POPUP'),
+})
+
 export const savedAddresses = iam.table('saved_addresses', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')
@@ -154,3 +165,5 @@ export type SavedAddress = InferSelectModel<typeof savedAddresses>
 export type NewSavedAddress = InferInsertModel<typeof savedAddresses>
 export type SavedPaymentMethod = InferSelectModel<typeof savedPaymentMethods>
 export type NewSavedPaymentMethod = InferInsertModel<typeof savedPaymentMethods>
+export type NewsletterSubscriber = InferSelectModel<typeof newsletterSubscribers>
+export type NewNewsletterSubscriber = InferInsertModel<typeof newsletterSubscribers>

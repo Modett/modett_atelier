@@ -14,6 +14,7 @@ import {
   savedAddresses,
   savedPaymentMethods,
   wishlists,
+  newsletterSubscribers,
 } from '../schema/iam.schema'
 import type {
   User,
@@ -26,6 +27,7 @@ import type {
   NewSavedAddress,
   SavedPaymentMethod,
   NewSavedPaymentMethod,
+  NewsletterSubscriber,
 } from '../schema/iam.schema'
 
 const SESSION_KEY_PREFIX = 'session:'
@@ -602,4 +604,44 @@ export async function removeFromWishlist({
   await db
     .delete(wishlists)
     .where(and(eq(wishlists.userId, userId), eq(wishlists.productId, productId)))
+}
+
+// —— Newsletter (guest + logged-in) ——
+
+export async function getNewsletterSubscriberByEmail({
+  email,
+}: {
+  email: string
+}): Promise<NewsletterSubscriber | null> {
+  const normalized = email.toLowerCase().trim()
+  const rows = await db
+    .select()
+    .from(newsletterSubscribers)
+    .where(eq(newsletterSubscribers.email, normalized))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+export async function createNewsletterSubscriber({
+  email,
+  promoCodeId,
+  ipAddress,
+  source = 'POPUP',
+}: {
+  email: string
+  promoCodeId?: string
+  ipAddress?: string
+  source?: string
+}): Promise<NewsletterSubscriber> {
+  const [row] = await db
+    .insert(newsletterSubscribers)
+    .values({
+      email: email.toLowerCase().trim(),
+      promoCodeId: promoCodeId ?? null,
+      ipAddress: ipAddress ?? null,
+      source,
+    })
+    .returning()
+  if (!row) throw new Error('createNewsletterSubscriber: no row returned')
+  return row
 }

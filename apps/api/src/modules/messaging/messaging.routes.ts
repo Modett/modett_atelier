@@ -13,6 +13,7 @@ import { sendEmail, CONTACT_INBOX } from '../../infrastructure/email/email.servi
 import {
   contactNotificationEmail,
   contactConfirmationEmail,
+  newsletterWelcomeEmail,
 } from '../../infrastructure/email/templates'
 import * as messagingService from './messaging.service'
 
@@ -223,6 +224,47 @@ router.post(
       sessionId: body.sessionId,
     })
     res.status(200).json({ data: { ok: true } })
+  },
+)
+
+// —— Public: POST /newsletter/subscribe ——
+
+const newsletterSubscribeSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+})
+
+router.post(
+  '/newsletter/subscribe',
+  rateLimit({
+    name: 'newsletter-subscribe',
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    key: (req) => req.ip ?? 'unknown',
+  }),
+  validate(newsletterSubscribeSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as ValidatedBody<typeof newsletterSubscribeSchema>).body
+    const { promoCode } = await messagingService.recordNewsletterSignup({
+      email: body.email,
+      ipAddress: req.ip ?? null,
+    })
+
+    const template = newsletterWelcomeEmail({ promoCode })
+    sendEmail({
+      to: body.email.toLowerCase().trim(),
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    }).catch((err: unknown) => {
+      console.error('[newsletter] Email send failed:', err)
+    })
+
+    res.status(201).json({
+      data: {
+        ok: true,
+        promoCode,
+      },
+    })
   },
 )
 

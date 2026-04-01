@@ -4,8 +4,8 @@
  * All state transitions use atomic UPDATE with previous state in WHERE; 0 rows → OrderOperationError.
  */
 
-import { eq, asc } from 'drizzle-orm'
-import { sql } from 'drizzle-orm'
+import { eq, asc, and, sql } from 'drizzle-orm'
+import Decimal from 'decimal.js'
 import { db, type TransactionClient } from '../client'
 import { OrderOperationError } from '../errors'
 import { appendOrderEvent } from './checkout'
@@ -15,8 +15,21 @@ import {
   getOrderAddresses,
   getOrderContact,
 } from './checkout'
-import { orderEvents, orderItems, orderUnitAllocations } from '../schema/orders.schema'
-import type { OrderEvent, OrderItem, OrderAddress, Order } from '../schema/orders.schema'
+import {
+  orderEvents,
+  orderItems,
+  orderUnitAllocations,
+  promoCodes,
+  promoRedemptions,
+  ordersTable,
+} from '../schema/orders.schema'
+import type {
+  OrderEvent,
+  OrderItem,
+  OrderAddress,
+  Order,
+  PromoCode,
+} from '../schema/orders.schema'
 import type { OrderUnitAllocation } from '../types'
 
 // —— Row types ——
@@ -511,4 +524,276 @@ export async function deallocateUnit({
       tx,
     })
   })
+}
+
+// —— Promo codes (checkout) ——
+
+export async function deletePromoCodeById({ id }: { id: string }): Promise<void> {
+  await db.delete(promoCodes).where(eq(promoCodes.id, id))
+}
+
+export async function createPromoCode({
+  code,
+  type,
+  value,
+  currency,
+  maxUses,
+  validFrom,
+  validUntil,
+}: {
+  code: string
+  type: 'PERCENT' | 'FIXED'
+  value: string
+  currency?: string | null
+  maxUses?: number | null
+  validFrom?: Date | null
+  validUntil?: Date | null
+}): Promise<PromoCode> {
+  const [row] = await db
+    .insert(promoCodes)
+    .values({
+      code,
+      type,
+      value,
+      max_uses: maxUses ?? null,
+      uses_count: 0,
+      active: true,
+      valid_from: validFrom ?? null,
+      valid_until: validUntil ?? null,
+      ...(currency != null
+        ? {
+            currency: currency as NonNullable<PromoCode['currency']>,
+          }
+        : {}),
+    })
+    .returning()
+  if (!row) throw new Error('createPromoCode: no row returned')
+  return row
+}
+
+export async function validatePromoCode({
+  code,
+  userId,
+  orderId,
+  orderSubtotal,
+  currency: _currency,
+}: {
+  code: string
+  userId?: string | null
+  orderId?: string | null
+  orderSubtotal: string
+  currency: string
+}): Promise<PromoCode> {
+  void _currency // reserved for FIXED + currency checks later
+  const normalized = code.toUpperCase().trim()
+  const rows = await db
+    .select()
+    .from(promoCodes)
+    .where(eq(promoCodes.code, normalized))
+    .limit(1)
+  const row = rows[0]
+  if (!row || !row.active) {
+    throw new Error('PROMO_INVALID')
+  }
+
+  const now = new Date()
+  if (row.valid_from && now < row.valid_from) {
+    throw new Error('PROMO_NOT_YET_ACTIVE')
+  }
+  if (row.valid_until && now > row.valid_until) {
+    throw new Error('PROMO_EXPIRED')
+  }
+
+  if (orderId) {
+    const existingOnOrder = await db.query.promoRedemptions.findFirst({
+      where: and(
+        eq(promoRedemptions.promo_code_id, row.id),
+        eq(promoRedemptions.order_id, orderId),
+      ),
+    })
+    if (existingOnOrder) {
+      throw new Error('PROMO_ALREADY_USED')
+    }
+  }
+
+  if (userId) {
+    const redemptionRows = await db
+      .select()
+      .from(promoRedemptions)
+      .where(
+        and(
+          eq(promoRedemptions.promo_code_id, row.id),
+          eq(promoRedemptions.user_id, userId),
+        ),
+      )
+      .limit(1)
+    if (redemptionRows[0]) {
+      throw new Error('PROMO_ALREADY_USED')
+    }
+  }
+
+  if (row.max_uses !== null && row.uses_count >= row.max_uses) {
+    throw new Error('PROMO_MAX_USES_REACHED')
+  }
+
+  if (row.min_order_amount) {
+    const subtotal = new Decimal(orderSubtotal)
+    const minAmount = new Decimal(row.min_order_amount)
+    if (subtotal.lt(minAmount)) {
+      throw new Error('PROMO_MIN_ORDER_NOT_MET')
+    }
+  }
+
+  return row
+}
+
+export function calculatePromoDiscount({
+  promoCode,
+  subtotal,
+}: {
+  promoCode: Pick<PromoCode, 'type' | 'value'>
+  subtotal: string
+}): string {
+  const sub = new Decimal(subtotal)
+  if (promoCode.type === 'PERCENT') {
+    return sub
+      .mul(new Decimal(promoCode.value).div(100))
+      .toDecimalPlaces(2)
+      .toFixed(2)
+  }
+  const fixed = new Decimal(promoCode.value)
+  return Decimal.min(fixed, sub).toDecimalPlaces(2).toFixed(2)
+}
+
+export async function applyPromoCodeToOrder({
+  orderId,
+  promoCodeId,
+  discountAmount,
+  userId,
+}: {
+  orderId: string
+  promoCodeId: string
+  discountAmount: string
+  userId?: string | null
+}): Promise<void> {
+  await db.transaction(async (tx) => {
+    const orderRows = await tx
+      .select()
+      .from(ordersTable)
+      .where(eq(ordersTable.id, orderId))
+      .limit(1)
+    const order = orderRows[0]
+    if (!order) throw new Error('ORDER_NOT_FOUND')
+
+    let baseTotal = new Decimal(String(order.total)).add(
+      new Decimal(String(order.discount_amount)),
+    )
+
+    if (order.promo_code_id) {
+      await tx
+        .delete(promoRedemptions)
+        .where(
+          and(
+            eq(promoRedemptions.promo_code_id, order.promo_code_id),
+            eq(promoRedemptions.order_id, orderId),
+          ),
+        )
+      await tx
+        .update(promoCodes)
+        .set({
+          uses_count: sql`GREATEST(${promoCodes.uses_count} - 1, 0)`,
+        })
+        .where(eq(promoCodes.id, order.promo_code_id))
+    }
+
+    const newTotal = baseTotal.sub(new Decimal(discountAmount)).toDecimalPlaces(2)
+    if (newTotal.lt(0)) {
+      throw new Error('PROMO_DISCOUNT_EXCEEDS_TOTAL')
+    }
+
+    await tx
+      .update(ordersTable)
+      .set({
+        promo_code_id: promoCodeId,
+        discount_amount: discountAmount,
+        total: newTotal.toFixed(2),
+        updated_at: new Date(),
+      })
+      .where(eq(ordersTable.id, orderId))
+
+    await tx
+      .update(promoCodes)
+      .set({
+        uses_count: sql`${promoCodes.uses_count} + 1`,
+      })
+      .where(eq(promoCodes.id, promoCodeId))
+
+    await tx.insert(promoRedemptions).values({
+      promo_code_id: promoCodeId,
+      order_id: orderId,
+      user_id: userId ?? null,
+      discount_amount: discountAmount,
+    })
+  })
+}
+
+export async function removePromoCodeFromOrder({
+  orderId,
+}: {
+  orderId: string
+}): Promise<{ newTotal: string } | null> {
+  const orderRows = await db
+    .select()
+    .from(ordersTable)
+    .where(eq(ordersTable.id, orderId))
+    .limit(1)
+  const order = orderRows[0]
+  if (!order) return null
+
+  if (!order.promo_code_id) {
+    return { newTotal: String(order.total) }
+  }
+
+  const promoId = order.promo_code_id
+
+  await db.transaction(async (tx) => {
+    const restoredTotal = new Decimal(String(order.total))
+      .add(new Decimal(String(order.discount_amount)))
+      .toFixed(2)
+
+    await tx
+      .update(ordersTable)
+      .set({
+        promo_code_id: null,
+        discount_amount: '0',
+        total: restoredTotal,
+        updated_at: new Date(),
+      })
+      .where(eq(ordersTable.id, orderId))
+
+    await tx
+      .update(promoCodes)
+      .set({
+        uses_count: sql`GREATEST(${promoCodes.uses_count} - 1, 0)`,
+      })
+      .where(eq(promoCodes.id, promoId))
+
+    await tx
+      .delete(promoRedemptions)
+      .where(
+        and(
+          eq(promoRedemptions.promo_code_id, promoId),
+          eq(promoRedemptions.order_id, orderId),
+        ),
+      )
+  })
+
+  const updatedRows = await db
+    .select()
+    .from(ordersTable)
+    .where(eq(ordersTable.id, orderId))
+    .limit(1)
+  const updated = updatedRows[0]
+  if (!updated) return null
+  return { newTotal: String(updated.total) }
 }
