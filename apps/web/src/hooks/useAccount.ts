@@ -454,17 +454,24 @@ export interface SubmitReturnInput {
   }[]
 }
 
+export interface SubmitReturnResponse {
+  returnRequest: { id: string }
+  items:         unknown[]
+}
+
 export function useSubmitReturn() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: SubmitReturnInput) =>
-      api.post<{ data: unknown }>('/returns', {
+    mutationFn: async (data: SubmitReturnInput) => {
+      const res = await api.post<{ data: SubmitReturnResponse }>('/returns', {
         orderId:       data.orderId,
         type:          data.type,
         reason:        data.reason,
         policyVersion: data.policyVersion,
         items:         data.items,
-      }),
+      })
+      return res.data
+    },
     onSuccess: (_res, vars) => {
       qc.invalidateQueries({ queryKey: ['order', vars.orderRef] })
       qc.invalidateQueries({ queryKey: ['orders'] })

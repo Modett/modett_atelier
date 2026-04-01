@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { getCurrencyCookie } from '@/hooks/useCurrency'
 import { useSession } from './useSession'
+import { Analytics } from '@/lib/analytics'
 import type { WishlistItem } from '@/types'
 
 export const WISHLIST_QUERY_KEY = ['wishlist'] as const
@@ -33,6 +34,7 @@ export function useIsWishlisted(productId: string): boolean {
 export function useToggleWishlist() {
   const queryClient        = useQueryClient()
   const { data: wishlist } = useWishlist()
+  const { user }           = useSession()
 
   return useMutation({
     mutationFn: async (productId: string) => {
@@ -48,8 +50,13 @@ export function useToggleWishlist() {
         return { action: 'added' as const, productId }
       }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: WISHLIST_QUERY_KEY })
+      if (result.action === 'added') {
+        Analytics.wishlistAdd({ productId: result.productId, userId: user?.id })
+      } else {
+        Analytics.wishlistRemove({ productId: result.productId, userId: user?.id })
+      }
     },
   })
 }

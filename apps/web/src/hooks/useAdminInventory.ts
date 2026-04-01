@@ -366,6 +366,45 @@ export function useRunReconciliation() {
   })
 }
 
+export function useVariantBarcodes({
+  variantId,
+  status,
+  unitIds,
+}: {
+  variantId: string
+  status: 'IN_STOCK' | 'ALL'
+  unitIds?: string[]
+}) {
+  return useQuery({
+    queryKey: [
+      ...ADMIN_INVENTORY_KEYS.variant(variantId),
+      'barcodes',
+      status,
+      unitIds?.join(',') ?? '',
+    ] as const,
+    queryFn: async () => {
+      const params: Record<string, string> = { status }
+      if (unitIds != null && unitIds.length > 0) {
+        params.unitIds = unitIds.join(',')
+      }
+      const res = await api.get<{
+        data: {
+          units: AdminInventoryUnit[]
+          variant: {
+            id: string
+            color: string
+            size: string
+            skuGroup: string
+          }
+          product: { displayName: string; productCode: string }
+        }
+      }>(`/admin/inventory/variants/${variantId}/barcodes`, { params })
+      return res.data
+    },
+    enabled: Boolean(variantId),
+  })
+}
+
 export function useResolveReconciliation() {
   const queryClient = useQueryClient()
   return useMutation({

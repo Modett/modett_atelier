@@ -363,17 +363,70 @@ export async function handleWebhook({
 
 // ——— getPaymentStatus ———
 
+export interface PurchaseAnalyticsPayload {
+  totalValue: string
+  currency:   string
+  items:      Array<{
+    variantId: string
+    productId: string
+    color:     string
+    size:      string
+    qty:       number
+    unitPrice: string
+  }>
+}
+
 export interface GetPaymentStatusResult {
   orderId: string
   orderRef: string
   orderState: string
   paymentState: string
+  userId: string | null
   intent: {
     id: string
     status: string
     amount: string
     currency: string
   } | null
+  /** Present when payment has completed — used for storefront analytics only. */
+  purchaseAnalytics: PurchaseAnalyticsPayload | null
+}
+
+function snapshotProductId(snap: Record<string, unknown>): string {
+  const v = snap.product_id ?? snap.productId
+  return typeof v === 'string' ? v : ''
+}
+
+function snapshotColor(snap: Record<string, unknown>): string {
+  const v = snap.color ?? snap.colour
+  return typeof v === 'string' ? v : String(v ?? '')
+}
+
+function snapshotSize(snap: Record<string, unknown>): string {
+  const v = snap.size
+  return typeof v === 'string' ? v : String(v ?? '')
+}
+
+async function buildPurchaseAnalytics(orderId: string): Promise<PurchaseAnalyticsPayload | null> {
+  const order = await getOrderById({ id: orderId })
+  if (!order) return null
+  const rows = await getOrderItems({ orderId })
+  const items = rows.map((oi) => {
+    const snap = (oi.product_snapshot_json ?? {}) as Record<string, unknown>
+    return {
+      variantId: oi.variant_id ?? '',
+      productId: snapshotProductId(snap),
+      color:     snapshotColor(snap),
+      size:      snapshotSize(snap),
+      qty:       oi.qty,
+      unitPrice: String(oi.unit_price_snapshot_amount),
+    }
+  })
+  return {
+    totalValue: String(order.total),
+    currency:   order.currency,
+    items,
+  }
 }
 
 export async function getPaymentStatus({
@@ -400,11 +453,21 @@ export async function getPaymentStatus({
 
   const intent = await getPaymentIntentByOrderId({ orderId })
 
+  const paid =
+    order.payment_state === 'PAID'
+    || (intent != null && intent.status === 'SUCCEEDED')
+
+  let purchaseAnalytics: PurchaseAnalyticsPayload | null = null
+  if (paid) {
+    purchaseAnalytics = await buildPurchaseAnalytics(order.id)
+  }
+
   return {
     orderId: order.id,
     orderRef: order.order_ref,
     orderState: order.order_state,
     paymentState: order.payment_state,
+    userId: order.user_id ?? null,
     intent: intent
       ? {
           id: intent.id,
@@ -413,5 +476,6 @@ export async function getPaymentStatus({
           currency: intent.currency,
         }
       : null,
+    purchaseAnalytics,
   }
 }

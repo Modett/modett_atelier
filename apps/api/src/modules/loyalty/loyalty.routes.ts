@@ -10,6 +10,8 @@ import type { AuthRequest, AdminRequest } from '../../middleware/auth'
 import { validate, validateQuery } from '../../middleware/validate'
 import type { ValidatedBody, ValidatedQuery } from '../../middleware/validate'
 import * as loyaltyService from './loyalty.service'
+import { getUserById } from '@modett/db'
+import { writeAuditLog } from '../../middleware/audit'
 
 const router: IRouter = Router()
 
@@ -177,6 +179,16 @@ router.post(
       reason: body.reason,
       adminId: adminReq.admin.id,
     })
+    const targetUser = await getUserById({ id: userId })
+    void writeAuditLog({
+      req: adminReq,
+      action: 'GRANT_POINTS',
+      entityType: 'user',
+      entityId: userId,
+      entityLabel: targetUser?.email ?? userId,
+      beforeJson: null,
+      afterJson: { points: body.points, reason: body.reason, newBalance: result.newBalance },
+    })
     res.status(200).json({ data: result })
   },
 )
@@ -204,6 +216,16 @@ router.post(
       points: body.points,
       reason: body.reason,
       adminId: adminReq.admin.id,
+    })
+    const targetUser = await getUserById({ id: userId })
+    void writeAuditLog({
+      req: adminReq,
+      action: 'ADJUST_POINTS',
+      entityType: 'user',
+      entityId: userId,
+      entityLabel: targetUser?.email ?? userId,
+      beforeJson: null,
+      afterJson: { points: body.points, reason: body.reason, newBalance: result.newBalance },
     })
     res.status(200).json({ data: result })
   },

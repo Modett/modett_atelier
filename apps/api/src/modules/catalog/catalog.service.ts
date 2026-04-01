@@ -43,6 +43,7 @@ import {
   updateBanner,
   enableBanner,
   disableBanner,
+  deleteBanner,
 } from '@modett/db'
 import type {
   ProductListItemRow,
@@ -1101,6 +1102,7 @@ type AdminUpdateBannerData = Partial<{
   linkUrl: string | null
   startAt: Date | null
   endAt: Date | null
+  enabled: boolean
 }>
 
 export async function adminUpdateBanner({
@@ -1133,4 +1135,9 @@ export async function adminDisableBanner({
   const banner = await disableBanner({ id })
   if (!banner) throw new AppError('BANNER_NOT_FOUND', 404)
   return banner
+}
+
+export async function adminDeleteBanner({ id }: { id: string }): Promise<void> {
+  const ok = await deleteBanner({ id })
+  if (!ok) throw new AppError('BANNER_NOT_FOUND', 404)
 }

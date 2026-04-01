@@ -102,3 +102,11 @@ export const rateLimitPaymentIntent = rateLimit({
   max: 3,
   key: (req) => req.ip ?? 'unknown',
 })
+
+/** Public analytics ingestion: 60 events / min / IP */
+export const rateLimitAnalyticsEvent = rateLimit({
+  name: 'analytics:event',
+  windowMs: 60 * 1000,
+  max: 60,
+  key: (req) => req.ip ?? 'unknown',
+})

@@ -798,6 +798,65 @@ export async function atomicDecrementInStock({
   return result.rows.length > 0
 }
 
+export interface AdminVariantBarcodeUnitRow {
+  id: string
+  unit_sku: string
+  barcode_value: string
+  status: string
+  created_at: Date
+  color: string
+  size: string
+  sku_group: string
+  display_name: string
+  product_code: string
+}
+
+export async function listAdminVariantBarcodes({
+  variantId,
+  statusFilter,
+  unitIds,
+}: {
+  variantId: string
+  statusFilter: 'IN_STOCK' | 'ALL'
+  unitIds?: string[]
+}): Promise<AdminVariantBarcodeUnitRow[]> {
+  const idsCond =
+    unitIds != null && unitIds.length > 0
+      ? sql`AND iu.id IN (${sql.join(
+          unitIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})`
+      : sql``
+  const statusCond =
+    unitIds != null && unitIds.length > 0
+      ? sql``
+      : statusFilter === 'IN_STOCK'
+        ? sql`AND iu.status = 'IN_STOCK'`
+        : sql``
+  const result = await db.execute(sql`
+    SELECT
+      iu.id,
+      iu.unit_sku,
+      iu.barcode_value,
+      iu.status::text,
+      iu.created_at,
+      pv.color,
+      pv.size,
+      pv.sku_group,
+      p.display_name,
+      p.product_code
+    FROM inventory.inventory_units iu
+    INNER JOIN inventory.product_variants pv ON pv.id = iu.variant_id
+    INNER JOIN catalog.products p ON p.id = pv.product_id
+    WHERE iu.variant_id = ${variantId}
+      ${statusCond}
+      ${idsCond}
+    ORDER BY iu.created_at DESC
+    LIMIT 500
+  `)
+  return (result.rows ?? []) as unknown as AdminVariantBarcodeUnitRow[]
+}
+
 export async function updateInStockUnitsToStatus({
   variantId,
   unitIds,

@@ -27,6 +27,7 @@ export const ADMIN_DASHBOARD_KEYS = {
   lowStock:         ['admin', 'dashboard', 'low-stock'] as const,
   notifyMeDemand:   ['admin', 'dashboard', 'notify-me-demand'] as const,
   flaggedReviews:   ['admin', 'dashboard', 'flagged-reviews'] as const,
+  reconciliation:   ['admin', 'dashboard', 'reconciliation-unresolved'] as const,
 } as const
 
 interface OrderSummaryApiRow {
@@ -124,7 +125,7 @@ export function useRecentOrders() {
           limit: number
           total: number
         }
-      }>('/admin/orders', { params: { page: '1', limit: '10' } })
+      }>('/admin/orders', { params: { page: '1', limit: '5' } })
       const { page, limit, total, orders: raw } = res.data
       return {
         orders: raw.map(mapOrderRow),
@@ -298,6 +299,21 @@ export function useNotifyMeDemand() {
     },
     staleTime:     60 * 1000,
     refetchInterval: 5 * 60 * 1000,
+  })
+}
+
+// AUDIT FIX: unresolved inventory reconciliation count for dashboard
+export function useUnresolvedReconciliationCount() {
+  return useQuery({
+    queryKey: ADMIN_DASHBOARD_KEYS.reconciliation,
+    queryFn: async () => {
+      const res = await api.get<{ data: { logs: unknown[] } }>(
+        '/admin/inventory/reconciliation/unresolved',
+      )
+      return res.data.logs.length
+    },
+    staleTime:     60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
   })
 }
 

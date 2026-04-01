@@ -3,7 +3,7 @@
  * No business logic. RORO signatures. Return null when not found.
  */
 
-import { eq, and, isNull, gt, desc } from 'drizzle-orm'
+import { eq, and, isNull, gt, desc, lte, gte, count } from 'drizzle-orm'
 import { db } from '../client'
 import { redis } from '../redis'
 import {
@@ -15,6 +15,7 @@ import {
   savedPaymentMethods,
   wishlists,
   newsletterSubscribers,
+  adminAuditLog,
 } from '../schema/iam.schema'
 import type {
   User,
@@ -304,11 +305,13 @@ export async function createAdminInvite({
   tokenHash,
   expiresAt,
   createdByAdminId,
+  role = 'ADMIN',
 }: {
   email: string
   tokenHash: string
   expiresAt: Date
   createdByAdminId: string
+  role?: 'OWNER' | 'ADMIN'
 }): Promise<AdminInvite> {
   const [row] = await db
     .insert(adminInvites)
@@ -317,10 +320,55 @@ export async function createAdminInvite({
       tokenHash,
       expiresAt,
       createdByAdminId,
+      role,
     })
     .returning()
   if (!row) throw new Error('createAdminInvite: no row returned')
   return row
+}
+
+export async function listPendingAdminInvites(): Promise<AdminInvite[]> {
+  return db
+    .select()
+    .from(adminInvites)
+    .where(
+      and(isNull(adminInvites.usedAt), gt(adminInvites.expiresAt, new Date())),
+    )
+    .orderBy(desc(adminInvites.expiresAt))
+}
+
+export async function getAdminInviteById({
+  id,
+}: {
+  id: string
+}): Promise<AdminInvite | null> {
+  const rows = await db.select().from(adminInvites).where(eq(adminInvites.id, id))
+  return rows[0] ?? null
+}
+
+export async function updateAdminInviteToken({
+  id,
+  tokenHash,
+  expiresAt,
+}: {
+  id: string
+  tokenHash: string
+  expiresAt: Date
+}): Promise<AdminInvite | null> {
+  const [row] = await db
+    .update(adminInvites)
+    .set({ tokenHash, expiresAt })
+    .where(and(eq(adminInvites.id, id), isNull(adminInvites.usedAt)))
+    .returning()
+  return row ?? null
+}
+
+export async function deleteAdminInvite({ id }: { id: string }): Promise<boolean> {
+  const r = await db
+    .delete(adminInvites)
+    .where(and(eq(adminInvites.id, id), isNull(adminInvites.usedAt)))
+    .returning({ id: adminInvites.id })
+  return r.length > 0
 }
 
 export async function getAdminInviteByTokenHash({
@@ -354,12 +402,14 @@ export async function acceptAdminInviteTransaction({
   firstName,
   lastName,
   passwordHash,
+  invitedRole,
 }: {
   inviteId: string
   email: string
   firstName: string
   lastName: string
   passwordHash: string
+  invitedRole: 'OWNER' | 'ADMIN'
 }): Promise<{ user: User; admin: Admin }> {
   return await db.transaction(async (tx) => {
     let user = await tx
@@ -383,7 +433,7 @@ export async function acceptAdminInviteTransaction({
     if (!admin) {
       const [inserted] = await tx
         .insert(admins)
-        .values({ userId: user.id, role: 'ADMIN' })
+        .values({ userId: user.id, role: invitedRole })
         .returning()
       if (!inserted) throw new Error('acceptAdminInvite: admin insert failed')
       admin = inserted
@@ -391,9 +441,14 @@ export async function acceptAdminInviteTransaction({
     const updatedAt = new Date()
     await tx
       .update(admins)
-      .set({ status: 'ACTIVE', updatedAt })
+      .set({ status: 'ACTIVE', role: invitedRole, updatedAt })
       .where(eq(admins.id, admin.id))
-    admin = { ...admin, status: 'ACTIVE' as const, updatedAt }
+    admin = {
+      ...admin,
+      status: 'ACTIVE' as const,
+      role: invitedRole,
+      updatedAt,
+    }
     await tx
       .update(adminInvites)
       .set({ usedAt: new Date() })
@@ -644,4 +699,94 @@ export async function createNewsletterSubscriber({
     .returning()
   if (!row) throw new Error('createNewsletterSubscriber: no row returned')
   return row
+}
+
+// —— Admin audit log ——
+
+export interface ListAdminAuditLogsInput {
+  page: number
+  limit: number
+  adminId?: string
+  action?: string
+  entityType?: string
+  entityId?: string
+  from?: Date
+  to?: Date
+}
+
+export interface AdminAuditLogListRow {
+  id: string
+  admin_id: string | null
+  admin_email: string
+  admin_role: string
+  action: string
+  entity_type: string
+  entity_id: string | null
+  entity_label: string | null
+  before_json: unknown
+  after_json: unknown
+  ip_address: string | null
+  created_at: Date
+  current_role: string | null
+}
+
+export async function listAdminAuditLogs({
+  page,
+  limit,
+  adminId,
+  action,
+  entityType,
+  entityId,
+  from,
+  to,
+}: ListAdminAuditLogsInput): Promise<{
+  logs: AdminAuditLogListRow[]
+  total: number
+}> {
+  const offset = (page - 1) * limit
+  const conditions = []
+  if (adminId) conditions.push(eq(adminAuditLog.adminId, adminId))
+  if (action) conditions.push(eq(adminAuditLog.action, action))
+  if (entityType) conditions.push(eq(adminAuditLog.entityType, entityType))
+  if (entityId) conditions.push(eq(adminAuditLog.entityId, entityId))
+  if (from) conditions.push(gte(adminAuditLog.createdAt, from))
+  if (to) conditions.push(lte(adminAuditLog.createdAt, to))
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined
+
+  const [totalRow] = await db
+    .select({ c: count() })
+    .from(adminAuditLog)
+    .where(whereClause)
+
+  const rows = await db
+    .select({
+      id: adminAuditLog.id,
+      admin_id: adminAuditLog.adminId,
+      admin_email: adminAuditLog.adminEmail,
+      admin_role: adminAuditLog.adminRole,
+      action: adminAuditLog.action,
+      entity_type: adminAuditLog.entityType,
+      entity_id: adminAuditLog.entityId,
+      entity_label: adminAuditLog.entityLabel,
+      before_json: adminAuditLog.beforeJson,
+      after_json: adminAuditLog.afterJson,
+      ip_address: adminAuditLog.ipAddress,
+      created_at: adminAuditLog.createdAt,
+      current_role: admins.role,
+    })
+    .from(adminAuditLog)
+    .leftJoin(admins, eq(adminAuditLog.adminId, admins.id))
+    .where(whereClause)
+    .orderBy(desc(adminAuditLog.createdAt))
+    .limit(limit)
+    .offset(offset)
+
+  return {
+    logs: rows.map((r) => ({
+      ...r,
+      before_json: r.before_json ?? null,
+      after_json: r.after_json ?? null,
+    })) as AdminAuditLogListRow[],
+    total: Number(totalRow?.c ?? 0),
+  }
 }

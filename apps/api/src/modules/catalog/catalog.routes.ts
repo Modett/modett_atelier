@@ -10,11 +10,26 @@ import { requireAdmin } from '../../middleware/auth'
 import { imageUpload } from '../../infrastructure/upload/multer.config'
 import * as catalogService from './catalog.service'
 import type { AdminRequest } from '../../middleware/auth'
+import { writeAuditLog } from '../../middleware/audit'
+import { diffRecords } from '../../lib/auditHelpers'
 
 const router = Router()
 
 function adminReq(req: Request): AdminRequest {
   return req as AdminRequest
+}
+
+function snapshotProductForAudit(product: Record<string, unknown>) {
+  return {
+    displayName: product.displayName,
+    slug: product.slug,
+    shortName: product.shortName,
+    active: product.active,
+    isSale: product.isSale,
+    productCode: product.productCode,
+    categoryId: product.categoryId ?? null,
+    prices: product.prices,
+  }
 }
 
 const currencySchema = z.enum(['LKR', 'SGD', 'USD'])
@@ -426,6 +441,15 @@ router.post(
       categoryId: body.categoryId ?? undefined,
     })
     const product = await catalogService.adminGetProduct({ id: created.id })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'CREATE_PRODUCT',
+      entityType: 'product',
+      entityId: product.id,
+      entityLabel: String(product.displayName),
+      beforeJson: null,
+      afterJson: snapshotProductForAudit(product as unknown as Record<string, unknown>),
+    })
     res.status(201).json({ data: { product } })
   },
 )
@@ -460,11 +484,25 @@ router.patch(
   validate(updateProductSchema),
   async (req: Request, res: Response) => {
     const body = (req as { body: z.infer<typeof updateProductSchema> }).body
+    const before = await catalogService.adminGetProduct({ id: req.params.id! })
     await catalogService.adminUpdateProduct({
       id: req.params.id!,
       data: body,
     })
     const product = await catalogService.adminGetProduct({ id: req.params.id! })
+    const { beforeJson, afterJson } = diffRecords(
+      snapshotProductForAudit(before as unknown as Record<string, unknown>),
+      snapshotProductForAudit(product as unknown as Record<string, unknown>),
+    )
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'UPDATE_PRODUCT',
+      entityType: 'product',
+      entityId: product.id,
+      entityLabel: String(product.displayName),
+      beforeJson,
+      afterJson,
+    })
     res.status(200).json({ data: { product } })
   },
 )
@@ -489,7 +527,17 @@ router.delete(
   '/admin/catalog/products/:id',
   requireAdmin,
   async (req: Request, res: Response) => {
+    const before = await catalogService.adminGetProduct({ id: req.params.id! })
     await catalogService.adminDeleteProduct({ id: req.params.id! })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'DELETE_PRODUCT',
+      entityType: 'product',
+      entityId: req.params.id!,
+      entityLabel: String(before.displayName),
+      beforeJson: snapshotProductForAudit(before as unknown as Record<string, unknown>),
+      afterJson: null,
+    })
     res.status(200).json({ data: { ok: true } })
   },
 )
@@ -1134,7 +1182,7 @@ router.get(
 )
 
 const createBannerSchema = z.object({
-  message: z.string().min(1),
+  message: z.string().min(1).max(120),
   linkUrl: z.string().url().optional().nullable(),
   startAt: z.string().datetime().optional().nullable(),
   endAt: z.string().datetime().optional().nullable(),
@@ -1176,7 +1224,9 @@ router.post(
   },
 )
 
-const updateBannerSchema = createBannerSchema.partial()
+const updateBannerSchema = createBannerSchema.partial().extend({
+  enabled: z.boolean().optional(),
+})
 
 /**
  * @swagger
@@ -1214,11 +1264,13 @@ router.patch(
       linkUrl: string | null
       startAt: Date | null
       endAt: Date | null
+      enabled: boolean
     }> = {}
     if (body.message != null) data.message = body.message
     if (body.linkUrl != null) data.linkUrl = body.linkUrl
     if (body.startAt != null) data.startAt = new Date(body.startAt)
     if (body.endAt != null) data.endAt = new Date(body.endAt)
+    if (body.enabled != null) data.enabled = body.enabled
     const banner = await catalogService.adminUpdateBanner({
       id: req.params.id!,
       data,
@@ -1249,6 +1301,15 @@ router.post(
     const banner = await catalogService.adminEnableBanner({
       id: req.params.id!,
     })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'ACTIVATE_BANNER',
+      entityType: 'banner',
+      entityId: banner.id,
+      entityLabel: String(banner.message ?? banner.id),
+      beforeJson: null,
+      afterJson: { enabled: true },
+    })
     res.status(200).json({ data: { banner } })
   },
 )
@@ -1276,6 +1337,46 @@ router.post(
       id: req.params.id!,
     })
     res.status(200).json({ data: { banner } })
+  },
+)
+
+router.post(
+  '/admin/catalog/banners/:id/activate',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const banner = await catalogService.adminEnableBanner({
+      id: req.params.id!,
+    })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'ACTIVATE_BANNER',
+      entityType: 'banner',
+      entityId: banner.id,
+      entityLabel: String(banner.message ?? banner.id),
+      beforeJson: null,
+      afterJson: { enabled: true },
+    })
+    res.status(200).json({ data: { banner } })
+  },
+)
+
+router.post(
+  '/admin/catalog/banners/:id/deactivate',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const banner = await catalogService.adminDisableBanner({
+      id: req.params.id!,
+    })
+    res.status(200).json({ data: { banner } })
+  },
+)
+
+router.delete(
+  '/admin/catalog/banners/:id',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    await catalogService.adminDeleteBanner({ id: req.params.id! })
+    res.status(200).json({ data: { ok: true } })
   },
 )
 

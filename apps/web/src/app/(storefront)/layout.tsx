@@ -1,6 +1,7 @@
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { ScrolledNavbar } from '@/components/storefront/ScrolledNavbar'
 import { NewsletterPopup } from '@/components/storefront/NewsletterPopup'
+import { PageTracker } from '@/components/storefront/PageTracker'
 import { SiteFooter } from '@modett/ui'
 
 export default function StorefrontLayout({
@@ -10,6 +11,7 @@ export default function StorefrontLayout({
 }) {
   return (
     <>
+      <PageTracker />
       <StorefrontHeader />
       {/* Compact navbar slides in when user scrolls past the full header (~140px) */}
       <ScrolledNavbar heroHeight={140} />

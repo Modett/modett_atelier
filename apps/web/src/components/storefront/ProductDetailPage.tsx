@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { notFound } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { useGeo } from '@/hooks/useCurrency'
+import { useGeo, getCurrencyCookie } from '@/hooks/useCurrency'
+import { useSession } from '@/hooks/useSession'
 import { useProduct } from '@/hooks/useProduct'
+import { Analytics } from '@/lib/analytics'
 import { ProductBreadcrumb } from './ProductBreadcrumb'
 import { ProductImageGallery } from './ProductImageGallery'
 import { ProductInfoPanel } from './ProductInfoPanel'
@@ -19,7 +21,8 @@ interface ProductDetailPageProps {
 }
 
 export function ProductDetailPage({ slug }: ProductDetailPageProps) {
-  const { isReady }                        = useGeo()
+  const { isReady }                       = useGeo()
+  const { user }                          = useSession()
   const { data: product, isLoading, error } = useProduct(slug)
 
   const [selectedColour, setSelectedColour] = useState<string | null>(null)
@@ -87,6 +90,29 @@ export function ProductDetailPage({ slug }: ProductDetailPageProps) {
           (v) => v.color === selectedColour && v.size === selectedSize,
         ) ?? null)
       : null
+
+  useEffect(() => {
+    if (!product) return
+    Analytics.productView({
+      productId:   product.id,
+      productName: product.displayName,
+      source:
+        typeof document !== 'undefined' ? document.referrer || 'direct' : 'direct',
+      currency:    getCurrencyCookie(),
+      userId:      user?.id,
+    })
+  }, [product?.id, user?.id])
+
+  useEffect(() => {
+    if (!product || !selectedVariant) return
+    Analytics.variantSelect({
+      variantId: selectedVariant.id,
+      productId: product.id,
+      color:     selectedColour ?? '',
+      size:      selectedSize ?? '',
+      userId:    user?.id,
+    })
+  }, [product?.id, selectedVariant?.id, user?.id])
 
   const allOOSForColour = selectedColour
     ? sizesForColour.every((v) => v.stockStatus === 'OUT_OF_STOCK')

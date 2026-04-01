@@ -1255,13 +1255,24 @@ export async function updateBanner({
   return row ?? null
 }
 
+/** Only one storefront banner active: deactivate all others, then enable `id`. */
 export async function enableBanner({ id }: { id: string }): Promise<Banner | null> {
-  const [row] = await db
-    .update(banners)
-    .set({ enabled: true, updatedAt: new Date() })
-    .where(eq(banners.id, id))
-    .returning()
-  return row ?? null
+  return await db.transaction(async (tx) => {
+    await tx
+      .update(banners)
+      .set({ enabled: false, updatedAt: new Date() })
+    const [row] = await tx
+      .update(banners)
+      .set({ enabled: true, updatedAt: new Date() })
+      .where(eq(banners.id, id))
+      .returning()
+    return row ?? null
+  })
+}
+
+export async function deleteBanner({ id }: { id: string }): Promise<boolean> {
+  const deleted = await db.delete(banners).where(eq(banners.id, id)).returning({ id: banners.id })
+  return deleted.length > 0
 }
 
 export async function disableBanner({ id }: { id: string }): Promise<Banner | null> {

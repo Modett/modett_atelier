@@ -13,14 +13,14 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
-interface BarcodeLabelProps {
+export interface BarcodeLabelProps {
   unit: AdminInventoryUnit
   productName: string
   color: string
   size: string
 }
 
-function BarcodeSvg({ barcodeValue }: { barcodeValue: string }) {
+export function BarcodeSvg({ barcodeValue }: { barcodeValue: string }) {
   const ref = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
@@ -46,7 +46,7 @@ function BarcodeSvg({ barcodeValue }: { barcodeValue: string }) {
   return <svg ref={ref} className="mx-auto block h-[50px] max-w-full" />
 }
 
-function BarcodeLabel({ unit, productName, color, size }: BarcodeLabelProps) {
+export function BarcodeLabel({ unit, productName, color, size }: BarcodeLabelProps) {
   return (
     <div
       className="box-border flex flex-col border border-gray-200 bg-white p-2 print:break-inside-avoid"

@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { requireAdmin } from '../../middleware/auth'
 import type { AdminRequest } from '../../middleware/auth'
 import * as inventoryService from './inventory.service'
+import { writeAuditLog } from '../../middleware/audit'
 
 const router = Router()
 
@@ -101,6 +102,39 @@ router.patch(
       adminId: adminReq(req).admin!.id,
     })
     res.status(200).json({ data: { log } })
+  },
+)
+
+const barcodesQuerySchema = z.object({
+  status: z.enum(['IN_STOCK', 'ALL']).default('IN_STOCK'),
+})
+
+// GET /admin/inventory/variants/:variantId/barcodes
+router.get(
+  '/admin/inventory/variants/:variantId/barcodes',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = barcodesQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid query parameters',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const unitIdsParam = req.query.unitIds
+    const unitIds =
+      typeof unitIdsParam === 'string' && unitIdsParam.trim() !== ''
+        ? unitIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined
+    const data = await inventoryService.getAdminVariantBarcodes({
+      variantId: req.params.variantId!,
+      status: parsed.data.status,
+      unitIds,
+    })
+    res.status(200).json({ data })
   },
 )
 
@@ -212,10 +246,23 @@ router.post(
         },
       })
     }
+    const variantId = req.params.variantId!
+    const detailBefore = await inventoryService.getAdminVariantStockDetail({
+      variantId,
+    })
     const result = await inventoryService.restockVariant({
-      variantId: req.params.variantId!,
+      variantId,
       qty: parsed.data.qty,
       adminId: adminReq(req).admin!.id,
+    })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'RESTOCK_VARIANT',
+      entityType: 'variant',
+      entityId: variantId,
+      entityLabel: `${detailBefore.color} / ${detailBefore.size} — ${detailBefore.productCode}`,
+      beforeJson: { availableQty: detailBefore.stock.availableQty },
+      afterJson: { qtyAdded: parsed.data.qty, newUnitCount: result.newUnits.length },
     })
     res.status(201).json({ data: result })
   },
@@ -252,10 +299,23 @@ router.post(
         },
       })
     }
+    const variantId = req.params.variantId!
+    const detailBefore = await inventoryService.getAdminVariantStockDetail({
+      variantId,
+    })
     const result = await inventoryService.markUnitsDamaged({
-      variantId: req.params.variantId!,
+      variantId,
       unitIds: parsed.data.unitIds,
       adminId: adminReq(req).admin!.id,
+    })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'MARK_DAMAGED',
+      entityType: 'variant',
+      entityId: variantId,
+      entityLabel: `${detailBefore.color} / ${detailBefore.size} — ${detailBefore.productCode}`,
+      beforeJson: { unitIds: parsed.data.unitIds },
+      afterJson: { markedCount: result.markedCount },
     })
     res.status(200).json({ data: result })
   },
@@ -281,11 +341,24 @@ router.post(
         },
       })
     }
+    const variantId = req.params.variantId!
+    const detailBefore = await inventoryService.getAdminVariantStockDetail({
+      variantId,
+    })
     const result = await inventoryService.markUnitsAdjustedOut({
-      variantId: req.params.variantId!,
+      variantId,
       unitIds: parsed.data.unitIds,
       note: parsed.data.note,
       adminId: adminReq(req).admin!.id,
+    })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'ADJUST_OUT',
+      entityType: 'variant',
+      entityId: variantId,
+      entityLabel: `${detailBefore.color} / ${detailBefore.size} — ${detailBefore.productCode}`,
+      beforeJson: { unitIds: parsed.data.unitIds, note: parsed.data.note ?? null },
+      afterJson: { markedCount: result.markedCount },
     })
     res.status(200).json({ data: result })
   },

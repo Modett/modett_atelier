@@ -3,6 +3,11 @@ export { useSession, useInvalidateSession } from './useSession'
 export { useAdminSession, ADMIN_SESSION_KEY } from './useAdminSession'
 export * from './useAdminDashboard'
 export * from './useAdminOrders'
+export * from './useAdminSettings'
+export * from './useAnalyticsDashboard'
+export * from './useAuditLog'
+export * from './useAdminCustomers'
+export * from './useAdminNotifications'
 export { useLogin }                         from './useLogin'
 export { useRegister }                      from './useRegister'
 export { useLogout }                        from './useLogout'
@@ -69,6 +74,22 @@ export {
   ADMIN_LOYALTY_KEYS,
 } from './useAdminLoyalty'
 export { useHomepage }                         from './useHomepage'
+
+// Admin reports (web-only; use @/hooks — not packages/hooks)
+export {
+  useReportSellers,
+  useReportMostViewed,
+  useReportCartAbandonment,
+  useReportReturns,
+  useReportTraffic,
+  useReportColorsSizes,
+  useReportGuestVsRegistered,
+  useReportWishlist,
+  useReportFunnel,
+  useReportTimeSeries,
+  useReportTimeSeriesByDimension,
+} from './useReports'
+export type { ReportPeriod } from './useReports'
 
 // Cart
 export { useCart, CART_QUERY_KEY }             from './useCart'

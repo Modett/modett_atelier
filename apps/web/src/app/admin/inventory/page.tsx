@@ -24,7 +24,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { BarcodePrintSheet } from '@/components/admin/BarcodePrintSheet'
 import { VariantInventorySheet } from '@/components/admin/VariantInventorySheet'
 import {
   useAdminInventoryList,
@@ -129,9 +128,6 @@ export default function AdminInventoryPage() {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [reconOpen, setReconOpen] = useState(true)
-  const [printOpen, setPrintOpen] = useState(false)
-  const [printPayload, setPrintPayload] = useState<RestockResult | null>(null)
-
   const [resolvingLogId, setResolvingLogId] = useState<string | null>(null)
   const [resolveNote, setResolveNote] = useState('')
 
@@ -159,8 +155,12 @@ export default function AdminInventoryPage() {
   }
 
   function handleRestockSuccess(result: RestockResult) {
-    setPrintPayload(result)
-    setPrintOpen(true)
+    const unitIds = result.newUnits.map((u) => u.id).join(',')
+    const q = new URLSearchParams({
+      variantId: result.variantId,
+      unitIds,
+    })
+    window.open(`/admin/barcodes/print?${q.toString()}`, '_blank')
   }
 
   return (
@@ -546,14 +546,6 @@ export default function AdminInventoryPage() {
         onRestockSuccess={handleRestockSuccess}
       />
 
-      <BarcodePrintSheet
-        open={printOpen}
-        onOpenChange={(o) => {
-          setPrintOpen(o)
-          if (!o) setPrintPayload(null)
-        }}
-        restockResult={printPayload}
-      />
     </div>
   )
 }

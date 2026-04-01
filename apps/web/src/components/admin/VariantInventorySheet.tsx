@@ -632,6 +632,21 @@ export function VariantInventorySheet({
                       >
                         Adjust Out
                       </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const ids = [...selectedIds].join(',')
+                          const q = new URLSearchParams({
+                            variantId,
+                            unitIds: ids,
+                          })
+                          window.open(`/admin/barcodes/print?${q.toString()}`, '_blank')
+                        }}
+                      >
+                        Reprint Barcodes
+                      </Button>
                     </div>
                     {damageConfirmOpen && (
                       <div className="space-y-2 border-t border-amber-200 pt-3 text-sm">

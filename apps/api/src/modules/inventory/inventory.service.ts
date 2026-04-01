@@ -37,9 +37,11 @@ import {
   atomicDecrementInStock,
   updateInStockUnitsToStatus,
   getProductById,
+  listAdminVariantBarcodes,
 } from '@modett/db'
 import type {
   AdminInventoryListRow,
+  AdminVariantBarcodeUnitRow,
   MovementWithAdminRow,
   ReconciliationLogEnrichedRow,
 } from '@modett/db'
@@ -724,6 +726,48 @@ export async function markReconciliationResolved({
 }
 
 // —— Admin list ——
+
+export async function getAdminVariantBarcodes({
+  variantId,
+  status,
+  unitIds,
+}: {
+  variantId: string
+  status: 'IN_STOCK' | 'ALL'
+  unitIds?: string[]
+}) {
+  const variantRow = await getProductVariantById({ variantId })
+  if (!variantRow) throw new AppError('VARIANT_NOT_FOUND', 404)
+  const productRow = await getProductById({ id: variantRow.product_id })
+  if (!productRow) throw new AppError('PRODUCT_NOT_FOUND', 404)
+
+  const rows = await listAdminVariantBarcodes({
+    variantId,
+    statusFilter: status,
+    unitIds,
+  })
+
+  const variant = {
+    id: variantId,
+    color: variantRow.color,
+    size: variantRow.size,
+    skuGroup: variantRow.sku_group,
+  }
+  const product = {
+    displayName: productRow.displayName,
+    productCode: productRow.productCode,
+  }
+
+  const units = rows.map((r: AdminVariantBarcodeUnitRow) => ({
+    id: r.id,
+    unitSku: r.unit_sku,
+    barcodeValue: r.barcode_value,
+    status: r.status,
+    createdAt: toIso(r.created_at instanceof Date ? r.created_at : new Date(r.created_at)),
+  }))
+
+  return { units, variant, product }
+}
 
 export async function listUnitsForVariant({
   variantId,

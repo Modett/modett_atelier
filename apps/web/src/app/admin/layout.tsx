@@ -13,20 +13,27 @@ import {
   AlertTriangle,
   Boxes,
   Coins,
+  FileText,
   LayoutDashboard,
   Loader2,
   LogOut,
   Megaphone,
   Menu,
   Package,
+  BarChart3,
   RotateCcw,
   Settings,
   ShoppingCart,
   Star,
+  TrendingUp,
+  Users,
   X,
 } from 'lucide-react'
 import { ADMIN_SESSION_KEY, useAdminSession } from '@/hooks/useAdminSession'
 import { api } from '@/lib/api'
+import { AdminSessionWarning } from '@/components/admin/AdminSessionWarning'
+import { AdminErrorBoundary } from '@/components/admin/AdminErrorBoundary'
+import { NotificationBell } from '@/components/admin/NotificationBell'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import {
@@ -41,16 +48,21 @@ import {
 const IDLE_WARNING_MS = 13 * 60 * 1000
 const IDLE_LOGOUT_MS = 15 * 60 * 1000
 
+// AUDIT FIX: nav order matches dashboard spec (Settings remains last above logout)
 const NAV_ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/inventory', label: 'Inventory', icon: Boxes },
+  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/returns', label: 'Returns', icon: RotateCcw },
   { href: '/admin/reviews', label: 'Reviews', icon: Star },
   { href: '/admin/campaigns', label: 'Campaigns', icon: Megaphone },
   { href: '/admin/loyalty', label: 'Loyalty', icon: Coins },
+  { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/admin/analytics', label: 'Analytics', icon: TrendingUp },
+  { href: '/admin/customers', label: 'Customers', icon: Users },
+  { href: '/admin/audit-log', label: 'Audit Log', icon: FileText },
 ] as const
 
 export default function AdminLayout({
@@ -62,7 +74,7 @@ export default function AdminLayout({
   const router = useRouter()
   const { user, admin, isLoading, isAdmin } = useAdminSession()
 
-  if (pathname === '/admin/login') {
+  if (pathname === '/admin/login' || pathname === '/admin/accept-invite') {
     return <>{children}</>
   }
 
@@ -118,7 +130,8 @@ function AdminShell({
       } catch {
         // ignore
       }
-      queryClient.removeQueries({ queryKey: ADMIN_SESSION_KEY })
+      queryClient.clear()
+      void queryClient.removeQueries({ queryKey: ADMIN_SESSION_KEY })
       router.push(expired ? '/admin/login?reason=session_expired' : '/admin/login')
     },
     [queryClient, router],
@@ -198,6 +211,7 @@ function AdminShell({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AdminSessionWarning />
       <Toaster position="top-right" richColors />
       {sidebarOpen && (
         <button
@@ -210,7 +224,7 @@ function AdminShell({
 
       <aside
         className={`
-          fixed top-0 left-0 z-50 h-full w-64 border-r border-gray-200 bg-white
+          fixed top-0 left-0 z-50 flex h-full w-64 flex-col border-r border-gray-200 bg-white
           transform transition-transform duration-200 ease-in-out
           lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -220,16 +234,19 @@ function AdminShell({
           <Link className="font-semibold text-gray-900" href="/admin">
             Modett Admin
           </Link>
-          <button
-            type="button"
-            className="p-1 text-gray-400 hover:text-gray-600 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              type="button"
+              className="p-1 text-gray-400 hover:text-gray-600 lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        <nav className="space-y-1 p-4">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
           {NAV_ITEMS.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -255,7 +272,7 @@ function AdminShell({
           })}
         </nav>
 
-        <div className="absolute right-0 bottom-0 left-0 border-t border-gray-200 p-4">
+        <div className="mt-auto border-t border-gray-200 p-4">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600">
               {user?.firstName?.charAt(0) ?? 'A'}
@@ -267,11 +284,11 @@ function AdminShell({
           </div>
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+            className="mt-auto flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
             onClick={() => void handleLogout(false)}
           >
             <LogOut className="h-4 w-4" />
-            Sign out
+            Log Out
           </button>
         </div>
       </aside>
@@ -287,11 +304,13 @@ function AdminShell({
               <Menu className="h-5 w-5" />
             </button>
             <span className="font-semibold text-gray-900">Modett Admin</span>
-            <div className="w-9" />
+            <NotificationBell />
           </div>
         </header>
 
-        <main className="p-4 lg:p-6">{children}</main>
+        <main className="p-4 lg:p-6">
+          <AdminErrorBoundary>{children}</AdminErrorBoundary>
+        </main>
       </div>
 
       <Dialog

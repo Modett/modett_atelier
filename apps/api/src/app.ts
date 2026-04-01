@@ -16,6 +16,11 @@ import { returnsRoutes } from './modules/returns'
 import { reviewsRoutes } from './modules/reviews'
 import { loyaltyRoutes } from './modules/loyalty'
 import { messagingRoutes } from './modules/messaging'
+import { analyticsRoutes } from './modules/analytics'
+import { reportsRoutes } from './modules/reports'
+import { customersRoutes } from './modules/customers'
+import { notificationsRoutes } from './modules/notifications'
+import { runAnalyticsAggregation } from './workers/analytics-aggregate.worker'
 
 export const app: Express = express()
 
@@ -90,7 +95,21 @@ app.use('/api', returnsRoutes)
 app.use('/api', reviewsRoutes)
 app.use('/api', loyaltyRoutes)
 app.use('/api', messagingRoutes)
+app.use('/api', analyticsRoutes)
+app.use('/api', reportsRoutes)
+app.use('/api', customersRoutes)
+app.use('/api', notificationsRoutes)
 setupSwagger(app)
+
+const HOUR_MS = 60 * 60 * 1000
+setInterval(() => {
+  void runAnalyticsAggregation().catch((err) => {
+    console.error('[analytics-worker]', err)
+  })
+}, HOUR_MS)
+void runAnalyticsAggregation().catch((err) => {
+  console.error('[analytics-worker]', err)
+})
 
 // Global error handler — catches all AppError throws from routes
 app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
