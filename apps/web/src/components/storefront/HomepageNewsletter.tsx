@@ -1,16 +1,19 @@
 'use client'
 
-import { NewsletterSection } from '@modett/ui'
+import { NewsletterSection }      from '@modett/ui'
+import { useNewsletterSubscribe } from '@/hooks/useNewsletterSubscribe'
 
-/**
- * Client wrapper for NewsletterSection so onSubmit can be wired to
- * POST /newsletter/subscribe via TanStack mutation later.
- */
 export function HomepageNewsletter() {
-  const handleSubmit = (email: string) => {
-    // TODO: Wire to POST /newsletter/subscribe via TanStack mutation
-    console.log('Newsletter signup:', email)
-  }
+  const { subscribe, isPending, error, isSuccess } =
+    useNewsletterSubscribe()
 
-  return <NewsletterSection onSubmit={handleSubmit} />
+  return (
+    <NewsletterSection
+      onSubmit={(email) => { void subscribe(email) }}
+      isSubmitting={isPending}
+      isSuccess={isSuccess}
+      successMessage="Thanks for subscribing! Check your inbox for your 15% off code."
+      error={error ?? undefined}
+    />
+  )
 }

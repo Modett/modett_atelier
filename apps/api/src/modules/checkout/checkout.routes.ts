@@ -17,6 +17,13 @@ import type { AuthRequest } from '../../middleware/auth'
 import { validate, validateQuery } from '../../middleware/validate'
 import { rateLimitCheckoutStart, rateLimitPaymentIntent } from '../../middleware/rateLimit'
 import * as checkoutService from './checkout.service'
+import {
+  validatePromoCode,
+  calculatePromoDiscount,
+  applyPromoCodeToOrder,
+  getOrderById,
+  removePromoCodeFromOrder,
+} from '@modett/db'
 
 const router = Router()
 
@@ -188,6 +195,149 @@ router.post(
       currency: body.currency,
     })
     res.status(200).json({ data: { order: result } })
+  },
+)
+
+const applyPromoSchema = z.object({
+  code: z.string().min(1).max(50),
+})
+
+// POST /checkout/:orderId/promo
+router.post(
+  '/checkout/:orderId/promo',
+  optionalAuth,
+  resolveCheckoutIdentity,
+  validateOrderIdParam,
+  validate(applyPromoSchema),
+  async (req: Request, res: Response) => {
+    const { orderId } = req.params as { orderId: string }
+    const body = (req as Request & { body: z.infer<typeof applyPromoSchema> }).body
+
+    const r = req as CheckoutIdentityRequest
+
+    const order = await getOrderById({ id: orderId })
+    if (!order) {
+      res.status(404).json({
+        error: { code: 'ORDER_NOT_FOUND', message: 'Order not found' },
+      })
+      return
+    }
+    if (order.order_state !== 'DRAFT') {
+      res.status(409).json({
+        error: {
+          code: 'ORDER_NOT_DRAFT',
+          message: 'Promo codes can only be applied to draft orders.',
+        },
+      })
+      return
+    }
+
+    let promoRow: Awaited<ReturnType<typeof validatePromoCode>>
+    try {
+      promoRow = await validatePromoCode({
+        code: body.code,
+        userId: r.checkoutUserId ?? null,
+        orderId,
+        orderSubtotal: String(order.subtotal),
+        currency: order.currency,
+      })
+    } catch (err) {
+      const msg = (err as Error).message
+      const userMessages: Record<string, string> = {
+        PROMO_INVALID: 'This promo code is invalid or has expired.',
+        PROMO_NOT_YET_ACTIVE: 'This promo code is not yet active.',
+        PROMO_EXPIRED: 'This promo code has expired.',
+        PROMO_MAX_USES_REACHED: 'This promo code has already been used.',
+        PROMO_ALREADY_USED: 'You have already used this promo code.',
+        PROMO_MIN_ORDER_NOT_MET:
+          'Your order does not meet the minimum amount for this code.',
+      }
+      res.status(400).json({
+        error: {
+          code: msg,
+          message:
+            userMessages[msg] ?? 'This promo code cannot be applied.',
+        },
+      })
+      return
+    }
+
+    const discountAmount = calculatePromoDiscount({
+      promoCode: promoRow,
+      subtotal: String(order.subtotal),
+    })
+
+    try {
+      await applyPromoCodeToOrder({
+        orderId,
+        promoCodeId: promoRow.id,
+        discountAmount,
+        userId: r.checkoutUserId ?? null,
+      })
+    } catch (applyErr) {
+      const applyMsg = (applyErr as Error).message
+      if (applyMsg === 'PROMO_DISCOUNT_EXCEEDS_TOTAL') {
+        res.status(400).json({
+          error: {
+            code: applyMsg,
+            message: 'This discount cannot be applied to the current order total.',
+          },
+        })
+        return
+      }
+      throw applyErr
+    }
+
+    const updated = await getOrderById({ id: orderId })
+    res.status(200).json({
+      data: {
+        discountAmount,
+        promoCode: promoRow.code,
+        promoType: promoRow.type,
+        promoValue: promoRow.value,
+        newTotal: String(updated!.total),
+      },
+    })
+  },
+)
+
+// DELETE /checkout/:orderId/promo
+router.delete(
+  '/checkout/:orderId/promo',
+  optionalAuth,
+  resolveCheckoutIdentity,
+  validateOrderIdParam,
+  async (req: Request, res: Response) => {
+    const { orderId } = req.params as { orderId: string }
+
+    const order = await getOrderById({ id: orderId })
+    if (!order) {
+      res.status(404).json({
+        error: { code: 'ORDER_NOT_FOUND', message: 'Order not found' },
+      })
+      return
+    }
+    if (order.order_state !== 'DRAFT') {
+      res.status(409).json({
+        error: {
+          code: 'ORDER_NOT_DRAFT',
+          message: 'Promo codes can only be changed on draft orders.',
+        },
+      })
+      return
+    }
+
+    const result = await removePromoCodeFromOrder({ orderId })
+    if (!result) {
+      res.status(404).json({
+        error: { code: 'ORDER_NOT_FOUND', message: 'Order not found' },
+      })
+      return
+    }
+
+    res.status(200).json({
+      data: { newTotal: result.newTotal },
+    })
   },
 )
 

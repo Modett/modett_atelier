@@ -30,6 +30,10 @@ import {
   updateCampaign,
   scheduleCampaign,
   cancelCampaign,
+  getNewsletterSubscriberByEmail,
+  createNewsletterSubscriber,
+  createPromoCode,
+  deletePromoCodeById,
 } from '@modett/db'
 import type { NotificationPreferences } from '@modett/db'
 
@@ -605,4 +609,102 @@ export async function adminGetCampaign({
   const campaign = await getCampaignById({ id })
   if (!campaign) throw new AppError('CAMPAIGN_NOT_FOUND', 404)
   return campaign
+}
+
+function generateNewsletterPromoCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let code = 'MODETT-'
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)]!
+  }
+  return code
+}
+
+function pgErrorCode(err: unknown): string | undefined {
+  if (!err || typeof err !== 'object') return undefined
+  const e = err as { code?: string; cause?: unknown }
+  if (typeof e.code === 'string') return e.code
+  const c = e.cause
+  if (c && typeof c === 'object' && 'code' in c) {
+    const code = (c as { code?: string }).code
+    return typeof code === 'string' ? code : undefined
+  }
+  return undefined
+}
+
+function pgConstraintName(err: unknown): string | undefined {
+  if (!err || typeof err !== 'object') return undefined
+  const e = err as { constraint?: string; cause?: unknown }
+  if (typeof e.constraint === 'string') return e.constraint
+  const c = e.cause
+  if (c && typeof c === 'object' && 'constraint' in c) {
+    const name = (c as { constraint?: string }).constraint
+    return typeof name === 'string' ? name : undefined
+  }
+  return undefined
+}
+
+export async function recordNewsletterSignup({
+  email,
+  ipAddress,
+}: {
+  email: string
+  ipAddress?: string | null
+}): Promise<{ promoCode: string }> {
+  const normalized = email.toLowerCase().trim()
+  const existing = await getNewsletterSubscriberByEmail({ email: normalized })
+  if (existing) {
+    throw new AppError(
+      'ALREADY_SUBSCRIBED',
+      409,
+      'This email is already subscribed.',
+    )
+  }
+
+  const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const promoCode = generateNewsletterPromoCode()
+    let createdPromoId: string | null = null
+    try {
+      const promoRow = await createPromoCode({
+        code: promoCode,
+        type: 'PERCENT',
+        value: '15',
+        maxUses: 1,
+        validFrom: new Date(),
+        validUntil,
+      })
+      createdPromoId = promoRow.id
+      await createNewsletterSubscriber({
+        email: normalized,
+        promoCodeId: promoRow.id,
+        ipAddress: ipAddress ?? undefined,
+        source: 'POPUP',
+      })
+      return { promoCode }
+    } catch (err) {
+      if (createdPromoId) {
+        await deletePromoCodeById({ id: createdPromoId }).catch(() => {})
+      }
+      if (pgErrorCode(err) === '23505') {
+        const constraint = pgConstraintName(err)
+        if (constraint === 'uq_newsletter_email') {
+          throw new AppError(
+            'ALREADY_SUBSCRIBED',
+            409,
+            'This email is already subscribed.',
+          )
+        }
+        if (constraint === 'uq_promo_code' && attempt < 7) {
+          lastError = err
+          continue
+        }
+      }
+      throw err
+    }
+  }
+
+  throw lastError ?? new Error('NEWSLETTER_PROMO_GENERATION_FAILED')
 }

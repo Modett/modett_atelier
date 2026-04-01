@@ -38,6 +38,10 @@ interface CheckoutStore {
   cartId: string | null
   /** Order total string (from POST /checkout/start summary.total) — used for display only */
   orderTotal: string | null
+  promoCode:        string | null
+  promoDiscount:    string | null
+  promoType:        string | null
+  promoValue:       string | null
 
   setStep: (step: StepKey) => void
   setEmail: (email: string, isGuest: boolean) => void
@@ -54,6 +58,14 @@ interface CheckoutStore {
   setPaymentSubmitted: (val: boolean) => void
   setCartId: (id: string) => void
   setOrderTotal: (total: string) => void
+  setPromo: (
+    code:     string,
+    discount: string,
+    type:     string,
+    value:    string,
+    newTotal: string,
+  ) => void
+  clearPromo: () => void
   clearCheckout: () => void
 }
 
@@ -77,6 +89,10 @@ const INITIAL_STATE = {
   paymentSubmitted: false,
   cartId: null as string | null,
   orderTotal: null as string | null,
+  promoCode:     null as string | null,
+  promoDiscount: null as string | null,
+  promoType:     null as string | null,
+  promoValue:    null as string | null,
 }
 
 export const useCheckoutStore = create<CheckoutStore>()(
@@ -107,6 +123,23 @@ export const useCheckoutStore = create<CheckoutStore>()(
       setCartId: (cartId) => set({ cartId }),
 
       setOrderTotal: (orderTotal) => set({ orderTotal }),
+
+      setPromo: (code, discount, type, value, newTotal) =>
+        set({
+          promoCode:     code,
+          promoDiscount: discount,
+          promoType:     type,
+          promoValue:    value,
+          orderTotal:    newTotal,
+        }),
+
+      clearPromo: () =>
+        set({
+          promoCode:     null,
+          promoDiscount: null,
+          promoType:     null,
+          promoValue:    null,
+        }),
 
       clearCheckout: () => set(INITIAL_STATE),
     }),
