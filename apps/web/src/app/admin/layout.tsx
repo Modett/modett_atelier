@@ -28,6 +28,7 @@ import {
 import { ADMIN_SESSION_KEY, useAdminSession } from '@/hooks/useAdminSession'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Toaster } from '@/components/ui/sonner'
 import {
   Dialog,
   DialogContent,
@@ -197,6 +198,7 @@ function AdminShell({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" richColors />
       {sidebarOpen && (
         <button
           type="button"

@@ -69,6 +69,17 @@ export {
 
 // Entity interfaces (PostgreSQL table mirrors)
 export type {
+  ReturnStatus,
+  ReturnReason,
+  AdminReturnLineItem,
+  AdminReturnTimelineEvent,
+  AdminReturnRequest,
+  AdminReturnListRow,
+  AdminReturnDetailPayload,
+  AdminReturnsListResponse,
+} from './returns'
+
+export type {
   User,
   Admin,
   AdminInvite,
