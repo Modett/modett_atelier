@@ -1,6 +1,8 @@
 // Auth
 export { useSession, useInvalidateSession } from './useSession'
-export { useAdminSession }                  from './useAdminSession'
+export { useAdminSession, ADMIN_SESSION_KEY } from './useAdminSession'
+export * from './useAdminDashboard'
+export * from './useAdminOrders'
 export { useLogin }                         from './useLogin'
 export { useRegister }                      from './useRegister'
 export { useLogout }                        from './useLogout'

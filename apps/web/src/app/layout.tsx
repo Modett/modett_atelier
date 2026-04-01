@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from 'next'
-import { Playfair_Display, Raleway } from 'next/font/google'
+import { Playfair_Display, Raleway, Geist } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/react'
 import { QueryProvider } from '@/components/providers/QueryProvider'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { ShoppingBagDrawer } from '@/components/storefront/ShoppingBagDrawer'
 import './globals.css'
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const playfairDisplay = Playfair_Display({
   subsets:  ['latin'],
@@ -48,7 +51,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${playfairDisplay.variable} ${raleway.variable}`}
+      className={cn(playfairDisplay.variable, raleway.variable, "font-sans", geist.variable)}
     >
       <body className="bg-background text-ink antialiased">
         <QueryProvider>

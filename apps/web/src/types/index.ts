@@ -214,3 +214,5 @@ export interface ProductReviewsResponse {
   limit:     number
   total:     number
 }
+
+export * from './admin'

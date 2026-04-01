@@ -77,10 +77,10 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
 ]
 
 const DEFAULT_SOCIAL_LINKS: SocialLink[] = [
-  { platform: 'facebook', href: 'https://www.facebook.com/modett' },
-  { platform: 'instagram', href: 'https://www.instagram.com/modett' },
-  { platform: 'tiktok', href: 'https://www.tiktok.com/@modett' },
-  { platform: 'linkedin', href: 'https://www.linkedin.com/company/modett' },
+  { platform: 'facebook', href: 'https://www.facebook.com/profile.php?id=61576302094475' },
+  { platform: 'instagram', href: 'https://www.instagram.com/_modett/' },
+  { platform: 'tiktok', href: 'https://www.tiktok.com/@_modett' },
+  { platform: 'linkedin', href: 'https://www.linkedin.com/company/modett/' },
 ]
 
 function ChevronDownIcon({ className }: { className?: string }) {
