@@ -163,9 +163,9 @@ export class StorageService {
     folder: StorageFolder,
     subPath: string,
     contentType: string,
+    expiresInSeconds = 1800,
   ): Promise<PresignedUploadUrl> {
     const key = `${folder}/${subPath}`
-    const expiresIn = 1800
     try {
       const uploadUrl = await getSignedUrl(
         this.client,
@@ -174,9 +174,9 @@ export class StorageService {
           Key: key,
           ContentType: contentType,
         }),
-        { expiresIn },
+        { expiresIn: expiresInSeconds },
       )
-      return { uploadUrl, key, expiresIn }
+      return { uploadUrl, key, expiresIn: expiresInSeconds }
     } catch (err) {
       throw new StorageError(
         `Presigned URL failed: ${err instanceof Error ? err.message : 'Unknown error'}`,

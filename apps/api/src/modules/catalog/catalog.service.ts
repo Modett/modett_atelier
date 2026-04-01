@@ -18,15 +18,21 @@ import {
   getActiveBanner,
   getProductById,
   listAllProducts,
+  listAllCategoriesAdmin,
+  insertCategory,
+  updateCategoryById,
+  deleteCategoryById,
   createProduct,
   updateProduct,
   softDeleteProduct,
   createProductImage,
   deleteProductImage,
+  updateProductImageById,
   setKeyImage,
   reorderImages,
   createVariant,
   softDeleteVariant,
+  listProductVariantsWithStockForAdmin,
   upsertStylingGuide,
   getBestsellerList,
   addToBestsellerList,
@@ -299,16 +305,48 @@ export async function getHomepage({
 
 // —— Admin ——
 
+function numericToPriceString(v: unknown): string {
+  if (v == null) return '0.00'
+  if (typeof v === 'string') return v
+  const n = Number(v)
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00'
+}
+
 export async function adminGetAllProducts({
   page = 1,
   limit = 50,
   includeInactive = false,
+  categoryId,
+  search,
 }: {
   page?: number
   limit?: number
   includeInactive?: boolean
+  categoryId?: string | null
+  search?: string | null
 }): Promise<{
-  products: Awaited<ReturnType<typeof listAllProducts>>['products']
+  products: Array<{
+    id: string
+    slug: string
+    displayName: string
+    shortName: string
+    productCode: string
+    active: boolean
+    isSale: boolean
+    categoryId: string | null
+    categoryName: string | null
+    keyImageUrl: string | null
+    prices: {
+      lkrAmount: string
+      sgdAmount: string
+      usdAmount: string
+      updatedAt: string
+    }
+    variantCount: number
+    createdAt: string
+    updatedAt: string
+    deletedAt: string | null
+  }>
   total: number
   page: number
   limit: number
@@ -318,19 +356,142 @@ export async function adminGetAllProducts({
     page,
     limit,
     includeInactive,
+    categoryId: categoryId ?? undefined,
+    search: search ?? undefined,
   })
   const totalPages = Math.ceil(total / limit) || 1
-  return { products, total, page, limit, totalPages }
+  const mapped = products.map((p) => {
+    const keyImg =
+      p.keyImageId != null
+        ? p.images.find((i) => i.id === p.keyImageId)
+        : undefined
+    const keyImageUrl = keyImg?.url ?? p.images[0]?.url ?? null
+    return {
+      id: p.id,
+      slug: p.slug,
+      displayName: p.displayName,
+      shortName: p.shortName,
+      productCode: p.productCode,
+      active: p.active,
+      isSale: p.isSale,
+      categoryId: p.categoryId ?? null,
+      categoryName: p.categoryName ?? null,
+      keyImageUrl,
+      prices: {
+        lkrAmount: numericToPriceString(p.prices.lkrAmount),
+        sgdAmount: numericToPriceString(p.prices.sgdAmount),
+        usdAmount: numericToPriceString(p.prices.usdAmount),
+        updatedAt: p.prices.updatedAt.toISOString(),
+      },
+      variantCount: p.variantCount,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+      deletedAt: p.deletedAt?.toISOString() ?? null,
+    }
+  })
+  return { products: mapped, total, page, limit, totalPages }
+}
+
+export interface AdminProductDetailPayload {
+  id: string
+  slug: string
+  displayName: string
+  shortName: string
+  description: string | null
+  fabricInfo: string | null
+  productCode: string
+  active: boolean
+  isSale: boolean
+  categoryId: string | null
+  keyImageId: string | null
+  prices: {
+    lkrAmount: string
+    sgdAmount: string
+    usdAmount: string
+    updatedAt: string
+  } | null
+  images: Array<{
+    id: string
+    productId: string
+    url: string
+    altText: string | null
+    sortOrder: number
+  }>
+  variants: Array<{
+    id: string
+    productId: string
+    color: string
+    colorHex: string | null
+    size: string
+    skuGroup: string
+    deletedAt: string | null
+    stock: {
+      inStockQty: number
+      heldQty: number
+      availableQty: number
+      lowStockThreshold: number
+    }
+  }>
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
 }
 
 export async function adminGetProduct({
   id,
 }: {
   id: string
-}): Promise<NonNullable<Awaited<ReturnType<typeof getProductById>>>> {
+}): Promise<AdminProductDetailPayload> {
   const product = await getProductById({ id })
   if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
-  return product
+  const variantRows = await listProductVariantsWithStockForAdmin({ productId: id })
+  const prices = product.prices
+    ? {
+        lkrAmount: numericToPriceString(product.prices.lkrAmount),
+        sgdAmount: numericToPriceString(product.prices.sgdAmount),
+        usdAmount: numericToPriceString(product.prices.usdAmount),
+        updatedAt: product.prices.updatedAt.toISOString(),
+      }
+    : null
+  return {
+    id: product.id,
+    slug: product.slug,
+    displayName: product.displayName,
+    shortName: product.shortName,
+    description: product.description ?? null,
+    fabricInfo: product.fabricInfo ?? null,
+    productCode: product.productCode,
+    active: product.active,
+    isSale: product.isSale,
+    categoryId: product.categoryId ?? null,
+    keyImageId: product.keyImageId ?? null,
+    prices,
+    images: product.images.map((img) => ({
+      id: img.id,
+      productId: img.productId,
+      url: img.url,
+      altText: img.altText ?? null,
+      sortOrder: img.sortOrder,
+    })),
+    variants: variantRows.map((v) => ({
+      id: v.id,
+      productId: v.productId,
+      color: v.color,
+      colorHex: v.colorHex,
+      size: v.size,
+      skuGroup: v.skuGroup,
+      deletedAt: v.deletedAt?.toISOString() ?? null,
+      stock: {
+        inStockQty: v.inStockQty,
+        heldQty: v.heldQty,
+        availableQty: v.availableQty,
+        lowStockThreshold: v.lowStockThreshold,
+      },
+    })),
+    createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt.toISOString(),
+    deletedAt: product.deletedAt?.toISOString() ?? null,
+  }
 }
 
 function validateSlug(slug: string): void {
@@ -418,36 +579,53 @@ type AdminUpdateProductData = Partial<{
   usdAmount: number
 }>
 
+type AdminUpdateProductBody = AdminUpdateProductData & {
+  prices?: { lkrAmount?: number; sgdAmount?: number; usdAmount?: number }
+}
+
 export async function adminUpdateProduct({
   id,
   data,
 }: {
   id: string
-  data: AdminUpdateProductData
+  data: AdminUpdateProductBody
 }): Promise<NonNullable<Awaited<ReturnType<typeof updateProduct>>>> {
   const existing = await getProductById({ id })
   if (!existing) throw new AppError('PRODUCT_NOT_FOUND', 404)
 
-  if (data.slug !== undefined) validateSlug(data.slug)
-  const priceData: { lkrAmount?: string; sgdAmount?: string; usdAmount?: string } = {}
-  if (data.lkrAmount !== undefined) {
-    if (data.lkrAmount < 0 || !Number.isFinite(data.lkrAmount))
-      throw new AppError('INVALID_PRICE', 400)
-    priceData.lkrAmount = data.lkrAmount.toFixed(2)
-  }
-  if (data.sgdAmount !== undefined) {
-    if (data.sgdAmount < 0 || !Number.isFinite(data.sgdAmount))
-      throw new AppError('INVALID_PRICE', 400)
-    priceData.sgdAmount = data.sgdAmount.toFixed(2)
-  }
-  if (data.usdAmount !== undefined) {
-    if (data.usdAmount < 0 || !Number.isFinite(data.usdAmount))
-      throw new AppError('INVALID_PRICE', 400)
-    priceData.usdAmount = data.usdAmount.toFixed(2)
+  const { prices, ...bodyWithoutPrices } = data
+  const dataFlat: AdminUpdateProductData = { ...bodyWithoutPrices }
+  if (prices != null) {
+    if (prices.lkrAmount !== undefined) dataFlat.lkrAmount = prices.lkrAmount
+    if (prices.sgdAmount !== undefined) dataFlat.sgdAmount = prices.sgdAmount
+    if (prices.usdAmount !== undefined) dataFlat.usdAmount = prices.usdAmount
   }
 
-  const { lkrAmount, sgdAmount, usdAmount, ...rest } = data
-  const updatePayload = { ...rest, ...priceData }
+  if (dataFlat.slug !== undefined) validateSlug(dataFlat.slug)
+  const priceData: { lkrAmount?: string; sgdAmount?: string; usdAmount?: string } = {}
+  if (dataFlat.lkrAmount !== undefined) {
+    if (dataFlat.lkrAmount < 0 || !Number.isFinite(dataFlat.lkrAmount))
+      throw new AppError('INVALID_PRICE', 400)
+    priceData.lkrAmount = dataFlat.lkrAmount.toFixed(2)
+  }
+  if (dataFlat.sgdAmount !== undefined) {
+    if (dataFlat.sgdAmount < 0 || !Number.isFinite(dataFlat.sgdAmount))
+      throw new AppError('INVALID_PRICE', 400)
+    priceData.sgdAmount = dataFlat.sgdAmount.toFixed(2)
+  }
+  if (dataFlat.usdAmount !== undefined) {
+    if (dataFlat.usdAmount < 0 || !Number.isFinite(dataFlat.usdAmount))
+      throw new AppError('INVALID_PRICE', 400)
+    priceData.usdAmount = dataFlat.usdAmount.toFixed(2)
+  }
+
+  const {
+    lkrAmount: _lkr,
+    sgdAmount: _sgd,
+    usdAmount: _usd,
+    ...productFieldUpdates
+  } = dataFlat
+  const updatePayload = { ...productFieldUpdates, ...priceData }
   const result = await updateProduct({ id, data: updatePayload })
   if (!result) throw new AppError('PRODUCT_NOT_FOUND', 404)
   return result
@@ -457,6 +635,114 @@ export async function adminDeleteProduct({ id }: { id: string }): Promise<void> 
   const existing = await getProductById({ id })
   if (!existing) throw new AppError('PRODUCT_NOT_FOUND', 404)
   await softDeleteProduct({ id })
+}
+
+export async function adminListCategories(): Promise<Category[]> {
+  return listAllCategoriesAdmin()
+}
+
+export async function adminCreateCategory({
+  name,
+  slug,
+  active = true,
+  sortOrder = 0,
+}: {
+  name: string
+  slug: string
+  active?: boolean
+  sortOrder?: number
+}): Promise<Category> {
+  return insertCategory({ name, slug, active, sortOrder })
+}
+
+export async function adminUpdateCategory({
+  id,
+  data,
+}: {
+  id: string
+  data: Partial<{ name: string; slug: string; active: boolean; sortOrder: number }>
+}): Promise<Category> {
+  const row = await updateCategoryById({ id, data })
+  if (!row) throw new AppError('CATEGORY_NOT_FOUND', 404)
+  return row
+}
+
+export async function adminDeleteCategory({ id }: { id: string }): Promise<void> {
+  await deleteCategoryById({ id })
+}
+
+export async function adminGetPresignedProductImageUploadUrl({
+  productId,
+  fileName,
+  contentType,
+}: {
+  productId: string
+  fileName: string
+  contentType: string
+}): Promise<{ uploadUrl: string; key: string; publicUrl: string; expiresIn: number }> {
+  const product = await getProductById({ id: productId })
+  if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
+  if (!contentType.startsWith('image/')) {
+    throw new AppError('INVALID_CONTENT_TYPE', 400)
+  }
+  const { randomUUID } = await import('node:crypto')
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200)
+  const subPath = `${product.slug}/${randomUUID()}-${safeName || 'image'}`
+  const storage = getStorageService()
+  try {
+    const { uploadUrl, key, expiresIn } = await storage.getPresignedUploadUrl(
+      'product_images',
+      subPath,
+      contentType,
+      3600,
+    )
+    const publicUrl = storage.getPublicUrl(key)
+    return { uploadUrl, key, publicUrl, expiresIn }
+  } catch (err) {
+    if (err instanceof StorageError) {
+      throw new AppError('STORAGE_ERROR', 500, err.message)
+    }
+    throw err
+  }
+}
+
+export async function adminUpdateProductImageMetadata({
+  productId,
+  imageId,
+  altText,
+  sortOrder,
+}: {
+  productId: string
+  imageId: string
+  altText?: string | null
+  sortOrder?: number
+}): Promise<{
+  id: string
+  productId: string
+  url: string
+  altText: string | null
+  sortOrder: number
+}> {
+  const product = await getProductById({ id: productId })
+  if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
+  const image = product.images.find((img) => img.id === imageId)
+  if (!image) throw new AppError('IMAGE_NOT_FOUND', 404)
+  const row = await updateProductImageById({
+    id: imageId,
+    productId,
+    data: {
+      ...(altText !== undefined && { altText }),
+      ...(sortOrder !== undefined && { sortOrder }),
+    },
+  })
+  if (!row) throw new AppError('IMAGE_NOT_FOUND', 404)
+  return {
+    id: row.id,
+    productId: row.productId,
+    url: row.url,
+    altText: row.altText ?? null,
+    sortOrder: row.sortOrder,
+  }
 }
 
 export async function adminUploadProductImage({
@@ -482,11 +768,41 @@ export async function adminUploadProductImage({
     sortOrder,
   })
 
-  const isFirstImage = !product.images || product.images.length <= 1
+  const isFirstImage = product.images.length === 0
   if (setAsKey || isFirstImage) {
     await setKeyImage({ productId, imageId: image.id })
   }
   return image
+}
+
+/** Register base image URL after direct R2 upload; appends at end of sort order unless overridden */
+export async function adminRegisterProductImageAfterUpload({
+  productId,
+  url,
+  altText,
+  sortOrder,
+  setAsKey,
+}: {
+  productId: string
+  url: string
+  altText?: string | null
+  sortOrder?: number
+  setAsKey?: boolean
+}): Promise<ProductImage> {
+  const product = await getProductById({ id: productId })
+  if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
+  const nextSort =
+    sortOrder ??
+    (product.images.length > 0
+      ? Math.max(...product.images.map((i) => i.sortOrder)) + 1
+      : 0)
+  return adminUploadProductImage({
+    productId,
+    url,
+    altText,
+    sortOrder: nextSort,
+    setAsKey,
+  })
 }
 
 export async function adminDeleteProductImage({
@@ -664,17 +980,19 @@ export async function adminReorderImages({
 export async function adminCreateVariant({
   productId,
   color,
+  colorHex,
   size,
   skuGroup,
 }: {
   productId: string
   color: string
+  colorHex?: string | null
   size: string
   skuGroup: string
 }): Promise<Awaited<ReturnType<typeof createVariant>>> {
   const product = await getProductById({ id: productId })
   if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
-  return createVariant({ productId, color, size, skuGroup })
+  return createVariant({ productId, color, colorHex: colorHex ?? null, size, skuGroup })
 }
 
 export async function adminDeleteVariant({

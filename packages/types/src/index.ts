@@ -67,6 +67,19 @@ export {
   RATE_TYPES,
 } from './enums'
 
+// Admin catalog (storefront catalog types live in entities where mirrored)
+export type {
+  AdminCategory,
+  AdminProductImage,
+  AdminProductVariant,
+  AdminProductPrices,
+  AdminProductListItem,
+  AdminProductDetail,
+  AdminProductsListResponse,
+  ProductFormValues,
+  CategoryFormValues,
+} from './catalog'
+
 // Entity interfaces (PostgreSQL table mirrors)
 export type {
   ReturnStatus,

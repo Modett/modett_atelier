@@ -218,6 +218,58 @@ router.get('/catalog/homepage', async (req: Request, res: Response) => {
 
 // —— Admin catalog (requireAdmin) ——
 
+const adminCategoryCreateSchema = z.object({
+  name: z.string().min(1).max(200),
+  slug: z.string().min(1).max(200),
+  active: z.boolean().optional().default(true),
+  sortOrder: z.number().int().min(0).optional().default(0),
+})
+
+const adminCategoryUpdateSchema = adminCategoryCreateSchema.partial()
+
+router.get(
+  '/admin/catalog/categories',
+  requireAdmin,
+  async (_req: Request, res: Response) => {
+    const categories = await catalogService.adminListCategories()
+    res.status(200).json({ data: { categories } })
+  },
+)
+
+router.post(
+  '/admin/catalog/categories',
+  requireAdmin,
+  validate(adminCategoryCreateSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof adminCategoryCreateSchema> }).body
+    const category = await catalogService.adminCreateCategory(body)
+    res.status(201).json({ data: { category } })
+  },
+)
+
+router.patch(
+  '/admin/catalog/categories/:id',
+  requireAdmin,
+  validate(adminCategoryUpdateSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof adminCategoryUpdateSchema> }).body
+    const category = await catalogService.adminUpdateCategory({
+      id: req.params.id!,
+      data: body,
+    })
+    res.status(200).json({ data: { category } })
+  },
+)
+
+router.delete(
+  '/admin/catalog/categories/:id',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    await catalogService.adminDeleteCategory({ id: req.params.id! })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
 const adminProductsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -225,6 +277,8 @@ const adminProductsQuerySchema = z.object({
     .string()
     .optional()
     .transform((v) => v === 'true' || v === '1'),
+  categoryId: z.string().uuid().optional(),
+  search: z.string().optional(),
 })
 
 /**
@@ -266,6 +320,8 @@ router.get(
       page: query.page,
       limit: query.limit,
       includeInactive: query.includeInactive ?? false,
+      categoryId: query.categoryId,
+      search: query.search?.trim() ? query.search.trim() : undefined,
     })
     res.status(200).json({ data: result })
   },
@@ -365,10 +421,11 @@ router.post(
   validate(createProductSchema),
   async (req: Request, res: Response) => {
     const body = (req as { body: z.infer<typeof createProductSchema> }).body
-    const product = await catalogService.adminCreateProduct({
+    const created = await catalogService.adminCreateProduct({
       ...body,
       categoryId: body.categoryId ?? undefined,
     })
+    const product = await catalogService.adminGetProduct({ id: created.id })
     res.status(201).json({ data: { product } })
   },
 )
@@ -403,10 +460,11 @@ router.patch(
   validate(updateProductSchema),
   async (req: Request, res: Response) => {
     const body = (req as { body: z.infer<typeof updateProductSchema> }).body
-    const product = await catalogService.adminUpdateProduct({
+    await catalogService.adminUpdateProduct({
       id: req.params.id!,
       data: body,
     })
+    const product = await catalogService.adminGetProduct({ id: req.params.id! })
     res.status(200).json({ data: { product } })
   },
 )
@@ -459,6 +517,90 @@ router.delete(
  *       201: { description: Images uploaded and registered }
  *       400: { description: No files or invalid type }
  */
+const productImageUploadUrlQuerySchema = z.object({
+  filename: z.string().min(1),
+  contentType: z.string().min(1),
+})
+
+router.get(
+  '/admin/catalog/products/:id/images/upload-url',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = productImageUploadUrlQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid query parameters',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const { filename, contentType } = parsed.data
+    const result = await catalogService.adminGetPresignedProductImageUploadUrl({
+      productId: req.params.id!,
+      fileName: filename,
+      contentType,
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+const registerProductImageSchema = z.object({
+  url: z.string().url(),
+  altText: z.string().optional().nullable(),
+  sortOrder: z.number().int().min(0).optional(),
+  setAsKey: z.boolean().optional(),
+})
+
+router.post(
+  '/admin/catalog/products/:id/images/register',
+  requireAdmin,
+  validate(registerProductImageSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof registerProductImageSchema> }).body
+    const image = await catalogService.adminRegisterProductImageAfterUpload({
+      productId: req.params.id!,
+      url: body.url,
+      altText: body.altText,
+      sortOrder: body.sortOrder,
+      setAsKey: body.setAsKey,
+    })
+    res.status(201).json({
+      data: {
+        image: {
+          id: image.id,
+          productId: image.productId,
+          url: image.url,
+          altText: image.altText ?? null,
+          sortOrder: image.sortOrder,
+        },
+      },
+    })
+  },
+)
+
+const updateProductImageSchema = z.object({
+  altText: z.string().optional().nullable(),
+  sortOrder: z.number().int().min(0).optional(),
+})
+
+router.patch(
+  '/admin/catalog/products/:id/images/:imageId',
+  requireAdmin,
+  validate(updateProductImageSchema),
+  async (req: Request, res: Response) => {
+    const body = (req as { body: z.infer<typeof updateProductImageSchema> }).body
+    const image = await catalogService.adminUpdateProductImageMetadata({
+      productId: req.params.id!,
+      imageId: req.params.imageId!,
+      altText: body.altText,
+      sortOrder: body.sortOrder,
+    })
+    res.status(200).json({ data: { image } })
+  },
+)
+
 router.post(
   '/admin/catalog/products/:id/images',
   requireAdmin,
@@ -626,6 +768,7 @@ router.patch(
 
 const createVariantSchema = z.object({
   color: z.string().min(1),
+  colorHex: z.string().min(4).max(7).optional().nullable(),
   size: z.string().min(1),
   skuGroup: z.string().min(1),
 })
@@ -674,7 +817,10 @@ router.post(
     const body = (req as { body: z.infer<typeof createVariantSchema> }).body
     const variant = await catalogService.adminCreateVariant({
       productId: req.params.id!,
-      ...body,
+      color: body.color,
+      colorHex: body.colorHex,
+      size: body.size,
+      skuGroup: body.skuGroup,
     })
     res.status(201).json({ data: { variant } })
   },
