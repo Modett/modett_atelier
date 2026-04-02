@@ -8,7 +8,7 @@
  *   Admin:  dev@modett.com        /  DevAdmin@2025
  *
  * CUSTOMER CREDENTIALS (all use: Test@12345):
- *   amara@example.com    — Amara Silva     (SILVER, 2450 pts)
+ *   amara@example.com    — Amara Silva     (SILVER, 2550 pts incl. +100 grant)
  *   priya@example.com    — Priya Krishnan  (GOLD,   6800 pts)
  *   sara@example.com     — Sara Nawaz      (BRONZE,  180 pts)
  *   nilusha@example.com  — Nilusha Bandara (SILVER,  950 pts)
@@ -162,11 +162,26 @@ async function resetDatabase(client: pg.PoolClient) {
     TRUNCATE TABLE
       catalog.bestseller_list,
       catalog.product_relations,
+      analytics.analytics_aggregates,
+      messaging.email_delivery_log,
+      messaging.notification_outbox,
+      messaging.campaign_deliveries,
+      messaging.campaigns,
+      messaging.notify_me_events,
+      messaging.price_drop_subscriptions,
+      messaging.back_in_stock_subscriptions,
+      reviews.review_flags,
       reviews.review_media,
       reviews.reviews,
+      reviews.review_request_tokens,
+      iam.admin_invites,
+      loyalty.loyalty_grants,
       loyalty.loyalty_ledger,
       loyalty.loyalty_accounts,
       messaging.inbox_messages,
+      returns.return_events,
+      returns.return_request_items,
+      returns.return_requests,
       orders.order_events,
       orders.order_contacts,
       orders.order_addresses,
@@ -191,7 +206,7 @@ async function resetDatabase(client: pg.PoolClient) {
     CASCADE
   `)
 
-  console.log('   ✓ All tables cleared')
+  console.log('   ✓ All tables cleared (loyalty_rules preserved)')
 }
 
 // ── Step 2: IAM ───────────────────────────────────────────────────────────────
@@ -974,6 +989,431 @@ async function seedInboxMessages(client: pg.PoolClient) {
   console.log('   ✓ 3 inbox messages for amara')
 }
 
+async function seedLoyaltyRules(client: pg.PoolClient) {
+  console.log('📐 Seeding loyalty rules...')
+
+  await client.query(
+    `
+    UPDATE loyalty.loyalty_rules
+    SET
+      earn_rate_json = $1,
+      redemption_rate_by_currency_json = $2,
+      tier_thresholds_json = $3,
+      multipliers_json = $4,
+      min_redeem = 200,
+      max_redeem_percent = '15.00',
+      no_stack_with_sale = true,
+      updated_at = NOW()
+  `,
+    [
+      JSON.stringify({
+        LKR: { points: 1, per_amount: 100 },
+        SGD: { points: 1, per_amount: 1 },
+        USD: { points: 1, per_amount: 1 },
+      }),
+      JSON.stringify({
+        LKR: { points: 100, value: 150.0 },
+        SGD: { points: 100, value: 1.5 },
+        USD: { points: 100, value: 1.5 },
+      }),
+      JSON.stringify({ BRONZE: 0, SILVER: 6.0, GOLD: 12.0 }),
+      JSON.stringify({ BRONZE: 1.0, SILVER: 1.25, GOLD: 1.5 }),
+    ],
+  )
+
+  const { rows } = await client.query(`SELECT COUNT(*)::text AS c FROM loyalty.loyalty_rules`)
+  if (parseInt(rows[0].c, 10) === 0) {
+    throw new Error('loyalty_rules has no rows — check that migrations ran first')
+  }
+
+  console.log('   ✓ Loyalty rules updated (dual-axis tier system)')
+}
+
+async function seedLoyaltyGrants(client: pg.PoolClient) {
+  console.log('🎁 Seeding loyalty grants...')
+
+  const grantId = uuid()
+  const grantAt = ago(30)
+
+  await client.query(
+    `
+    INSERT INTO loyalty.loyalty_grants
+      (id, user_id, points, reason, granted_by_admin_id, created_at)
+    VALUES ($1, $2, 100, 'Welcome bonus — valued customer', $3, $4)
+  `,
+    [grantId, CUSTOMER_1_ID, OWNER_ADMIN_ID, grantAt],
+  )
+
+  await client.query(
+    `
+    INSERT INTO loyalty.loyalty_ledger
+      (id, user_id, type, points, metadata_json, created_at)
+    VALUES ($1, $2, 'BONUS', 100, $3, $4)
+  `,
+    [
+      uuid(),
+      CUSTOMER_1_ID,
+      JSON.stringify({
+        type: 'admin_grant',
+        grantId,
+        reason: 'Welcome bonus — valued customer',
+        adminId: OWNER_ADMIN_ID,
+      }),
+      grantAt,
+    ],
+  )
+
+  await client.query(
+    `
+    UPDATE loyalty.loyalty_accounts
+    SET balance = balance + 100,
+        lifetime_earned = lifetime_earned + 100,
+        last_activity_at = NOW()
+    WHERE user_id = $1
+  `,
+    [CUSTOMER_1_ID],
+  )
+
+  console.log('   ✓ 1 admin loyalty grant (amara +100 pts)')
+}
+
+async function seedAdminInvites(client: pg.PoolClient) {
+  console.log('📨 Seeding admin invites...')
+
+  const fakeTokenHash = 'seed_demo_token_' + uuid().replace(/-/g, '')
+
+  await client.query(
+    `
+    INSERT INTO iam.admin_invites
+      (id, email, token_hash, expires_at, created_by_admin_id, used_at)
+    VALUES ($1, $2, $3, $4, $5, NULL)
+  `,
+    [
+      uuid(),
+      'kate@agency.com',
+      fakeTokenHash,
+      new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      OWNER_ADMIN_ID,
+    ],
+  )
+
+  console.log('   ✓ 1 pending admin invite (kate@agency.com)')
+}
+
+async function seedReturnAndFlags(client: pg.PoolClient) {
+  console.log('↩️  Seeding return + review flag...')
+
+  const refs3 = seededOrderItemIds['MOD-202600003']
+  if (refs3) {
+    const returnId = uuid()
+    const t = ago(5)
+    await client.query(
+      `
+      INSERT INTO returns.return_requests
+        (id, order_id, type, status, reason,
+         policy_accepted_at, policy_version, eligible_until, created_at, updated_at)
+      VALUES ($1, $2, 'REFUND', 'SUBMITTED', 'DOES_NOT_FIT',
+              $3, '2025-v1', $4, $5, $5)
+    `,
+      [
+        returnId,
+        refs3.orderId,
+        t,
+        new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString(),
+        t,
+      ],
+    )
+
+    await client.query(
+      `
+      INSERT INTO returns.return_request_items
+        (id, return_request_id, order_item_id, qty, request_status)
+      VALUES ($1, $2, $3, 1, 'SUBMITTED')
+    `,
+      [uuid(), returnId, refs3.orderItemId],
+    )
+
+    await client.query(
+      `
+      INSERT INTO returns.return_events
+        (id, return_request_id, event_type, payload_json,
+         admin_id, admin_note, created_at)
+      VALUES ($1, $2, 'RETURN_SUBMITTED', '{}', NULL, NULL, $3)
+    `,
+      [uuid(), returnId, t],
+    )
+  }
+
+  const { rows: saraReview } = await client.query(
+    `SELECT id FROM reviews.reviews WHERE user_id = $1 LIMIT 1`,
+    [CUSTOMER_3_ID],
+  )
+
+  if (saraReview.length > 0) {
+    await client.query(
+      `
+      INSERT INTO reviews.review_flags
+        (id, review_id, reason, auto_flagged, created_at, resolved_at, resolved_by_admin_id)
+      VALUES ($1, $2, 'Admin flagged for quality check', false, $3, NULL, NULL)
+      ON CONFLICT (review_id) DO NOTHING
+    `,
+      [uuid(), saraReview[0].id, ago(3)],
+    )
+  }
+
+  console.log('   ✓ 1 SUBMITTED return (sara) · 1 review flag')
+}
+
+async function seedCampaigns(client: pg.PoolClient) {
+  console.log('📣 Seeding campaigns...')
+
+  const draftId = uuid()
+  const sentId = uuid()
+
+  const draftContent = JSON.stringify({
+    subject: 'New arrivals — Silk Summer Collection',
+    preheader: "The pieces you've been waiting for.",
+    heading: 'Summer arrives at Modett',
+    body:
+      'Our new silk summer collection is here. Each piece is crafted from the finest natural fibres, designed to move with you through warm evenings and sun-filled days.',
+    ctaLabel: 'Shop the Collection',
+    ctaUrl: 'https://modett.com/collections',
+    footerNote: 'Free shipping on orders over LKR 1,000.',
+  })
+
+  const sentContent = JSON.stringify({
+    subject: 'Thank you for being a Modett customer',
+    heading: 'Elegance, amplified.',
+    body:
+      'We created Modett to bring you clothing that lasts — in quality, in style, and in memory. Thank you for being part of this journey.',
+    ctaLabel: 'Explore the Collection',
+    ctaUrl: 'https://modett.com/collections',
+  })
+
+  const sentAt = ago(30)
+
+  await client.query(
+    `
+    INSERT INTO messaging.campaigns
+      (id, name, content_json, channels_json, audience_filter_json,
+       status, created_by_admin_id, scheduled_at, sent_at, created_at, updated_at)
+    VALUES
+      ($1, 'Summer Collection Launch', $2, '["EMAIL"]', '{}',
+       'DRAFT', $5, NULL, NULL, NOW(), NOW()),
+      ($3, 'Brand Welcome — March 2025', $4, '["EMAIL"]', '{}',
+       'SENT', $5, $6, $6, $7, $7)
+  `,
+    [draftId, draftContent, sentId, sentContent, OWNER_ADMIN_ID, sentAt, sentAt],
+  )
+
+  await client.query(
+    `
+    INSERT INTO messaging.campaign_deliveries
+      (id, campaign_id, user_id, channel, status, created_at)
+    VALUES
+      ($1, $2, $3, 'EMAIL', 'SENT', $5),
+      ($4, $2, $6, 'EMAIL', 'SENT', $5)
+  `,
+    [uuid(), sentId, CUSTOMER_1_ID, uuid(), CUSTOMER_2_ID, sentAt],
+  )
+
+  console.log('   ✓ 2 campaigns (1 DRAFT, 1 SENT) + 2 delivery records')
+}
+
+async function seedNotifyMeEvents(client: pg.PoolClient) {
+  console.log('🔔 Seeding notify-me events...')
+
+  const { rows } = await client.query(
+    `
+    SELECT pv.id
+    FROM inventory.product_variants pv
+    JOIN inventory.variant_stock vs ON vs.variant_id = pv.id
+    WHERE pv.product_id = $1
+      AND pv.color = 'IVORY'
+      AND pv.size = 'UK 6'
+      AND vs.available_qty = 0
+    LIMIT 1
+  `,
+    [PROD_1_ID],
+  )
+
+  if (rows.length === 0) return
+
+  const variantId = rows[0].id
+
+  const sessions = ['sess_aaa111', 'sess_bbb222', 'sess_ccc333']
+  const userIds: (string | null)[] = [CUSTOMER_3_ID, null, null]
+
+  for (let i = 0; i < 3; i++) {
+    await client.query(
+      `
+      INSERT INTO messaging.notify_me_events
+        (id, variant_id, user_id, session_id, created_at)
+      VALUES ($1, $2, $3, $4, $5)
+    `,
+      [uuid(), variantId, userIds[i], sessions[i], ago(i * 3)],
+    )
+  }
+
+  console.log('   ✓ 3 notify-me events (1 logged-in, 2 guest)')
+}
+
+async function seedAnalyticsAggregates(client: pg.PoolClient) {
+  console.log('📊 Seeding analytics aggregates...')
+
+  const productViewData = [
+    { productId: PROD_1_ID, avgViews: 12 },
+    { productId: PROD_2_ID, avgViews: 18 },
+    { productId: PROD_3_ID, avgViews: 9 },
+    { productId: PROD_9_ID, avgViews: 14 },
+    { productId: PROD_5_ID, avgViews: 8 },
+  ]
+
+  for (const p of productViewData) {
+    for (let d = 14; d >= 1; d--) {
+      const periodStart = new Date()
+      periodStart.setDate(periodStart.getDate() - d)
+      periodStart.setHours(0, 0, 0, 0)
+
+      const views = p.avgViews + Math.floor(Math.random() * 6 - 3)
+      await client.query(
+        `
+        INSERT INTO analytics.analytics_aggregates
+          (id, metric, dimension_json, value, period, period_start, computed_at)
+        VALUES ($1, 'product_views', $2, $3, 'daily', $4, NOW())
+        ON CONFLICT (metric, period, period_start, dimension_json) DO UPDATE
+          SET value = EXCLUDED.value, computed_at = NOW()
+      `,
+        [
+          uuid(),
+          JSON.stringify({ product_id: p.productId }),
+          String(Math.max(1, views)),
+          periodStart.toISOString(),
+        ],
+      )
+    }
+  }
+
+  const purchaseData = [
+    { productId: PROD_2_ID, color: 'ECRU', size: 'UK 10', units: 3 },
+    { productId: PROD_1_ID, color: 'SAGE', size: 'UK 8', units: 2 },
+    { productId: PROD_9_ID, color: 'CAMEL', size: 'UK 10', units: 1 },
+  ]
+
+  for (const p of purchaseData) {
+    const periodStart = new Date()
+    periodStart.setDate(periodStart.getDate() - 7)
+    periodStart.setHours(0, 0, 0, 0)
+
+    await client.query(
+      `
+      INSERT INTO analytics.analytics_aggregates
+        (id, metric, dimension_json, value, period, period_start, computed_at)
+      VALUES ($1, 'purchases', $2, $3, 'daily', $4, NOW())
+      ON CONFLICT (metric, period, period_start, dimension_json) DO UPDATE
+        SET value = EXCLUDED.value, computed_at = NOW()
+    `,
+      [
+        uuid(),
+        JSON.stringify({ product_id: p.productId, color: p.color, size: p.size }),
+        String(p.units),
+        periodStart.toISOString(),
+      ],
+    )
+  }
+
+  const sources = [
+    { source: 'google', sessions: 45 },
+    { source: 'instagram', sessions: 28 },
+    { source: 'direct', sessions: 32 },
+    { source: 'facebook', sessions: 12 },
+  ]
+
+  for (const s of sources) {
+    for (let d = 7; d >= 1; d--) {
+      const periodStart = new Date()
+      periodStart.setDate(periodStart.getDate() - d)
+      periodStart.setHours(0, 0, 0, 0)
+
+      const sessionCount = s.sessions + Math.floor(Math.random() * 10 - 5)
+      await client.query(
+        `
+        INSERT INTO analytics.analytics_aggregates
+          (id, metric, dimension_json, value, period, period_start, computed_at)
+        VALUES ($1, 'traffic_source', $2, $3, 'daily', $4, NOW())
+        ON CONFLICT (metric, period, period_start, dimension_json) DO UPDATE
+          SET value = EXCLUDED.value, computed_at = NOW()
+      `,
+        [
+          uuid(),
+          JSON.stringify({ source: s.source, utm_source: s.source }),
+          String(Math.max(1, sessionCount)),
+          periodStart.toISOString(),
+        ],
+      )
+    }
+  }
+
+  for (let d = 14; d >= 1; d--) {
+    const periodStart = new Date()
+    periodStart.setDate(periodStart.getDate() - d)
+    periodStart.setHours(0, 0, 0, 0)
+    const iso = periodStart.toISOString()
+
+    await client.query(
+      `
+      INSERT INTO analytics.analytics_aggregates
+        (id, metric, dimension_json, value, period, period_start, computed_at)
+      VALUES
+        ($1, 'checkout_starts', '{}'::jsonb, $2, 'daily', $3, NOW()),
+        ($4, 'purchase_count',  '{}'::jsonb, $5, 'daily', $3, NOW()),
+        ($6, 'account_creations', '{}'::jsonb, $7, 'daily', $3, NOW())
+      ON CONFLICT (metric, period, period_start, dimension_json) DO UPDATE
+        SET value = EXCLUDED.value, computed_at = NOW()
+    `,
+      [
+        uuid(),
+        String(3 + Math.floor(Math.random() * 5)),
+        iso,
+        uuid(),
+        String(1 + Math.floor(Math.random() * 3)),
+        uuid(),
+        String(Math.random() > 0.7 ? 1 : 0),
+      ],
+    )
+  }
+
+  for (let d = 14; d >= 1; d--) {
+    const periodStart = new Date()
+    periodStart.setDate(periodStart.getDate() - d)
+    periodStart.setHours(0, 0, 0, 0)
+    const iso = periodStart.toISOString()
+
+    await client.query(
+      `
+      INSERT INTO analytics.analytics_aggregates
+        (id, metric, dimension_json, value, period, period_start, computed_at)
+      VALUES
+        ($1, 'user_type_purchase', '{"user_type":"registered"}'::jsonb, $2, 'daily', $3, NOW()),
+        ($4, 'user_type_purchase', '{"user_type":"guest"}'::jsonb,      $5, 'daily', $3, NOW())
+      ON CONFLICT (metric, period, period_start, dimension_json) DO UPDATE
+        SET value = EXCLUDED.value, computed_at = NOW()
+    `,
+      [
+        uuid(),
+        String(1 + Math.floor(Math.random() * 2)),
+        iso,
+        uuid(),
+        String(Math.random() > 0.5 ? 1 : 0),
+      ],
+    )
+  }
+
+  console.log(
+    '   ✓ Analytics aggregates: 14d product views, funnel, traffic, guest/registered',
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function seed() {
@@ -993,13 +1433,25 @@ async function seed() {
     await seedReviews(client)
     await seedProductRelations(client)
     await seedInboxMessages(client)
+    await seedLoyaltyRules(client)
+    await seedLoyaltyGrants(client)
+    await seedAdminInvites(client)
+    await seedReturnAndFlags(client)
+    await seedCampaigns(client)
+    await seedNotifyMeEvents(client)
+    await seedAnalyticsAggregates(client)
 
     await client.query('COMMIT')
 
     console.log('\n✅ SEED COMPLETE')
     console.log('   11 products · 6 categories · 7 bestsellers')
     console.log('   4 completed orders · 4 reviews · 7 shipping methods')
-    console.log('   Sizes: UK 6 · UK 8 · UK 10 · UK 12 · UK 14 · UK 16 (+ UK 20 for linen trousers)')
+    console.log('   1 SUBMITTED return (sara) · 1 review flag')
+    console.log('   2 campaigns (1 DRAFT, 1 SENT) · 3 notify-me events')
+    console.log('   14 days of analytics aggregates')
+    console.log('   1 pending admin invite (kate@agency.com)')
+    console.log('   Loyalty rules: dual-axis tier (60% frequency / 40% spend)')
+    console.log('   Sizes: UK 6 · UK 8 · UK 10 · UK 12 · UK 14 · UK 16 (+ UK 20)')
     console.log('   Owner:  kumudikaj@modett.com / Modett@2025')
     console.log('   Admin:  dev@modett.com / DevAdmin@2025')
     console.log('   Customers (password: Test@12345):')
