@@ -44,6 +44,9 @@ export default function AccountLoyaltyPage() {
     setLedgerRows((prev) => [...prev, ...ledgerPage.ledger])
   }, [ledgerPage, page])
 
+  // Must be above any early return — Rules of Hooks
+  const [explainOpen, setExplainOpen] = useState(false)
+
   if (aLoad && !detail) {
     return <div className="h-48 bg-muted animate-pulse rounded-none" />
   }
@@ -70,8 +73,6 @@ export default function AccountLoyaltyPage() {
 
   const mSilver = rules.multipliersJson.SILVER
   const mGold = rules.multipliersJson.GOLD
-
-  const [explainOpen, setExplainOpen] = useState(false)
 
   return (
     <div className="space-y-10">

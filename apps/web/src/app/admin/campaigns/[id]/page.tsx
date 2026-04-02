@@ -24,7 +24,6 @@ import {
   useUploadCampaignAsset,
 } from '@/hooks/useAdminMessaging'
 import { CampaignEmailPreview } from '@/components/admin/CampaignEmailPreview'
-import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

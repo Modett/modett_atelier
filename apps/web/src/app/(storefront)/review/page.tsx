@@ -83,7 +83,7 @@ export default function ReviewSubmissionPage() {
         } finally {
           setUploading(false)
           setUploadProgress((p) => {
-            const { [key]: _, ...rest } = p
+            const { [key]: _removed, ...rest } = p
             return rest
           })
         }

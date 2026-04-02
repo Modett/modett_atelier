@@ -96,7 +96,6 @@ export default function AdminNewProductPage() {
   const { register, handleSubmit, watch, setValue, formState } = form
   const displayName = watch('displayName')
   const slug = watch('slug')
-  const shortName = watch('shortName')
   const productCode = watch('productCode')
   const prices = watch('prices')
 
