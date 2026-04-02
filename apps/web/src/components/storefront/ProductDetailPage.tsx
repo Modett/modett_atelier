@@ -1,251 +1,221 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { usePathname } from 'next/navigation'
-import Link from 'next/link'
-import {
-  GlobeIcon,
-  ContactIcon,
-  NewsletterIcon,
-  SearchIcon,
-  WishlistIcon,
-  AccountIcon,
-  MobileMenu,
-} from '@modett/ui'
+import { useState, useRef, useEffect } from 'react'
+import { notFound } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { useAuthPanel } from '@/components/providers/AuthProvider'
+import { useGeo, getCurrencyCookie } from '@/hooks/useCurrency'
 import { useSession } from '@/hooks/useSession'
-import { storePostAuthPath } from '@/lib/postAuthRedirect'
-import { NAV_LINKS } from '@/lib/nav-links'
-import { ModettLogo } from '@/components/shared/ModettLogo'
-import { CartButton } from '@/components/shared/CartButton'
+import { useProduct } from '@/hooks/useProduct'
+import { Analytics } from '@/lib/analytics'
+import { ProductBreadcrumb } from './ProductBreadcrumb'
+import { ProductImageGallery } from './ProductImageGallery'
+import { ProductInfoPanel } from './ProductInfoPanel'
+import { ProductReviews } from './ProductReviews'
+import { WearItWith } from './WearItWith'
+import { YouMayAlsoLike } from './YouMayAlsoLike'
+import { ProductDetailSkeleton } from './ProductDetailSkeleton'
+import type { ProductVariant } from '@/types'
 
-export function StorefrontHeader() {
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const pathname = usePathname()
-  const { openPanel } = useAuthPanel()
-  const { user, isLoggedIn } = useSession()
+interface ProductDetailPageProps {
+  slug: string
+}
 
-  // All hooks must be above any early return — Rules of Hooks
-  const openMenu = useCallback(() => setMobileOpen(true), [])
-  const closeMenu = useCallback(() => setMobileOpen(false), [])
+export function ProductDetailPage({ slug }: ProductDetailPageProps) {
+  const { isReady }                       = useGeo()
+  const { user }                          = useSession()
+  const { data: product, isLoading, error } = useProduct(slug)
 
-  const handleAccountIconClick = useCallback(() => {
-    storePostAuthPath('/account')
-    openPanel()
-  }, [openPanel])
+  const [selectedColour, setSelectedColour] = useState<string | null>(null)
+  const [selectedSize, setSelectedSize]     = useState<string | null>(null)
+  const [justAdded, setJustAdded]           = useState(false)
+  const [isFullImageMode, setIsFullImageMode]       = useState(false)
+  const [fullImageStartIndex, setFullImageStartIndex] = useState(0)
+  const galleryRef = useRef<HTMLDivElement>(null)
 
-  // The homepage has its own HeroNav inside HomepageHero.
-  // Rendering StorefrontHeader there produces a duplicate navbar.
-  if (pathname === '/') return null
+  // Analytics tracking — must be above early returns (Rules of Hooks)
+  useEffect(() => {
+    if (!product) return
+    Analytics.productView({
+      productId:   product.id,
+      productName: product.displayName,
+      source:
+        typeof document !== 'undefined' ? document.referrer || 'direct' : 'direct',
+      currency:    getCurrencyCookie(),
+      userId:      user?.id,
+    })
+  }, [product?.id, user?.id])
+
+  useEffect(() => {
+    if (!product) return
+    const selectedVariant =
+      selectedColour && selectedSize
+        ? (product.variants.find(
+            (v) => v.color === selectedColour && v.size === selectedSize,
+          ) ?? null)
+        : null
+    if (!selectedVariant) return
+    Analytics.variantSelect({
+      variantId: selectedVariant.id,
+      productId: product.id,
+      color:     selectedColour ?? '',
+      size:      selectedSize ?? '',
+      userId:    user?.id,
+    })
+  }, [product?.id, selectedColour, selectedSize, user?.id])
+
+  function handleColourChange(colour: string) {
+    setSelectedColour(colour)
+    setSelectedSize(null)
+  }
+
+  function handleImageClick(index: number) {
+    setFullImageStartIndex(index)
+    setIsFullImageMode(true)
+  }
+
+  function handleExitFullImageMode() {
+    setIsFullImageMode(false)
+    galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  if (!isReady || isLoading) return <ProductDetailSkeleton />
+
+  if (!isLoading && !product && !error) return notFound()
+
+  if (error) {
+    const status =
+      typeof error === 'object' &&
+      error !== null &&
+      'status' in error &&
+      typeof (error as { status: unknown }).status === 'number'
+        ? (error as { status: number }).status
+        : undefined
+    if (status === 404) return notFound()
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="text-center">
+          <p className="font-body font-light text-[14px] text-muted-foreground mb-4">
+            Something went wrong loading this product.
+          </p>
+          <a
+            href={`/products/${slug}`}
+            className="font-body font-light text-[12px] uppercase tracking-[0.2em] text-umber underline underline-offset-2 hover:text-ink transition-colors duration-200"
+          >
+            Try again
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  if (!product) return notFound()
+
+  const variantsByColour = groupVariantsByColour(product.variants)
+  const sizesForColour = selectedColour
+    ? (variantsByColour[selectedColour] ?? [])
+    : []
+
+  const selectedVariant =
+    selectedColour && selectedSize
+      ? (product.variants.find(
+          (v) => v.color === selectedColour && v.size === selectedSize,
+        ) ?? null)
+      : null
+
+  const allOOSForColour = selectedColour
+    ? sizesForColour.every((v) => v.stockStatus === 'OUT_OF_STOCK')
+    : false
 
   return (
-    <>
-      <header
-        className={cn(
-          'relative w-full',
-          'bg-background',
-          'border-b border-muted',
-        )}
-        aria-label="Site header"
-      >
+    <div className="min-h-screen bg-background" ref={galleryRef}>
+      <ProductBreadcrumb product={product} />
 
-        {/* ── ROW 1: Utility bar (desktop only) ──────── */}
+      {/* Main content — layout switches between normal and full-image mode */}
+      <div
+        className={cn(
+          'transition-all duration-300 ease-out',
+          isFullImageMode
+            ? 'max-w-none px-0'
+            : 'max-w-page mx-auto px-4 md:px-0 pb-12 md:pb-16 lg:pb-20',
+        )}
+      >
         <div
           className={cn(
-            'hidden md:flex items-center justify-between',
-            'px-4 md:px-6 lg:px-8 h-9',
-            'border-b border-muted/50',
+            isFullImageMode
+              ? 'block'
+              : 'md:grid md:grid-cols-[60%_40%] md:gap-x-8 lg:gap-x-12 md:items-start',
           )}
         >
-          <div className="flex items-center gap-6">
-            <button
-              type="button"
-              className={cn(
-                'flex items-center gap-1.5',
-                'font-body font-light text-[11px]',
-                'uppercase tracking-[0.15em]',
-                'text-muted-foreground hover:text-umber',
-                'transition-colors duration-200',
-              )}
-            >
-              <GlobeIcon size={14} className="shrink-0" />
-              Sri Lanka
-            </button>
-            <Link
-              href="/contact"
-              className={cn(
-                'flex items-center gap-1.5',
-                'font-body font-light text-[11px]',
-                'uppercase tracking-[0.15em]',
-                'text-muted-foreground hover:text-umber',
-                'transition-colors duration-200',
-              )}
-            >
-              <ContactIcon size={14} className="shrink-0" />
-              Contact Us
-            </Link>
-            <Link
-              href="/newsletter"
-              className={cn(
-                'flex items-center gap-1.5',
-                'font-body font-light text-[11px]',
-                'uppercase tracking-[0.15em]',
-                'text-muted-foreground hover:text-umber',
-                'transition-colors duration-200',
-              )}
-            >
-              <NewsletterIcon size={14} className="shrink-0" />
-              Newsletter
-            </Link>
+          {/* Image gallery — always shown */}
+          <div
+            className={cn(
+              isFullImageMode
+                ? 'w-full'
+                : 'pt-4 md:pt-6 pb-8 md:pb-12 md:pl-8 lg:pl-10 xl:pl-12',
+            )}
+          >
+            <ProductImageGallery
+              images={product.images}
+              productName={product.displayName}
+              isFullImageMode={isFullImageMode}
+              fullImageStartIndex={fullImageStartIndex}
+              onImageClick={handleImageClick}
+              onExitFullImageMode={handleExitFullImageMode}
+            />
           </div>
 
-          <div className="flex items-center gap-4">
-            <Link
-              href="/search"
-              aria-label="Search"
-              className="text-muted-foreground hover:text-umber transition-colors duration-200"
-            >
-              <SearchIcon size={16} />
-            </Link>
-            <Link
-              href="/account/wishlist"
-              aria-label="Wishlist"
-              className="text-muted-foreground hover:text-umber transition-colors duration-200"
-            >
-              <WishlistIcon size={16} />
-            </Link>
-            {isLoggedIn ? (
-              <Link
-                href="/account"
-                aria-label={`My account — ${user?.firstName}`}
-                className="flex items-center justify-center
-                           w-6 h-6 rounded-full
-                           bg-surface-raised text-umber
-                           font-body font-bold text-[11px]
-                           hover:bg-muted transition-colors duration-200"
-              >
-                {user?.firstName?.charAt(0)?.toUpperCase() ?? '?'}
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={handleAccountIconClick}
-                aria-label="Sign in or create account"
-                className="text-muted-foreground hover:text-umber transition-colors duration-200"
-              >
-                <AccountIcon size={16} />
-              </button>
+          {/* Product info panel — hidden in full image mode */}
+          <div
+            className={cn(
+              // No max-h / overflow here — info + accordions scroll with the main page only
+              'md:pr-8 lg:pr-10 xl:pr-12 md:pl-2 md:sticky md:top-16 md:self-start',
+              isFullImageMode ? 'hidden' : 'block',
             )}
-            <CartButton
-              className="text-muted-foreground hover:text-umber"
-              iconSize="w-4 h-4"
+          >
+            <ProductInfoPanel
+              product={product}
+              selectedColour={selectedColour}
+              selectedSize={selectedSize}
+              selectedVariant={selectedVariant}
+              sizesForColour={sizesForColour}
+              allOOSForColour={allOOSForColour}
+              justAdded={justAdded}
+              onColourChange={handleColourChange}
+              onSizeChange={setSelectedSize}
+              onJustAdded={() => {
+                setJustAdded(true)
+                setTimeout(() => setJustAdded(false), 1500)
+              }}
             />
           </div>
         </div>
+      </div>
 
-        {/* ── ROW 2: Logo (centred desktop / left mobile) ── */}
-        <div className="flex items-center justify-center pt-4 pb-3 px-4 md:px-6 lg:px-8">
-          {/* Mobile: logo left + icons right */}
-          <div className="flex md:hidden items-center justify-between w-full">
-            <ModettLogo variant="dark" size="md" href="/" />
-            <div className="flex items-center gap-3">
-              <CartButton
-                className="text-umber hover:text-ink"
-                iconSize="w-5 h-5"
-              />
-              {isLoggedIn ? (
-                <Link
-                  href="/account"
-                  className="flex items-center justify-center
-                             w-6 h-6 rounded-full bg-surface-raised
-                             text-umber font-body font-bold text-[11px]"
-                >
-                  {user?.firstName?.charAt(0)?.toUpperCase() ?? '?'}
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleAccountIconClick}
-                  className="text-umber"
-                >
-                  <AccountIcon size={20} />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={openMenu}
-                aria-label="Open menu"
-                className="text-umber hover:text-ink transition-colors duration-200"
-              >
-                <HamburgerIcon />
-              </button>
-            </div>
-          </div>
-
-          {/* Desktop: centred logo */}
-          <div className="hidden md:block">
-            <ModettLogo variant="dark" size="lg" href="/" />
-          </div>
+      {/* Sections hidden in full image mode */}
+      {!isFullImageMode && (
+        <div className="max-w-page mx-auto px-4 md:px-6 lg:px-8 py-14 md:py-20 border-t border-muted">
+          <ProductReviews key={product.id} productId={product.id} />
         </div>
-
-        {/* ── ROW 3: Nav links (centred, desktop only) ─── */}
-        <div className="hidden md:flex items-center justify-center gap-12 pb-4">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={
-                pathname === link.href ||
-                pathname.startsWith(link.href + '/')
-                  ? 'page'
-                  : undefined
-              }
-              className={cn(
-                'font-body font-light text-[11px]',
-                'uppercase tracking-[0.25em]',
-                'transition-colors duration-200',
-                pathname === link.href ||
-                pathname.startsWith(link.href + '/')
-                  ? 'text-ink underline underline-offset-4'
-                  : 'text-muted-foreground hover:text-umber',
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      </header>
-
-      <MobileMenu
-        isOpen={mobileOpen}
-        onClose={closeMenu}
-        countryName="Sri Lanka"
-        navLinks={NAV_LINKS.map((l) => ({
-          label: l.label.toUpperCase(),
-          href: l.href,
-        }))}
-      />
-    </>
+      )}
+      {!isFullImageMode && product.relations && product.relations.length > 0 && (
+        <WearItWith relations={product.relations} />
+      )}
+      {!isFullImageMode && (
+        <YouMayAlsoLike
+          currentProductId={product.id}
+          categoryId={product.categoryId}
+        />
+      )}
+    </div>
   )
 }
 
-function HamburgerIcon() {
-  return (
-    <svg
-      width={24}
-      height={24}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M3 6h18M3 12h18M3 18h18"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="square"
-      />
-    </svg>
-  )
+function groupVariantsByColour(
+  variants: ProductVariant[],
+): Record<string, ProductVariant[]> {
+  return variants.reduce<Record<string, ProductVariant[]>>((acc, variant) => {
+    if (!acc[variant.color]) acc[variant.color] = []
+    acc[variant.color]!.push(variant)
+    return acc
+  }, {})
 }
