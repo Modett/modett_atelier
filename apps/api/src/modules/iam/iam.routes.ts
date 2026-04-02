@@ -38,9 +38,10 @@ const CUSTOMER_COOKIE_OPTIONS = {
   ..._cookieBase,
   path: '/' as const,
 }
+/** Prefix of mounted admin routes (`/api` + `/admin/...`); wrong path omits `sid` on fetch → 401. */
 const ADMIN_COOKIE_OPTIONS = {
   ..._cookieBase,
-  path: '/admin' as const,
+  path: '/api/admin' as const,
 }
 
 /** Loose shapes so handlers type-check with Express; use StrictAdminRequest for audit helper. */
@@ -672,7 +673,7 @@ router.delete(
  *               password: { type: string }
  *     responses:
  *       200:
- *         description: Login successful. Sets admin sid cookie (Path=/admin, cross-origin attrs in production).
+ *         description: Login successful. Sets admin sid cookie (Path=/api/admin, cross-origin attrs in production).
  *         content:
  *           application/json:
  *             schema:
@@ -714,7 +715,7 @@ router.post(
 router.post('/admin/auth/logout', requireAdmin, async (req: IamAdminRequest, res: Response) => {
   const sid = req.cookies?.sid
   if (sid) await iamService.adminLogout({ sessionId: sid })
-  clearSidCookie(res, '/admin')
+  clearSidCookie(res, '/api/admin')
   res.status(200).json({ data: { ok: true } })
 })
 
