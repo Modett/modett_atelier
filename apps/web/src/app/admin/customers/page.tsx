@@ -18,19 +18,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAdminCustomerDetail, useAdminCustomerSearch } from '@/hooks/useAdminCustomers'
 
-interface SearchCustomerRow {
-  id: string
-  first_name: string
-  last_name: string
-  email: string
-  created_at: string
-  loyalty_balance: number | null
-  loyalty_tier: string | null
-  composite_score: string | null
-  order_count: number
-  total_spent_lkr: string
-}
-
 function tierBadgeClass(tier: string | null): string {
   const t = (tier ?? '').toUpperCase()
   if (t === 'GOLD') return 'bg-amber-100 text-amber-900'
@@ -65,38 +52,18 @@ export default function AdminCustomersPage() {
   const search = useAdminCustomerSearch(q, page)
   const detail = useAdminCustomerDetail(selectedId)
 
-  const customers = (search.data?.customers ?? []) as SearchCustomerRow[]
+  const customers = search.data?.customers ?? []
   const totalPages = search.data
     ? Math.ceil(search.data.total / search.data.limit)
     : 0
 
-  const user = detail.data?.user as
-    | {
-        id: string
-        firstName: string
-        lastName: string
-        email: string
-        createdAt: string
-      }
-    | undefined
-
-  const loyalty = detail.data?.loyalty as
-    | {
-        account: {
-          balance: number
-          tier: string
-          composite_score: string
-          last_activity_at?: string
-        } | null
-        ledger: Array<Record<string, unknown>>
-      }
-    | undefined
-
-  const orders = (detail.data?.orders ?? []) as Array<Record<string, unknown>>
-  const reviews = (detail.data?.reviews ?? []) as Array<Record<string, unknown>>
-  const returns = (detail.data?.returns ?? []) as Array<Record<string, unknown>>
-  const addresses = (detail.data?.addresses ?? []) as Array<Record<string, unknown>>
-  const preferences = detail.data?.preferences as Record<string, unknown> | null | undefined
+  const user = detail.data?.user
+  const loyalty = detail.data?.loyalty
+  const orders = detail.data?.orders ?? []
+  const reviews = detail.data?.reviews ?? []
+  const returns = detail.data?.returns ?? []
+  const addresses = detail.data?.addresses ?? []
+  const preferences = detail.data?.preferences ?? null
 
   const showMobileDetail = selectedId !== null
 
@@ -106,7 +73,7 @@ export default function AdminCustomersPage() {
   const headerSpent = useMemo(() => {
     const row = customers.find((c) => c.id === selectedId)
     if (!row) return null
-    return formatLkr(row.total_spent_lkr)
+    return formatLkr(row.totalSpentLkr)
   }, [customers, selectedId])
 
   return (
@@ -186,29 +153,29 @@ export default function AdminCustomersPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-medium text-gray-900">
-                    {c.first_name} {c.last_name}
+                    {c.firstName} {c.lastName}
                   </span>
-                  {c.loyalty_tier && (
+                  {c.loyaltyTier && (
                     <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${tierBadgeClass(c.loyalty_tier)}`}
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${tierBadgeClass(c.loyaltyTier)}`}
                     >
-                      {c.loyalty_tier}
+                      {c.loyaltyTier}
                     </span>
                   )}
                 </div>
                 <p className="mt-1 truncate text-sm text-gray-600">{c.email}</p>
                 <p className="mt-2 text-xs text-gray-500">
-                  {c.order_count} {c.order_count === 1 ? 'order' : 'orders'} ·{' '}
-                  {formatLkr(c.total_spent_lkr)} spent (LKR)
+                  {c.orderCount} {c.orderCount === 1 ? 'order' : 'orders'} ·{' '}
+                  {formatLkr(c.totalSpentLkr)} spent (LKR)
                 </p>
-                {c.composite_score != null && (
+                {c.compositeScore != null && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Score: {c.composite_score} · Joined {formatJoined(c.created_at)}
+                    Score: {c.compositeScore} · Joined {formatJoined(c.createdAt)}
                   </p>
                 )}
-                {c.composite_score == null && (
+                {c.compositeScore == null && (
                   <p className="mt-1 text-xs text-gray-500">
-                    Joined {formatJoined(c.created_at)}
+                    Joined {formatJoined(c.createdAt)}
                   </p>
                 )}
               </button>
@@ -285,11 +252,11 @@ export default function AdminCustomersPage() {
                   <h2 className="text-xl font-semibold text-gray-900">
                     {user.firstName} {user.lastName}
                   </h2>
-                  {loyalty?.account && (
+                  {loyalty?.tier && (
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${tierBadgeClass(loyalty.account.tier)}`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${tierBadgeClass(loyalty.tier)}`}
                     >
-                      {loyalty.account.tier}
+                      {loyalty.tier}
                     </span>
                   )}
                 </div>
@@ -298,7 +265,7 @@ export default function AdminCustomersPage() {
                 </p>
                 {headerSpent && (
                   <p className="mt-1 text-sm text-gray-500">
-                    {customers.find((c) => c.id === selectedId)?.order_count ?? 0} orders ·{' '}
+                    {customers.find((c) => c.id === selectedId)?.orderCount ?? 0} orders ·{' '}
                     {headerSpent} total spent (LKR, paid orders)
                   </p>
                 )}
@@ -316,30 +283,30 @@ export default function AdminCustomersPage() {
                   <Card>
                     <CardContent className="space-y-2 p-4 text-sm">
                       <h3 className="font-semibold text-gray-900">Loyalty</h3>
-                      {loyalty?.account ? (
+                      {loyalty ? (
                         <>
                           <p>
                             Balance:{' '}
-                            <span className="font-medium">{loyalty.account.balance}</span> pts
+                            <span className="font-medium">{loyalty.balance}</span> pts
                           </p>
                           <p>
                             Tier:{' '}
-                            <span className="font-medium">{loyalty.account.tier}</span>
+                            <span className="font-medium">{loyalty.tier ?? '—'}</span>
                           </p>
                           <p>
                             Composite score:{' '}
                             <span className="font-medium">
-                              {loyalty.account.composite_score}
+                              {loyalty.compositeScore ?? '—'}
                             </span>
                           </p>
-                          {loyalty.account.last_activity_at && (
+                          {loyalty.lastActivityAt && (
                             <p className="text-xs text-gray-500">
                               Last activity:{' '}
-                              {formatJoined(loyalty.account.last_activity_at)}
+                              {formatJoined(loyalty.lastActivityAt)}
                             </p>
                           )}
                           <p className="text-xs text-gray-500">
-                            Last ledger entries: {loyalty.ledger.length} loaded
+                            Last ledger entries: {loyalty.recentLedger.length} loaded
                           </p>
                         </>
                       ) : (
@@ -356,20 +323,16 @@ export default function AdminCustomersPage() {
                       )}
                       <ul className="space-y-2 text-sm">
                         {addresses.map((a) => {
-                          const id = String(a.id ?? '')
-                          const label = (a.label as string) || 'Address'
-                          const aj = a.addressJson as Record<string, unknown> | undefined
-                          const line1 = aj && typeof aj.line1 === 'string' ? aj.line1 : ''
-                          const city = aj && typeof aj.city === 'string' ? aj.city : ''
-                          const cc = (a.countryCode as string) || ''
+                          const label = a.label || 'Address'
+                          const cc = a.country
                           return (
-                            <li key={id} className="rounded border border-gray-100 p-2">
+                            <li key={a.id} className="rounded border border-gray-100 p-2">
                               <span className="font-medium">{label}</span>
-                              {line1 && <p className="text-gray-600">{line1}</p>}
-                              {(city || cc) && (
+                              {a.line1 && <p className="text-gray-600">{a.line1}</p>}
+                              {(a.city || cc) && (
                                 <p className="text-xs text-gray-500">
-                                  {city}
-                                  {city && cc ? ' · ' : ''}
+                                  {a.city}
+                                  {a.city && cc ? ' · ' : ''}
                                   {cc}
                                 </p>
                               )}
@@ -420,33 +383,32 @@ export default function AdminCustomersPage() {
                             </TableRow>
                           )}
                           {orders.map((o) => {
-                            const ref = String(o.order_ref ?? '')
-                            const created = o.created_at
-                              ? formatJoined(String(o.created_at))
+                            const created = o.createdAt
+                              ? formatJoined(o.createdAt)
                               : '—'
                             return (
-                              <TableRow key={String(o.id)}>
+                              <TableRow key={o.id}>
                                 <TableCell className="text-xs whitespace-nowrap">
                                   {created}
                                 </TableCell>
                                 <TableCell>
                                   <a
-                                    href={`/admin/orders/${encodeURIComponent(ref)}`}
+                                    href={`/admin/orders/${encodeURIComponent(o.orderRef)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 hover:underline"
                                   >
-                                    {ref}
+                                    {o.orderRef}
                                   </a>
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {String(o.fulfillment_state ?? o.order_state ?? '—')}
+                                  {o.fulfillmentState || o.paymentState || '—'}
                                 </TableCell>
                                 <TableCell className="text-xs">
-                                  {String(o.currency ?? '—')}
+                                  {o.currency || '—'}
                                 </TableCell>
                                 <TableCell className="text-right text-xs">
-                                  {String(o.total ?? '—')}
+                                  {o.total || '—'}
                                 </TableCell>
                               </TableRow>
                             )
@@ -462,20 +424,20 @@ export default function AdminCustomersPage() {
                     <p className="text-sm text-gray-500">No reviews</p>
                   )}
                   {reviews.map((r) => {
-                    const body = String(r.body ?? '')
+                    const body = r.body ?? ''
                     const short = body.length > 80 ? `${body.slice(0, 80)}…` : body
                     return (
-                      <Card key={String(r.id)}>
+                      <Card key={r.id}>
                         <CardContent className="space-y-1 p-3 text-sm">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="font-medium">{String(r.product_name ?? '')}</span>
+                            <span className="font-medium">{r.productName}</span>
                             <span className="text-xs text-amber-700">
-                              {'★'.repeat(Number(r.rating) || 0)}
+                              {'★'.repeat(r.rating || 0)}
                             </span>
                           </div>
                           <p className="text-xs text-gray-500">
-                            {String(r.status ?? '')} ·{' '}
-                            {r.created_at ? formatJoined(String(r.created_at)) : ''}
+                            {r.status} ·{' '}
+                            {r.createdAt ? formatJoined(r.createdAt) : ''}
                           </p>
                           <p className="text-gray-700">{short}</p>
                         </CardContent>
@@ -506,24 +468,24 @@ export default function AdminCustomersPage() {
                             </TableRow>
                           )}
                           {returns.map((r) => (
-                            <TableRow key={String(r.id)}>
+                            <TableRow key={r.id}>
                               <TableCell className="font-mono text-xs">
-                                {String(r.id).slice(0, 8)}…
+                                {r.id.slice(0, 8)}…
                               </TableCell>
                               <TableCell>
                                 <Link
                                   href="/admin/returns"
                                   className="text-blue-600 hover:underline"
                                 >
-                                  {String(r.order_ref ?? '—')}
+                                  {r.orderRef || '—'}
                                 </Link>
                               </TableCell>
-                              <TableCell className="text-xs">{String(r.status ?? '')}</TableCell>
+                              <TableCell className="text-xs">{r.status}</TableCell>
                               <TableCell className="text-xs">
-                                {String(r.item_count ?? '—')}
+                                {r.itemCount != null ? String(r.itemCount) : '—'}
                               </TableCell>
                               <TableCell className="text-xs whitespace-nowrap">
-                                {r.created_at ? formatJoined(String(r.created_at)) : '—'}
+                                {r.createdAt ? formatJoined(r.createdAt) : '—'}
                               </TableCell>
                             </TableRow>
                           ))}

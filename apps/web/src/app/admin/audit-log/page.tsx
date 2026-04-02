@@ -20,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useAuditLog, useAdminAdminsList, type AuditLogRow } from '@/hooks/useAuditLog'
+import { useAuditLog, useAdminAdminsList } from '@/hooks/useAuditLog'
+import type { AuditLogEntry } from '@/types/admin'
 
 const ACTION_LABELS: Record<string, string> = {
   CREATE_PRODUCT: 'Created product',
@@ -270,7 +271,7 @@ export default function AdminAuditLogPage() {
                   </TableRow>
                 )}
               {!isLoading &&
-                (data?.logs ?? []).map((row: AuditLogRow) => (
+                (data?.logs ?? []).map((row: AuditLogEntry) => (
                   <Fragment key={row.id}>
                     <TableRow
                       className="cursor-pointer hover:bg-gray-50"
@@ -284,7 +285,7 @@ export default function AdminAuditLogPage() {
                       <TableCell>
                         <div className="text-sm">{row.adminEmail}</div>
                         <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase">
-                          {row.currentRole ?? row.adminRole}
+                          {row.adminRole}
                         </span>
                       </TableCell>
                       <TableCell className="text-sm">

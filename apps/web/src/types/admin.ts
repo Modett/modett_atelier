@@ -274,3 +274,163 @@ export interface ScanResult {
     scannedAt: string
   }
 }
+
+// ── Analytics ─────────────────────────────────────────────────────────────
+
+export interface AnalyticsTodaySummary {
+  ordersToday: number
+  revenueLkr: string
+  revenueSgd: string
+  revenueUsd: string
+  avgOrderValueLkr: string
+  conversionToday: number
+  activeSessionsNow: number
+}
+
+export interface AnalyticsRevenuePoint {
+  date: string
+  currency: string
+  orderCount: number
+  revenue: string
+  avgOrderValue: string
+}
+
+export interface AnalyticsFunnelData {
+  productViews: number
+  addToCart: number
+  checkoutStarts: number
+  purchases: number
+  viewToCartPct: number
+  cartToCheckoutPct: number
+  checkoutToPurchasePct: number
+  overallConversionPct: number
+}
+
+export interface AnalyticsRevenueByCurrency {
+  currency: string
+  orders: number
+  totalRevenue: string
+}
+
+export interface AnalyticsTimeSeriesPoint {
+  date: string
+  value: number
+}
+
+// ── Audit Log ─────────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: string
+  adminId: string
+  adminEmail: string
+  adminRole: string
+  action: string
+  entityType: string
+  entityId: string | null
+  entityLabel: string | null
+  beforeJson: Record<string, unknown> | null
+  afterJson: Record<string, unknown> | null
+  ipAddress: string | null
+  createdAt: string
+}
+
+export interface AuditLogFilters {
+  page?: number
+  limit?: number
+  adminId?: string
+  action?: string
+  entityType?: string
+  from?: string
+  to?: string
+}
+
+// ── Customers ─────────────────────────────────────────────────────────────
+
+export interface AdminCustomerSummary {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  createdAt: string
+  loyaltyBalance: number
+  loyaltyTier: 'BRONZE' | 'SILVER' | 'GOLD' | null
+  compositeScore: number | null
+  orderCount: number
+  totalSpentLkr: string
+}
+
+export interface AdminCustomerDetail {
+  user: {
+    id: string
+    email: string
+    firstName: string
+    lastName: string
+    createdAt: string
+  }
+  loyalty: {
+    balance: number
+    tier: 'BRONZE' | 'SILVER' | 'GOLD' | null
+    compositeScore: number | null
+    lastActivityAt: string | null
+    recentLedger: Array<{
+      id: string
+      type: string
+      points: number
+      createdAt: string
+      metadataJson: Record<string, unknown>
+    }>
+  } | null
+  orders: Array<{
+    id: string
+    orderRef: string
+    paymentState: string
+    fulfillmentState: string
+    currency: string
+    total: string
+    createdAt: string
+  }>
+  reviews: Array<{
+    id: string
+    productName: string
+    rating: number
+    status: string
+    createdAt: string
+    body: string | null
+  }>
+  returns: Array<{
+    id: string
+    orderRef: string
+    status: string
+    createdAt: string
+    itemCount?: number
+  }>
+  addresses: Array<{
+    id: string
+    label: string | null
+    line1: string
+    city: string
+    country: string
+    isDefault: boolean
+  }>
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────
+
+export interface AdminNotificationSummary {
+  lowStock: number
+  outOfStock: number
+  newReturns: number
+  flaggedReviews: number
+  unresolvedDrift: number
+  pendingOrders: number
+  total: number
+}
+
+export interface AdminNotificationAlert {
+  type: 'LOW_STOCK' | 'OUT_OF_STOCK' | 'NEW_RETURN' | 'FLAGGED_REVIEW' | 'PENDING_ORDER'
+  message: string
+  entityId: string | null
+  href: string
+  timestamp: string
+  isRead: boolean
+}

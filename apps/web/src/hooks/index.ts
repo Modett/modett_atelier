@@ -4,10 +4,6 @@ export { useAdminSession, ADMIN_SESSION_KEY } from './useAdminSession'
 export * from './useAdminDashboard'
 export * from './useAdminOrders'
 export * from './useAdminSettings'
-export * from './useAnalyticsDashboard'
-export * from './useAuditLog'
-export * from './useAdminCustomers'
-export * from './useAdminNotifications'
 export { useLogin }                         from './useLogin'
 export { useRegister }                      from './useRegister'
 export { useLogout }                        from './useLogout'
@@ -114,6 +110,34 @@ export {
   useShippingEstimate,
   SHIPPING_ESTIMATE_KEY,
 }                                              from './useShippingEstimate'
+
+// Analytics dashboard
+export {
+  useAnalyticsToday,
+  useAnalyticsRevenue,
+  useAnalyticsFunnel,
+  useAnalyticsRevenueByCurrency,
+  useAnalyticsTimeSeries,
+  ANALYTICS_KEYS,
+} from './useAnalyticsDashboard'
+
+// Audit log
+export { useAuditLog, useAdminAdminsList, AUDIT_LOG_KEYS } from './useAuditLog'
+
+// Customer lookup
+export {
+  useAdminCustomerSearch,
+  useAdminCustomerDetail,
+  ADMIN_CUSTOMER_KEYS,
+} from './useAdminCustomers'
+export type { AdminCustomerDetailPayload } from './useAdminCustomers'
+
+// Admin notification center
+export {
+  useAdminNotificationsSummary,
+  useAdminNotificationsFeed,
+  ADMIN_NOTIFICATION_KEYS,
+} from './useAdminNotifications'
 
 // Account
 export {
