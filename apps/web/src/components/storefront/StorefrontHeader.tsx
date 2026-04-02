@@ -26,10 +26,7 @@ export function StorefrontHeader() {
   const { openPanel } = useAuthPanel()
   const { user, isLoggedIn } = useSession()
 
-  // The homepage has its own HeroNav inside HomepageHero.
-  // Rendering StorefrontHeader there produces a duplicate navbar.
-  if (pathname === '/') return null
-
+  // All hooks must be above any early return — Rules of Hooks
   const openMenu = useCallback(() => setMobileOpen(true), [])
   const closeMenu = useCallback(() => setMobileOpen(false), [])
 
@@ -37,6 +34,10 @@ export function StorefrontHeader() {
     storePostAuthPath('/account')
     openPanel()
   }, [openPanel])
+
+  // The homepage has its own HeroNav inside HomepageHero.
+  // Rendering StorefrontHeader there produces a duplicate navbar.
+  if (pathname === '/') return null
 
   return (
     <>

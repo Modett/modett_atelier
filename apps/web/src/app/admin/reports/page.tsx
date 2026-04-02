@@ -194,6 +194,41 @@ export default function AdminReportsPage() {
     }
   }, [activeTab, period])
 
+  // All useMemo hooks must be above early returns — Rules of Hooks
+  // These read from query data which may be undefined until loaded (that's fine)
+  const funnelNums = useMemo(() => {
+    const funnel = funnelQ.data?.data.funnel as Record<string, string> | undefined
+    const pv  = Number.parseFloat(funnel?.product_views  ?? '0') || 0
+    const atc = Number.parseFloat(funnel?.add_to_cart    ?? '0') || 0
+    const co  = Number.parseFloat(funnel?.checkout_starts ?? '0') || 0
+    const pur = Number.parseFloat(funnel?.purchases       ?? '0') || 0
+    return {
+      pv, atc, co, pur,
+      p1: pv  > 0 ? (atc / pv)  * 100 : 0,
+      p2: atc > 0 ? (co  / atc) * 100 : 0,
+      p3: co  > 0 ? (pur / co)  * 100 : 0,
+    }
+  }, [funnelQ.data])
+
+  const guestChart = useMemo(() => {
+    const guestPayload = guestQ.data?.data as { byUserType: { user_type: string; purchase_count: string }[] } | undefined
+    const rows = guestPayload?.byUserType ?? []
+    return rows.map((r) => ({
+      name:  r.user_type === 'registered' ? 'Registered' : 'Guest',
+      value: Number.parseFloat(r.purchase_count) || 0,
+      fill:  r.user_type === 'registered' ? UMBER : '#D6CFC6',
+    }))
+  }, [guestQ.data])
+
+  const registeredPct = useMemo(() => {
+    const guestPayload = guestQ.data?.data as { byUserType: { user_type: string; purchase_count: string }[] } | undefined
+    const rows = guestPayload?.byUserType ?? []
+    const reg   = Number.parseFloat(rows.find((r) => r.user_type === 'registered')?.purchase_count ?? '0') || 0
+    const guest = Number.parseFloat(rows.find((r) => r.user_type === 'guest')?.purchase_count      ?? '0') || 0
+    const t = reg + guest
+    return t > 0 ? Math.round((reg / t) * 100) : 0
+  }, [guestQ.data])
+
   if (authLoading) return <AdminPageSkeleton />
   if (!admin) {
     router.push('/admin/login')
@@ -274,39 +309,6 @@ export default function AdminReportsPage() {
   const funnel = funnelQ.data?.data.funnel as
     | Record<string, string>
     | undefined
-
-  const funnelNums = useMemo(() => {
-    const pv = Number.parseFloat(funnel?.product_views ?? '0') || 0
-    const atc = Number.parseFloat(funnel?.add_to_cart ?? '0') || 0
-    const co = Number.parseFloat(funnel?.checkout_starts ?? '0') || 0
-    const pur = Number.parseFloat(funnel?.purchases ?? '0') || 0
-    return {
-      pv,
-      atc,
-      co,
-      pur,
-      p1: pv > 0 ? (atc / pv) * 100 : 0,
-      p2: atc > 0 ? (co / atc) * 100 : 0,
-      p3: co > 0 ? (pur / co) * 100 : 0,
-    }
-  }, [funnel])
-
-  const guestChart = useMemo(() => {
-    const rows = guestPayload?.byUserType ?? []
-    return rows.map((r) => ({
-      name:  r.user_type === 'registered' ? 'Registered' : 'Guest',
-      value: Number.parseFloat(r.purchase_count) || 0,
-      fill:  r.user_type === 'registered' ? UMBER : '#D6CFC6',
-    }))
-  }, [guestPayload])
-
-  const registeredPct = useMemo(() => {
-    const rows = guestPayload?.byUserType ?? []
-    const reg = Number.parseFloat(rows.find((r) => r.user_type === 'registered')?.purchase_count ?? '0') || 0
-    const guest = Number.parseFloat(rows.find((r) => r.user_type === 'guest')?.purchase_count ?? '0') || 0
-    const t = reg + guest
-    return t > 0 ? Math.round((reg / t) * 100) : 0
-  }, [guestPayload])
 
   return (
     <div className="p-4 md:p-8 max-w-[1400px] mx-auto space-y-6">
