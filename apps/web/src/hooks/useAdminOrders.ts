@@ -443,3 +443,30 @@ export function useRemoveAllocation() {
     },
   })
 }
+
+// AUDIT FIX: admin order shipping address (PATCH /admin/orders/:orderId/shipping-address)
+export function useUpdateOrderShippingAddress() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      orderId,
+      addressJson,
+      countryCode,
+    }: {
+      orderId: string
+      addressJson: Record<string, unknown>
+      countryCode: string
+    }) => {
+      await api.patch(`/admin/orders/${orderId}/shipping-address`, {
+        kind: 'SHIPPING',
+        addressJson,
+        countryCode,
+      })
+    },
+    onSuccess: (_, { orderId }) => {
+      void queryClient.invalidateQueries({ queryKey: ADMIN_ORDERS_KEYS.detail(orderId) })
+      void queryClient.invalidateQueries({ queryKey: ADMIN_ORDERS_KEYS.all })
+    },
+  })
+}

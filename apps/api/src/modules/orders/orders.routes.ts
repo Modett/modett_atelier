@@ -11,6 +11,7 @@ import type { AuthRequest, AdminRequest } from '../../middleware/auth'
 import { validate, validateQuery } from '../../middleware/validate'
 import { withAdmin } from '../../middleware/auth'
 import * as ordersService from './orders.service'
+import { writeAuditLog } from '../../middleware/audit'
 
 const router = Router()
 
@@ -111,10 +112,22 @@ router.post(
   withAdmin(async (req: AdminRequest, res: Response) => {
     const orderId = req.params.orderId as string
     const body = (req as Request & { body: z.infer<typeof packBodySchema> }).body
+    const beforeDetail = await ordersService.adminGetOrderDetail({ orderId })
+    const prev = String(beforeDetail.order.fulfillment_state)
     await ordersService.markOrderPacked({
       orderId,
       adminId: req.admin.id,
       note: body.note,
+    })
+    const afterDetail = await ordersService.adminGetOrderDetail({ orderId })
+    void writeAuditLog({
+      req,
+      action: 'UPDATE_FULFILLMENT',
+      entityType: 'order',
+      entityId: orderId,
+      entityLabel: String(beforeDetail.order.order_ref),
+      beforeJson: { fulfillmentState: prev },
+      afterJson: { fulfillmentState: String(afterDetail.order.fulfillment_state) },
     })
     res.status(200).json({ data: { ok: true } })
   }),
@@ -133,12 +146,24 @@ router.post(
   withAdmin(async (req: AdminRequest, res: Response) => {
     const orderId = req.params.orderId as string
     const body = (req as Request & { body: z.infer<typeof shipBodySchema> }).body
+    const beforeDetail = await ordersService.adminGetOrderDetail({ orderId })
+    const prev = String(beforeDetail.order.fulfillment_state)
     await ordersService.markOrderShipped({
       orderId,
       adminId: req.admin.id,
       trackingNumber: body.trackingNumber,
       carrier: body.carrier,
       note: body.note,
+    })
+    const afterDetail = await ordersService.adminGetOrderDetail({ orderId })
+    void writeAuditLog({
+      req,
+      action: 'UPDATE_FULFILLMENT',
+      entityType: 'order',
+      entityId: orderId,
+      entityLabel: String(beforeDetail.order.order_ref),
+      beforeJson: { fulfillmentState: prev },
+      afterJson: { fulfillmentState: String(afterDetail.order.fulfillment_state) },
     })
     res.status(200).json({ data: { ok: true } })
   }),
@@ -155,10 +180,22 @@ router.post(
   withAdmin(async (req: AdminRequest, res: Response) => {
     const orderId = req.params.orderId as string
     const body = (req as Request & { body: z.infer<typeof outForDeliveryBodySchema> }).body
+    const beforeDetail = await ordersService.adminGetOrderDetail({ orderId })
+    const prev = String(beforeDetail.order.fulfillment_state)
     await ordersService.markOrderOutForDelivery({
       orderId,
       adminId: req.admin.id,
       note: body.note,
+    })
+    const afterDetail = await ordersService.adminGetOrderDetail({ orderId })
+    void writeAuditLog({
+      req,
+      action: 'UPDATE_FULFILLMENT',
+      entityType: 'order',
+      entityId: orderId,
+      entityLabel: String(beforeDetail.order.order_ref),
+      beforeJson: { fulfillmentState: prev },
+      afterJson: { fulfillmentState: String(afterDetail.order.fulfillment_state) },
     })
     res.status(200).json({ data: { ok: true } })
   }),
@@ -175,10 +212,22 @@ router.post(
   withAdmin(async (req: AdminRequest, res: Response) => {
     const orderId = req.params.orderId as string
     const body = (req as Request & { body: z.infer<typeof deliverBodySchema> }).body
+    const beforeDetail = await ordersService.adminGetOrderDetail({ orderId })
+    const prev = String(beforeDetail.order.fulfillment_state)
     await ordersService.markOrderDelivered({
       orderId,
       adminId: req.admin.id,
       note: body.note,
+    })
+    const afterDetail = await ordersService.adminGetOrderDetail({ orderId })
+    void writeAuditLog({
+      req,
+      action: 'UPDATE_FULFILLMENT',
+      entityType: 'order',
+      entityId: orderId,
+      entityLabel: String(beforeDetail.order.order_ref),
+      beforeJson: { fulfillmentState: prev },
+      afterJson: { fulfillmentState: String(afterDetail.order.fulfillment_state) },
     })
     res.status(200).json({ data: { ok: true } })
   }),
@@ -195,10 +244,23 @@ router.post(
   withAdmin(async (req: AdminRequest, res: Response) => {
     const orderId = req.params.orderId as string
     const body = (req as Request & { body: z.infer<typeof cancelBodySchema> }).body
+    const beforeDetail = await ordersService.adminGetOrderDetail({ orderId })
     await ordersService.cancelOrder({
       orderId,
       adminId: req.admin.id,
       reason: body.reason,
+    })
+    void writeAuditLog({
+      req,
+      action: 'CANCEL_ORDER',
+      entityType: 'order',
+      entityId: orderId,
+      entityLabel: String(beforeDetail.order.order_ref),
+      beforeJson: {
+        orderState: String(beforeDetail.order.order_state),
+        paymentState: String(beforeDetail.order.payment_state),
+      },
+      afterJson: { orderState: 'CANCELLED', reason: body.reason },
     })
     res.status(200).json({ data: { ok: true } })
   }),
@@ -217,12 +279,25 @@ router.patch(
   withAdmin(async (req: AdminRequest, res: Response) => {
     const orderId = req.params.orderId as string
     const body = (req as Request & { body: z.infer<typeof shippingAddressBodySchema> }).body
+    const beforeDetail = await ordersService.adminGetOrderDetail({ orderId })
+    const shipBefore = beforeDetail.addresses.find((a) => a.kind === 'SHIPPING')
     await ordersService.updateShippingAddress({
       orderId,
       kind: body.kind,
       addressJson: body.addressJson,
       countryCode: body.countryCode,
       adminId: req.admin.id,
+    })
+    const afterDetail = await ordersService.adminGetOrderDetail({ orderId })
+    const shipAfter = afterDetail.addresses.find((a) => a.kind === 'SHIPPING')
+    void writeAuditLog({
+      req,
+      action: 'UPDATE_ADDRESS',
+      entityType: 'order',
+      entityId: orderId,
+      entityLabel: String(beforeDetail.order.order_ref),
+      beforeJson: { shipping: shipBefore?.address_json ?? null },
+      afterJson: { shipping: shipAfter?.address_json ?? null },
     })
     res.status(200).json({ data: { ok: true } })
   }),

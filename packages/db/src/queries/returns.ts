@@ -155,6 +155,10 @@ export interface ReturnRequestSummary extends ReturnRequest {
   order_ref: string
   user_id: string | null
   guest_email: string | null
+  item_count: number
+  user_first_name: string | null
+  user_last_name: string | null
+  user_email: string | null
 }
 
 export interface ListReturnRequestsAdminResult {
@@ -193,9 +197,16 @@ export async function listReturnRequestsAdmin({
     SELECT rr.id, rr.order_id, rr.type, rr.status, rr.reason,
            rr.policy_accepted_at, rr.policy_version, rr.eligible_until,
            rr.created_at, rr.updated_at,
-           o.order_ref, o.user_id, o.guest_email
+           o.order_ref, o.user_id, o.guest_email,
+           u.first_name AS user_first_name,
+           u.last_name AS user_last_name,
+           u.email AS user_email,
+           (SELECT COUNT(*)::int
+            FROM returns.return_request_items rri
+            WHERE rri.return_request_id = rr.id) AS item_count
     FROM returns.return_requests rr
     JOIN orders.orders o ON o.id = rr.order_id
+    LEFT JOIN iam.users u ON u.id = o.user_id AND u.deleted_at IS NULL
     WHERE ${statusCondition} AND ${typeCondition}
     ORDER BY rr.created_at DESC
     LIMIT ${safeLimit} OFFSET ${offset}

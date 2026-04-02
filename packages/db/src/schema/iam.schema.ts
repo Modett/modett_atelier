@@ -68,6 +68,7 @@ export const adminInvites = iam.table('admin_invites', {
   email: text('email').notNull(),
   tokenHash: text('token_hash').notNull().unique('uq_admin_invites_token'),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  role: adminRoleEnum('role').notNull().default('ADMIN'),
   createdByAdminId: uuid('created_by_admin_id')
     .notNull()
     .references(() => admins.id),
@@ -135,6 +136,21 @@ export const savedAddresses = iam.table('saved_addresses', {
     .defaultNow(),
 })
 
+export const adminAuditLog = iam.table('admin_audit_log', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  adminId: uuid('admin_id').references(() => admins.id, { onDelete: 'set null' }),
+  adminEmail: text('admin_email').notNull(),
+  adminRole: text('admin_role').notNull(),
+  action: text('action').notNull(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id'),
+  entityLabel: text('entity_label'),
+  beforeJson: jsonb('before_json'),
+  afterJson: jsonb('after_json'),
+  ipAddress: text('ip_address'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const savedPaymentMethods = iam.table('saved_payment_methods', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id')
@@ -167,3 +183,5 @@ export type SavedPaymentMethod = InferSelectModel<typeof savedPaymentMethods>
 export type NewSavedPaymentMethod = InferInsertModel<typeof savedPaymentMethods>
 export type NewsletterSubscriber = InferSelectModel<typeof newsletterSubscribers>
 export type NewNewsletterSubscriber = InferInsertModel<typeof newsletterSubscribers>
+export type AdminAuditLogRow = InferSelectModel<typeof adminAuditLog>
+export type NewAdminAuditLogRow = InferInsertModel<typeof adminAuditLog>

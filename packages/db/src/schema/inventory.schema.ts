@@ -36,6 +36,7 @@ export const productVariants = inventory.table(
       .notNull()
       .references(() => products.id, { onDelete: 'restrict' }),
     color: text('color').notNull(),
+    color_hex: text('color_hex'),
     size: text('size').notNull(),
     sku_group: text('sku_group').notNull(),
     created_at: timestamp('created_at', { withTimezone: true })

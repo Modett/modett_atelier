@@ -15,6 +15,7 @@ import {
   rateLimitAcceptInvite,
 } from '../../middleware/rateLimit'
 import { optionalAuth, requireAuth, requireAdmin, requireOwner } from '../../middleware/auth'
+import type { AdminRequest as StrictAdminRequest } from '../../middleware/auth'
 import { mergeCartsOnLogin } from '../cart'
 import {
   crossOriginCookieAttributes,
@@ -22,6 +23,13 @@ import {
   setCidCookie,
 } from '../../lib/crossOriginCookies'
 import * as iamService from './iam.service'
+import {
+  listAdminAuditLogs,
+  getAdminById,
+  getUserById,
+  type AdminAuditLogListRow,
+} from '@modett/db'
+import { writeAuditLog } from '../../middleware/audit'
 
 const router = Router()
 
@@ -35,8 +43,9 @@ const ADMIN_COOKIE_OPTIONS = {
   path: '/admin' as const,
 }
 
-type AuthRequest = Request & { user?: { id: string }; sessionId?: string }
-type AdminRequest = Request & {
+/** Loose shapes so handlers type-check with Express; use StrictAdminRequest for audit helper. */
+type IamAuthRequest = Request & { user?: { id: string }; sessionId?: string }
+type IamAdminRequest = Request & {
   user?: { id: string }
   admin?: { id: string; role: string }
   sessionId?: string
@@ -300,7 +309,7 @@ router.get(
  *                     user: { $ref: '#/components/schemas/User' }
  *       401: { description: Not authenticated }
  */
-router.get('/me', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/me', requireAuth, async (req: IamAuthRequest, res: Response) => {
   const user = await iamService.getMe({ userId: req.user!.id })
   res.status(200).json({ data: { user } })
 })
@@ -349,7 +358,7 @@ router.patch(
   '/me',
   requireAuth,
   validate(updateMeSchema),
-  async (req: AuthRequest, res: Response) => {
+  async (req: IamAuthRequest, res: Response) => {
     const body = (req as { body: z.infer<typeof updateMeSchema> }).body
     const user = await iamService.updateMe({ userId: req.user!.id, data: body })
     res.status(200).json({ data: { user } })
@@ -386,7 +395,7 @@ router.patch(
   '/me/password',
   requireAuth,
   validate(changePasswordSchema),
-  async (req: AuthRequest, res: Response) => {
+  async (req: IamAuthRequest, res: Response) => {
     const body = (req as { body: z.infer<typeof changePasswordSchema> }).body
     const { sessionId } = await iamService.changePassword({
       userId: req.user!.id,
@@ -421,7 +430,7 @@ router.patch(
  *                       type: array
  *                       items: { $ref: '#/components/schemas/SavedAddress' }
  */
-router.get('/me/addresses', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/me/addresses', requireAuth, async (req: IamAuthRequest, res: Response) => {
   const addresses = await iamService.listSavedAddressesForUser({ userId: req.user!.id })
   res.status(200).json({ data: { addresses } })
 })
@@ -469,7 +478,7 @@ router.post(
   '/me/addresses',
   requireAuth,
   validate(createAddressSchema),
-  async (req: AuthRequest, res: Response) => {
+  async (req: IamAuthRequest, res: Response) => {
     const body = (req as { body: z.infer<typeof createAddressSchema> }).body
     const address = await iamService.createSavedAddressForUser({
       userId: req.user!.id,
@@ -511,7 +520,7 @@ router.patch(
   '/me/addresses/:addressId',
   requireAuth,
   validate(updateAddressSchema),
-  async (req: AuthRequest, res: Response) => {
+  async (req: IamAuthRequest, res: Response) => {
     const body = (req as { body: z.infer<typeof updateAddressSchema> }).body
     const address = await iamService.updateSavedAddressForUser({
       id: req.params.addressId!,
@@ -540,7 +549,7 @@ router.patch(
 router.delete(
   '/me/addresses/:addressId',
   requireAuth,
-  async (req: AuthRequest, res: Response) => {
+  async (req: IamAuthRequest, res: Response) => {
     await iamService.deleteSavedAddressForUser({
       id: req.params.addressId!,
       userId: req.user!.id,
@@ -551,7 +560,7 @@ router.delete(
 
 // —— Wishlist ——
 
-router.get('/me/wishlist', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/me/wishlist', requireAuth, async (req: IamAuthRequest, res: Response) => {
   const currency = storefrontCurrencyFromRequest(req)
   const wishlist = await iamService.getWishlist({
     userId: req.user!.id,
@@ -563,7 +572,7 @@ router.get('/me/wishlist', requireAuth, async (req: AuthRequest, res: Response) 
 router.post(
   '/me/wishlist/:productId',
   requireAuth,
-  async (req: AuthRequest, res: Response) => {
+  async (req: IamAuthRequest, res: Response) => {
     const { productId } = req.params as { productId: string }
     const item = await iamService.wishlistAdd({
       userId: req.user!.id,
@@ -576,7 +585,7 @@ router.post(
 router.delete(
   '/me/wishlist/:productId',
   requireAuth,
-  async (req: AuthRequest, res: Response) => {
+  async (req: IamAuthRequest, res: Response) => {
     const { productId } = req.params as { productId: string }
     await iamService.wishlistRemove({
       userId: req.user!.id,
@@ -608,7 +617,7 @@ router.delete(
  *                       type: array
  *                       items: { $ref: '#/components/schemas/SavedPaymentMethod' }
  */
-router.get('/me/payment-methods', requireAuth, async (req: AuthRequest, res: Response) => {
+router.get('/me/payment-methods', requireAuth, async (req: IamAuthRequest, res: Response) => {
   const paymentMethods = await iamService.listSavedPaymentMethodsForUser({
     userId: req.user!.id,
   })
@@ -633,7 +642,7 @@ router.get('/me/payment-methods', requireAuth, async (req: AuthRequest, res: Res
 router.delete(
   '/me/payment-methods/:methodId',
   requireAuth,
-  async (req: AuthRequest, res: Response) => {
+  async (req: IamAuthRequest, res: Response) => {
     await iamService.deleteSavedPaymentMethodForUser({
       id: req.params.methodId!,
       userId: req.user!.id,
@@ -702,7 +711,7 @@ router.post(
  *     responses:
  *       200: { description: Logged out }
  */
-router.post('/admin/auth/logout', requireAdmin, async (req: AdminRequest, res: Response) => {
+router.post('/admin/auth/logout', requireAdmin, async (req: IamAdminRequest, res: Response) => {
   const sid = req.cookies?.sid
   if (sid) await iamService.adminLogout({ sessionId: sid })
   clearSidCookie(res, '/admin')
@@ -730,13 +739,60 @@ router.post('/admin/auth/logout', requireAdmin, async (req: AdminRequest, res: R
  *                     user:  { $ref: '#/components/schemas/User' }
  *                     admin: { $ref: '#/components/schemas/Admin' }
  */
-router.get('/admin/me', requireAdmin, async (req: AdminRequest, res: Response) => {
+router.get('/admin/me', requireAdmin, async (req: IamAdminRequest, res: Response) => {
   res.status(200).json({ data: { user: req.user, admin: req.admin } })
 })
 
+const adminPatchMeSchema = z
+  .object({
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+  })
+  .refine((b) => b.firstName != null || b.lastName != null, {
+    message: 'At least one of firstName, lastName is required',
+  })
+
+router.patch(
+  '/admin/me',
+  requireAdmin,
+  validate(adminPatchMeSchema),
+  async (req: IamAdminRequest, res: Response) => {
+    const body = (req as { body: z.infer<typeof adminPatchMeSchema> }).body
+    const user = await iamService.updateAdminSelfProfile({
+      userId: req.user!.id,
+      firstName: body.firstName,
+      lastName: body.lastName,
+    })
+    res.status(200).json({ data: { user, admin: req.admin } })
+  },
+)
+
+const adminChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(100),
+})
+
+router.post(
+  '/admin/auth/change-password',
+  requireAdmin,
+  validate(adminChangePasswordSchema),
+  async (req: IamAdminRequest, res: Response) => {
+    const body = (req as { body: z.infer<typeof adminChangePasswordSchema> }).body
+    await iamService.adminChangePassword({
+      userId: req.user!.id,
+      currentPassword: body.currentPassword,
+      newPassword: body.newPassword,
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
 // —— Admin management (OWNER only) ——
 
-const createInviteSchema = z.object({ email: z.string().email() })
+const createInviteSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['ADMIN', 'OWNER']).default('ADMIN'),
+})
 
 /**
  * @swagger
@@ -774,17 +830,23 @@ router.post(
   requireOwner,
   rateLimitAdminInvites,
   validate(createInviteSchema),
-  async (req: AdminRequest, res: Response) => {
+  async (req: IamAdminRequest, res: Response) => {
     const body = (req as { body: z.infer<typeof createInviteSchema> }).body
-    const { invite, rawToken } = await iamService.createAdminInviteForOwner({
+    const { invite } = await iamService.createAdminInviteForOwner({
       email: body.email,
+      role: body.role,
       createdByAdminId: req.admin!.id,
     })
-    const data =
-      process.env.NODE_ENV !== 'production'
-        ? { invite: { ...invite, rawToken } }
-        : { invite }
-    res.status(201).json({ data })
+    void writeAuditLog({
+      req: req as StrictAdminRequest,
+      action: 'INVITE_ADMIN',
+      entityType: 'admin_invite',
+      entityId: invite.id,
+      entityLabel: invite.email,
+      beforeJson: null,
+      afterJson: { email: invite.email, role: invite.role },
+    })
+    res.status(201).json({ data: { invite } })
   },
 )
 
@@ -835,11 +897,15 @@ router.post(
   validate(acceptInviteSchema),
   async (req: Request, res: Response) => {
     const body = (req as { body: z.infer<typeof acceptInviteSchema> }).body
-    const { user, admin } = await iamService.acceptAdminInvite({
+    const { user, admin, sessionId } = await iamService.acceptAdminInvite({
       rawToken: body.token,
       firstName: body.firstName,
       lastName: body.lastName,
       password: body.password,
+    })
+    res.cookie('sid', sessionId, {
+      ...ADMIN_COOKIE_OPTIONS,
+      maxAge: 8 * 60 * 60 * 1000,
     })
     res.status(200).json({ data: { user, admin } })
   },
@@ -872,6 +938,82 @@ router.post(
  *                             properties:
  *                               user: { $ref: '#/components/schemas/User' }
  */
+const auditLogQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  adminId: z.string().uuid().optional(),
+  action: z.string().min(1).optional(),
+  entityType: z.string().min(1).optional(),
+  entityId: z.string().min(1).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+})
+
+router.get(
+  '/admin/audit-log',
+  requireAdmin,
+  validateQuery(auditLogQuerySchema),
+  async (req: Request, res: Response) => {
+    const q = (req as Request & { validatedQuery: z.infer<typeof auditLogQuerySchema> })
+      .validatedQuery
+    const from =
+      q.from != null && q.from.trim() !== '' ? new Date(q.from) : undefined
+    const to = q.to != null && q.to.trim() !== '' ? new Date(q.to) : undefined
+    if (from != null && Number.isNaN(from.getTime())) {
+      res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid from date' },
+      })
+      return
+    }
+    if (to != null && Number.isNaN(to.getTime())) {
+      res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Invalid to date' },
+      })
+      return
+    }
+    const { logs, total } = await listAdminAuditLogs({
+      page: q.page,
+      limit: q.limit,
+      adminId: q.adminId,
+      action: q.action,
+      entityType: q.entityType,
+      entityId: q.entityId,
+      from,
+      to,
+    })
+    res.status(200).json({
+      data: {
+        logs: logs.map((l: AdminAuditLogListRow) => ({
+          id: l.id,
+          adminId: l.admin_id,
+          adminEmail: l.admin_email,
+          adminRole: l.admin_role,
+          currentRole: l.current_role,
+          action: l.action,
+          entityType: l.entity_type,
+          entityId: l.entity_id,
+          entityLabel: l.entity_label,
+          beforeJson: l.before_json,
+          afterJson: l.after_json,
+          ipAddress: l.ip_address,
+          createdAt:
+            l.created_at instanceof Date
+              ? l.created_at.toISOString()
+              : String(l.created_at),
+        })),
+        total,
+        page: q.page,
+        limit: q.limit,
+      },
+    })
+  },
+)
+
+router.get('/admin/invites', requireAdmin, async (_req: Request, res: Response) => {
+  const invites = await iamService.listPendingAdminInvitesForAdmin()
+  res.status(200).json({ data: { invites } })
+})
+
 router.get('/admin/admins', requireAdmin, async (_req: Request, res: Response) => {
   const admins = await iamService.listAdminsForOwner()
   res.status(200).json({ data: { admins } })
@@ -912,12 +1054,25 @@ router.patch(
   '/admin/admins/:adminId/role',
   requireOwner,
   validate(updateRoleSchema),
-  async (req: AdminRequest, res: Response) => {
+  async (req: IamAdminRequest, res: Response) => {
     const body = (req as { body: z.infer<typeof updateRoleSchema> }).body
+    const targetId = req.params.adminId!
+    const beforeAdmin = await getAdminById({ id: targetId })
+    const beforeUser =
+      beforeAdmin != null ? await getUserById({ id: beforeAdmin.userId }) : null
     const admin = await iamService.updateAdminRoleForOwner({
-      targetAdminId: req.params.adminId!,
+      targetAdminId: targetId,
       role: body.role,
       requestingAdminId: req.admin!.id,
+    })
+    void writeAuditLog({
+      req: req as StrictAdminRequest,
+      action: 'CHANGE_ROLE',
+      entityType: 'admin',
+      entityId: targetId,
+      entityLabel: beforeUser?.email ?? targetId,
+      beforeJson: beforeAdmin != null ? { role: beforeAdmin.role } : null,
+      afterJson: { role: body.role },
     })
     res.status(200).json({ data: { admin } })
   },
@@ -944,10 +1099,68 @@ router.patch(
 router.post(
   '/admin/admins/:adminId/suspend',
   requireOwner,
-  async (req: AdminRequest, res: Response) => {
+  async (req: IamAdminRequest, res: Response) => {
+    const targetId = req.params.adminId!
+    const beforeAdmin = await getAdminById({ id: targetId })
+    const beforeUser =
+      beforeAdmin != null ? await getUserById({ id: beforeAdmin.userId }) : null
+    await iamService.suspendAdminForOwner({
+      targetAdminId: targetId,
+      requestingAdminId: req.admin!.id,
+    })
+    void writeAuditLog({
+      req: req as StrictAdminRequest,
+      action: 'SUSPEND_ADMIN',
+      entityType: 'admin',
+      entityId: targetId,
+      entityLabel: beforeUser?.email ?? targetId,
+      beforeJson: beforeAdmin != null ? { status: beforeAdmin.status } : null,
+      afterJson: { status: 'SUSPENDED' },
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
+router.post(
+  '/admin/admins/:adminId/reinstate',
+  requireOwner,
+  async (req: IamAdminRequest, res: Response) => {
+    await iamService.reinstateAdminForOwner({
+      targetAdminId: req.params.adminId!,
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
+router.delete(
+  '/admin/admins/:adminId',
+  requireOwner,
+  async (req: IamAdminRequest, res: Response) => {
     await iamService.suspendAdminForOwner({
       targetAdminId: req.params.adminId!,
       requestingAdminId: req.admin!.id,
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
+router.post(
+  '/admin/invites/:inviteId/resend',
+  requireOwner,
+  async (req: IamAdminRequest, res: Response) => {
+    await iamService.resendAdminInviteForOwner({
+      inviteId: req.params.inviteId!,
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
+router.delete(
+  '/admin/invites/:inviteId',
+  requireOwner,
+  async (req: IamAdminRequest, res: Response) => {
+    await iamService.cancelAdminInviteForOwner({
+      inviteId: req.params.inviteId!,
     })
     res.status(200).json({ data: { ok: true } })
   },

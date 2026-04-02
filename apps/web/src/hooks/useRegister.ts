@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { Analytics } from '@/lib/analytics'
 import { CART_QUERY_KEY } from './useCart'
 import { SESSION_QUERY_KEY } from './useSession'
 import { WISHLIST_QUERY_KEY } from './useWishlist'
@@ -27,6 +28,7 @@ export function useRegister() {
       queryClient.setQueryData(SESSION_QUERY_KEY, user)
       void queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY })
       void queryClient.invalidateQueries({ queryKey: WISHLIST_QUERY_KEY })
+      Analytics.accountCreated({ userId: user.id, method: 'email' })
     },
   })
 }

@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Bell,
   CheckCircle2,
+  ClipboardList,
   Clock,
   Package,
   RefreshCw,
@@ -35,6 +36,7 @@ import {
   useNotifyMeDemand,
   usePendingReturns,
   useRecentOrders,
+  useUnresolvedReconciliationCount,
 } from '@/hooks/useAdminDashboard'
 import type {
   AdminOrderSummary,
@@ -130,6 +132,7 @@ export default function AdminDashboardPage() {
   const { data: stockData, isLoading: stockLoading } = useLowStockVariants()
   const { data: notifyMeData, isLoading: notifyMeLoading } = useNotifyMeDemand()
   const { data: flaggedData, isLoading: flaggedLoading } = useFlaggedReviews()
+  const { data: reconCount = 0, isLoading: reconLoading } = useUnresolvedReconciliationCount()
 
   const stats = useMemo(
     () => ({
@@ -139,8 +142,9 @@ export default function AdminDashboardPage() {
       lowStock:       stockData?.lowStockItems.length ?? 0,
       outOfStock:     stockData?.outOfStockItems.length ?? 0,
       flaggedReviews: flaggedData?.total ?? 0,
+      reconciliation: reconCount,
     }),
-    [ordersData, returnsData, stockData, flaggedData],
+    [ordersData, returnsData, stockData, flaggedData, reconCount],
   )
 
   return (
@@ -152,7 +156,7 @@ export default function AdminDashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         <StatsCard
           alert={false}
           href="/admin/orders"
@@ -197,6 +201,15 @@ export default function AdminDashboardPage() {
           title="Flagged Reviews"
           value={stats.flaggedReviews}
         />
+        <StatsCard
+          alert={stats.reconciliation > 0}
+          alertColor="amber"
+          href="/admin/inventory"
+          icon={ClipboardList}
+          loading={reconLoading}
+          title="Reconciliation"
+          value={stats.reconciliation}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -227,7 +240,7 @@ export default function AdminDashboardPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {ordersData?.orders.slice(0, 8).map((order: AdminOrderSummary) => (
+                    {ordersData?.orders.slice(0, 5).map((order: AdminOrderSummary) => (
                       <TableRow key={order.id}>
                         <TableCell>
                           <Link

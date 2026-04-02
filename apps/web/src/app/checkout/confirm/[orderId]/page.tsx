@@ -9,18 +9,34 @@ import { api } from '@/lib/api'
 import { useCheckoutStore } from '@/store/checkout.store'
 import { CART_QUERY_KEY } from '@/hooks/useCart'
 import { useAuthPanel } from '@/components/providers/AuthProvider'
+import { Analytics } from '@/lib/analytics'
+
+interface PurchaseAnalyticsPayload {
+  totalValue: string
+  currency:   string
+  items:      Array<{
+    variantId: string
+    productId: string
+    color:     string
+    size:      string
+    qty:       number
+    unitPrice: string
+  }>
+}
 
 interface PaymentStatusResponse {
   orderId: string
   orderRef: string
   orderState: string
   paymentState: string
+  userId: string | null
   intent: {
     id: string
     status: string
     amount: string
     currency: string
   } | null
+  purchaseAnalytics: PurchaseAnalyticsPayload | null
 }
 
 type ConfirmState = 'polling' | 'success' | 'failed' | 'timeout'
@@ -41,7 +57,8 @@ export default function OrderConfirmationPage() {
   const [guestAfterOrder, setGuestAfterOrder] = useState<{
     email: string
   } | null>(null)
-  const pollCount = useRef(0)
+  const pollCount       = useRef(0)
+  const purchaseTracked = useRef(false)
 
   const poll = useCallback(async () => {
     try {
@@ -55,7 +72,7 @@ export default function OrderConfirmationPage() {
         { params: queryParams },
       )
 
-      const { paymentState, orderRef: ref, intent } = res.data
+      const { paymentState, orderRef: ref, intent, userId, purchaseAnalytics } = res.data
       setOrderRef(ref)
       const intentStatus = intent?.status
 
@@ -65,6 +82,20 @@ export default function OrderConfirmationPage() {
           setGuestAfterOrder({ email: snap.email })
         } else {
           setGuestAfterOrder(null)
+        }
+        if (!purchaseTracked.current && purchaseAnalytics) {
+          purchaseTracked.current = true
+          Analytics.purchaseComplete({
+            orderId:    res.data.orderId,
+            orderRef:   ref,
+            items:      purchaseAnalytics.items,
+            totalValue: purchaseAnalytics.totalValue,
+            currency:   purchaseAnalytics.currency,
+            userId:     userId ?? undefined,
+          })
+          if (!userId) {
+            Analytics.guestCheckout({ orderId: res.data.orderId, orderRef: ref })
+          }
         }
         setState('success')
         clearCheckout()

@@ -26,6 +26,10 @@ export function StorefrontHeader() {
   const { openPanel } = useAuthPanel()
   const { user, isLoggedIn } = useSession()
 
+  // The homepage has its own HeroNav inside HomepageHero.
+  // Rendering StorefrontHeader there produces a duplicate navbar.
+  if (pathname === '/') return null
+
   const openMenu = useCallback(() => setMobileOpen(true), [])
   const closeMenu = useCallback(() => setMobileOpen(false), [])
 

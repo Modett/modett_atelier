@@ -21,13 +21,16 @@ import {
   getActiveSessionsByUserId,
   getAdminByUserId,
   getAdminById,
-  createAdmin,
   updateAdminStatus,
   updateAdminRole,
   listAdmins,
   createAdminInvite,
   getAdminInviteByTokenHash,
   acceptAdminInviteTransaction,
+  listPendingAdminInvites,
+  getAdminInviteById,
+  updateAdminInviteToken,
+  deleteAdminInvite,
   listSavedAddresses,
   createSavedAddress,
   updateSavedAddress,
@@ -43,12 +46,14 @@ import {
 import type {
   User,
   Admin,
+  AdminInvite,
   SavedAddress,
   SavedPaymentMethod,
   ProductListItemRowWithCategory,
 } from '@modett/db'
 import { createLoyaltyAccount } from '../loyalty'
 import { createNotificationPreferences } from '../messaging'
+import { sendEmail } from '../../infrastructure/email/email.service'
 
 const BCRYPT_ROUNDS = 12
 const PASSWORD_RESET_REDIS_PREFIX = 'pwdreset:'
@@ -498,13 +503,60 @@ export async function adminLogout({
 
 // —— Admin invites ——
 
+function adminInviteEmailHtml({
+  inviteUrl,
+  role,
+}: {
+  inviteUrl: string
+  role: string
+}): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;">
+      <p style="font-size:13px;letter-spacing:0.3em;text-transform:uppercase;
+                color:#8B8480;margin-bottom:24px;">MODETT ATELIER</p>
+      <h1 style="font-family:Georgia,serif;font-size:24px;font-weight:normal;
+                 color:#1A1914;margin-bottom:16px;">
+        You've been invited to the team
+      </h1>
+      <p style="font-size:14px;line-height:1.7;color:#1A1914;">
+        You have been invited to join the Modett Atelier admin portal
+        as an <strong>${role}</strong>.
+      </p>
+      <p style="font-size:14px;line-height:1.7;color:#1A1914;">
+        Click the button below to accept your invitation and set up your account.
+        This link expires in <strong>48 hours</strong>.
+      </p>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin:32px 0;">
+        <tr>
+          <td style="background:#3D2E26;">
+            <a href="${inviteUrl}"
+               style="display:inline-block;padding:14px 32px;color:#FAFAF8;
+                      text-decoration:none;font-size:12px;letter-spacing:0.2em;
+                      text-transform:uppercase;">
+              Accept Invitation
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="font-size:12px;color:#8B8480;">
+        If you weren't expecting this invitation, you can safely ignore this email.
+      </p>
+    </body>
+    </html>
+  `
+}
+
 export async function createAdminInviteForOwner({
   email,
+  role,
   createdByAdminId,
 }: {
   email: string
+  role: 'OWNER' | 'ADMIN'
   createdByAdminId: string
-}): Promise<{ invite: Awaited<ReturnType<typeof createAdminInvite>>; rawToken: string }> {
+}): Promise<{ invite: Awaited<ReturnType<typeof createAdminInvite>> }> {
   const normalisedEmail = email.toLowerCase().trim()
   const rawToken = crypto.randomBytes(32).toString('hex')
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
@@ -514,8 +566,24 @@ export async function createAdminInviteForOwner({
     tokenHash,
     expiresAt,
     createdByAdminId,
+    role,
   })
-  return { invite, rawToken }
+  const base = process.env.FRONTEND_URL ?? 'http://localhost:3000'
+  const inviteUrl = `${base.replace(/\/$/, '')}/admin/accept-invite?token=${encodeURIComponent(rawToken)}`
+  try {
+    await sendEmail({
+      to: normalisedEmail,
+      subject: 'You have been invited to join Modett Atelier',
+      html: adminInviteEmailHtml({ inviteUrl, role }),
+    })
+  } catch (err) {
+    console.error('[iam] admin invite email failed:', err)
+    throw new AppError('INVITE_EMAIL_FAILED', 502)
+  }
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[iam] admin invite accept URL (dev):', inviteUrl)
+  }
+  return { invite }
 }
 
 export async function acceptAdminInvite({
@@ -528,21 +596,29 @@ export async function acceptAdminInvite({
   firstName: string
   lastName: string
   password: string
-}): Promise<{ user: SanitisedUser; admin: Admin }> {
+}): Promise<{ user: SanitisedUser; admin: Admin; sessionId: string }> {
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
   const invite = await getAdminInviteByTokenHash({ tokenHash })
   if (!invite) throw new AppError('INVALID_OR_EXPIRED_INVITE', 400)
   if (invite.expiresAt < new Date()) throw new AppError('INVALID_OR_EXPIRED_INVITE', 400)
   if (invite.usedAt) throw new AppError('INVITE_ALREADY_USED', 400)
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+  const invitedRole = invite.role === 'OWNER' ? 'OWNER' : 'ADMIN'
   const { user, admin } = await acceptAdminInviteTransaction({
     inviteId: invite.id,
     email: invite.email,
     firstName,
     lastName,
     passwordHash,
+    invitedRole,
   })
-  return { user: sanitiseUser(user), admin }
+  const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000)
+  const session = await createSession({
+    userId: user.id,
+    kind: 'ADMIN',
+    expiresAt,
+  })
+  return { user: sanitiseUser(user), admin, sessionId: session.id }
 }
 
 // —— Admin management (OWNER only, enforced in routes) ——
@@ -590,4 +666,93 @@ export async function suspendAdminForOwner({
   for (const s of sessions) {
     await invalidateSession({ sessionId: s.id })
   }
+}
+
+export async function reinstateAdminForOwner({
+  targetAdminId,
+}: {
+  targetAdminId: string
+}): Promise<void> {
+  const admin = await getAdminById({ id: targetAdminId })
+  if (!admin) throw new AppError('ADMIN_NOT_FOUND', 404)
+  if (admin.status !== 'SUSPENDED') {
+    throw new AppError('ADMIN_NOT_SUSPENDED', 400)
+  }
+  await updateAdminStatus({ id: targetAdminId, status: 'ACTIVE' })
+}
+
+export async function listPendingAdminInvitesForAdmin(): Promise<AdminInvite[]> {
+  return listPendingAdminInvites()
+}
+
+export async function resendAdminInviteForOwner({
+  inviteId,
+}: {
+  inviteId: string
+}): Promise<void> {
+  const invite = await getAdminInviteById({ id: inviteId })
+  if (!invite || invite.usedAt) throw new AppError('INVITE_NOT_FOUND', 404)
+  const rawToken = crypto.randomBytes(32).toString('hex')
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000)
+  const updated = await updateAdminInviteToken({
+    id: inviteId,
+    tokenHash,
+    expiresAt,
+  })
+  if (!updated) throw new AppError('INVITE_NOT_FOUND', 404)
+  const base = process.env.FRONTEND_URL ?? 'http://localhost:3000'
+  const inviteUrl = `${base.replace(/\/$/, '')}/admin/accept-invite?token=${encodeURIComponent(rawToken)}`
+  const roleLabel = invite.role === 'OWNER' ? 'OWNER' : 'ADMIN'
+  try {
+    await sendEmail({
+      to: invite.email,
+      subject: 'You have been invited to join Modett Atelier',
+      html: adminInviteEmailHtml({ inviteUrl, role: roleLabel }),
+    })
+  } catch (err) {
+    console.error('[iam] admin invite resend email failed:', err)
+    throw new AppError('INVITE_EMAIL_FAILED', 502)
+  }
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[iam] admin invite resend URL (dev):', inviteUrl)
+  }
+}
+
+export async function cancelAdminInviteForOwner({
+  inviteId,
+}: {
+  inviteId: string
+}): Promise<void> {
+  const ok = await deleteAdminInvite({ id: inviteId })
+  if (!ok) throw new AppError('INVITE_NOT_FOUND', 404)
+}
+
+export async function updateAdminSelfProfile({
+  userId,
+  firstName,
+  lastName,
+}: {
+  userId: string
+  firstName?: string
+  lastName?: string
+}): Promise<SanitisedUser> {
+  return updateMe({ userId, data: { firstName, lastName } })
+}
+
+export async function adminChangePassword({
+  userId,
+  currentPassword,
+  newPassword,
+}: {
+  userId: string
+  currentPassword: string
+  newPassword: string
+}): Promise<void> {
+  const user = await getUserById({ id: userId })
+  if (!user) throw new AppError('USER_NOT_FOUND', 404)
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash)
+  if (!ok) throw new AppError('INCORRECT_PASSWORD', 401)
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+  await updateUser({ id: userId, data: { passwordHash } })
 }

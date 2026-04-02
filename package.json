@@ -4,7 +4,7 @@
 		"build": "pnpm --filter @modett/types build && pnpm --filter @modett/db build && pnpm --filter @modett/api build",
 		"start": "pnpm --filter @modett/api start",
 		"migrate": "pnpm --filter @modett/db migrate",
-		"type-check": "pnpm --filter @modett/api type-check"
+		"type-check": "pnpm --filter @modett/api type-check && pnpm --filter @modett/web type-check"
 	},
 	"dependencies": {
 		"bcryptjs": "^3.0.3",

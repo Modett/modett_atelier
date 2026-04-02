@@ -30,6 +30,7 @@ export interface PresignedUploadUrl {
 
 export type StorageFolder =
   | 'products'
+  | 'product_images'
   | 'styling-guides'
   | 'reviews'
   | 'campaigns'

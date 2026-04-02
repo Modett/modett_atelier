@@ -84,4 +84,30 @@ export const api = {
 
   delete: <T>(endpoint: string, options?: RequestOptions) =>
     apiClient<T>(endpoint, { method: 'DELETE', ...options }),
+
+  postForm: async <T>(endpoint: string, formData: FormData): Promise<T> => {
+    const url = new URL(`${API_BASE_URL}${endpoint}`)
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      if (
+        response.status === 401 &&
+        endpoint.startsWith('/admin/') &&
+        typeof window !== 'undefined'
+      ) {
+        window.dispatchEvent(new Event('admin-session-expired'))
+      }
+      const body = await response.json().catch(() => ({}))
+      const err: ApiError = {
+        code:    body?.error?.code    ?? 'UNKNOWN_ERROR',
+        message: body?.error?.message ?? 'An unexpected error occurred',
+        status:  response.status,
+      }
+      throw err
+    }
+    return response.json() as Promise<T>
+  },
 }

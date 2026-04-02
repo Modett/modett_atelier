@@ -52,6 +52,12 @@ export const loyaltyAccounts = loyalty.table(
     last_activity_at: timestamp('last_activity_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    composite_score: numeric('composite_score', {
+      precision: 10,
+      scale: 4,
+    })
+      .notNull()
+      .default('0'),
   },
   (t) => [
     check('chk_loyalty_balance_non_neg', sql`${t.balance} >= 0`),
@@ -92,6 +98,21 @@ export const loyaltyRules = loyalty.table('loyalty_rules', {
     .notNull()
     .default('15.00'),
   no_stack_with_sale: boolean('no_stack_with_sale').notNull().default(true),
+  frequency_weight: numeric('frequency_weight', { precision: 4, scale: 3 })
+    .notNull()
+    .default('0.6'),
+  spend_weight: numeric('spend_weight', { precision: 4, scale: 3 })
+    .notNull()
+    .default('0.4'),
+  spend_normalisation_factor: integer('spend_normalisation_factor')
+    .notNull()
+    .default(100),
+  evaluation_window_months: integer('evaluation_window_months')
+    .notNull()
+    .default(12),
+  points_expiry_months: integer('points_expiry_months')
+    .notNull()
+    .default(12),
   updated_by_admin_id: uuid('updated_by_admin_id').references(() => admins.id, {
     onDelete: 'set null',
   }),

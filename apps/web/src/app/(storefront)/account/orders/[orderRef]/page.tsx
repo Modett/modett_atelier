@@ -15,6 +15,8 @@ import {
   type OrderEventRow,
   type OrderItemRow,
 } from '@/hooks/useAccount'
+import { useSession } from '@/hooks/useSession'
+import { Analytics } from '@/lib/analytics'
 import type { ApiError } from '@/types'
 import { ORDER_EVENT_LABELS, orderEventDotClass } from '@/lib/orderDisplay'
 
@@ -78,6 +80,7 @@ export default function AccountOrderDetailPage() {
   const orderKey = decodeURIComponent(params.orderRef ?? '')
   const { data, isLoading, error } = useOrder(orderKey)
   const submitReturn = useSubmitReturn()
+  const { user }     = useSession()
 
   const [showReturnForm, setShowReturnForm] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({})
@@ -186,7 +189,25 @@ export default function AccountOrderDetailPage() {
         })),
       },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
+          const analyticsItems = selectedEntries.map(([orderItemId, qty]) => {
+            const row = items.find((i) => i.id === orderItemId)
+            const snap = (row?.product_snapshot_json ?? {}) as Record<string, unknown>
+            return {
+              productId: String(snap.product_id ?? snap.productId ?? ''),
+              variantId: String(row?.variant_id ?? ''),
+              color:     String(snap.color ?? snap.colour ?? ''),
+              size:      String(snap.size ?? ''),
+              qty,
+            }
+          })
+          Analytics.returnSubmitted({
+            returnRequestId: result.returnRequest.id,
+            orderId:         String(orderRow.id),
+            reason,
+            items:           analyticsItems,
+            userId:          user?.id,
+          })
           setFormMessage(
             'Return request submitted successfully. We\'ll be in touch within 2 business days.',
           )

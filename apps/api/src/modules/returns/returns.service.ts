@@ -15,7 +15,35 @@ import {
   listReturnRequestsAdmin,
   createReturnRequest,
   transitionReturnStatus,
+  getUserById,
 } from '@modett/db'
+
+function productSnapshotFromOrderItem(productSnapshotJson: unknown): {
+  productName: string
+  colour: string
+  size: string
+  imageUrl: string | null
+} {
+  const snap = (productSnapshotJson as Record<string, unknown>) ?? {}
+  const pickStr = (a: string, b?: string) => {
+    const v = snap[a] ?? (b != null ? snap[b] : undefined)
+    return v != null && String(v).trim() !== '' ? String(v) : ''
+  }
+  const productName =
+    pickStr('displayName', 'display_name') ||
+    pickStr('shortName', 'short_name') ||
+    'Product'
+  const imageRaw =
+    (typeof snap.imageUrl === 'string' && snap.imageUrl) ||
+    (typeof snap.image_url === 'string' ? snap.image_url : '')
+  const imageUrl = imageRaw.trim() !== '' ? imageRaw : null
+  return {
+    productName,
+    colour: pickStr('color') || pickStr('colour'),
+    size: pickStr('size'),
+    imageUrl,
+  }
+}
 
 // —— Eligibility (no writes) ——
 
@@ -226,10 +254,53 @@ export async function adminGetReturnDetail({
   const data = await getReturnRequestWithItems({ id: returnRequestId })
   if (!data) throw new AppError('RETURN_NOT_FOUND', 404)
 
-  const events = await getReturnEventsForRequest({ returnRequestId })
+  const order = await getOrderById({ id: data.request.order_id })
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
+
+  const [orderItemsList, events] = await Promise.all([
+    getOrderItems({ orderId: data.request.order_id }),
+    getReturnEventsForRequest({ returnRequestId }),
+  ])
+
+  const user =
+    order.user_id != null
+      ? await getUserById({ id: order.user_id })
+      : null
+
+  const customerEmail =
+    user?.email?.trim() ||
+    (order.guest_email != null ? String(order.guest_email).trim() : '') ||
+    '—'
+  const customerName = user
+    ? `${user.firstName} ${user.lastName}`.trim()
+    : customerEmail !== '—'
+      ? (customerEmail.split('@')[0] ?? 'Guest')
+      : 'Guest'
+
+  const items = data.items.map((ri) => {
+    const oi = orderItemsList.find((x) => x.id === ri.order_item_id)
+    const snap = productSnapshotFromOrderItem(oi?.product_snapshot_json ?? {})
+    return {
+      ...ri,
+      product_name: snap.productName,
+      colour: snap.colour,
+      size: snap.size,
+      image_url: snap.imageUrl,
+      unit_price: oi ? String(oi.unit_price_snapshot_amount) : '0',
+      currency: oi?.unit_price_snapshot_currency ?? order.currency,
+      customer_reason_text: data.request.reason,
+    }
+  })
+
   return {
-    request: data.request,
-    items: data.items,
+    request: {
+      ...data.request,
+      order_ref: order.order_ref,
+      user_id: order.user_id,
+      customer_name: customerName,
+      customer_email: customerEmail,
+    },
+    items,
     events,
   }
 }

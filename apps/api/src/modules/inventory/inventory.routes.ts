@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { requireAdmin } from '../../middleware/auth'
 import type { AdminRequest } from '../../middleware/auth'
 import * as inventoryService from './inventory.service'
+import { writeAuditLog } from '../../middleware/audit'
 
 const router = Router()
 
@@ -14,19 +15,142 @@ function adminReq(req: Request): AdminRequest {
   return req as AdminRequest
 }
 
+const listInventoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  productId: z.string().uuid().optional(),
+  stockStatus: z
+    .enum(['IN_STOCK', 'LOW_STOCK', 'OUT_OF_STOCK'])
+    .optional(),
+  search: z.string().optional(),
+})
+
+// GET /admin/inventory
+router.get(
+  '/admin/inventory',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = listInventoryQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid query parameters',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const data = await inventoryService.listAdminInventory({
+      page: parsed.data.page,
+      limit: parsed.data.limit,
+      productId: parsed.data.productId,
+      stockStatus: parsed.data.stockStatus,
+      search: parsed.data.search,
+    })
+    res.status(200).json({ data })
+  },
+)
+
+const unresolvedReconciliationQuerySchema = z.object({
+  variantId: z.string().uuid().optional(),
+})
+
+// GET /admin/inventory/reconciliation/unresolved
+router.get(
+  '/admin/inventory/reconciliation/unresolved',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = unresolvedReconciliationQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid query parameters',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const logs = await inventoryService.getUnresolvedReconciliationEnriched({
+      variantId: parsed.data.variantId,
+    })
+    res.status(200).json({ data: { logs } })
+  },
+)
+
+const resolveReconciliationBodySchema = z.object({
+  resolvedNote: z.string().min(1),
+})
+
+// PATCH /admin/inventory/reconciliation/:logId/resolve
+router.patch(
+  '/admin/inventory/reconciliation/:logId/resolve',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = resolveReconciliationBodySchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid request body',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const log = await inventoryService.markReconciliationResolved({
+      logId: req.params.logId!,
+      resolvedNote: parsed.data.resolvedNote,
+      adminId: adminReq(req).admin!.id,
+    })
+    res.status(200).json({ data: { log } })
+  },
+)
+
+const barcodesQuerySchema = z.object({
+  status: z.enum(['IN_STOCK', 'ALL']).default('IN_STOCK'),
+})
+
+// GET /admin/inventory/variants/:variantId/barcodes
+router.get(
+  '/admin/inventory/variants/:variantId/barcodes',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = barcodesQuerySchema.safeParse(req.query)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid query parameters',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const unitIdsParam = req.query.unitIds
+    const unitIds =
+      typeof unitIdsParam === 'string' && unitIdsParam.trim() !== ''
+        ? unitIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined
+    const data = await inventoryService.getAdminVariantBarcodes({
+      variantId: req.params.variantId!,
+      status: parsed.data.status,
+      unitIds,
+    })
+    res.status(200).json({ data })
+  },
+)
+
 // GET /admin/inventory/variants/:variantId/stock
 router.get(
   '/admin/inventory/variants/:variantId/stock',
   requireAdmin,
   async (req: Request, res: Response) => {
-    const stock = await inventoryService.getVariantStock({
+    const detail = await inventoryService.getAdminVariantStockDetail({
       variantId: req.params.variantId!,
     })
-    res.status(200).json({ data: { stock } })
+    res.status(200).json({ data: detail })
   },
 )
 
-// GET /admin/inventory/variants/:variantId/details
+// GET /admin/inventory/variants/:variantId/details (legacy)
 router.get(
   '/admin/inventory/variants/:variantId/details',
   requireAdmin,
@@ -75,8 +199,8 @@ router.get(
 )
 
 const movementsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-  offset: z.coerce.number().int().min(0).default(0),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(20),
 })
 
 // GET /admin/inventory/variants/:variantId/movements
@@ -94,12 +218,12 @@ router.get(
         },
       })
     }
-    const movements = await inventoryService.getMovementHistory({
+    const paginated = await inventoryService.getMovementHistoryPaginated({
       variantId: req.params.variantId!,
+      page: parsed.data.page,
       limit: parsed.data.limit,
-      offset: parsed.data.offset,
     })
-    res.status(200).json({ data: { movements } })
+    res.status(200).json({ data: paginated })
   },
 )
 
@@ -122,12 +246,121 @@ router.post(
         },
       })
     }
+    const variantId = req.params.variantId!
+    const detailBefore = await inventoryService.getAdminVariantStockDetail({
+      variantId,
+    })
     const result = await inventoryService.restockVariant({
-      variantId: req.params.variantId!,
+      variantId,
       qty: parsed.data.qty,
       adminId: adminReq(req).admin!.id,
     })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'RESTOCK_VARIANT',
+      entityType: 'variant',
+      entityId: variantId,
+      entityLabel: `${detailBefore.color} / ${detailBefore.size} — ${detailBefore.productCode}`,
+      beforeJson: { availableQty: detailBefore.stock.availableQty },
+      afterJson: { qtyAdded: parsed.data.qty, newUnitCount: result.newUnits.length },
+    })
     res.status(201).json({ data: result })
+  },
+)
+
+// POST /admin/inventory/variants/:variantId/reconcile
+router.post(
+  '/admin/inventory/variants/:variantId/reconcile',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const result = await inventoryService.runManualReconciliationForVariant({
+      variantId: req.params.variantId!,
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+const bulkDamageBodySchema = z.object({
+  unitIds: z.array(z.string().uuid()).min(1),
+})
+
+// POST /admin/inventory/variants/:variantId/damage
+router.post(
+  '/admin/inventory/variants/:variantId/damage',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = bulkDamageBodySchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid request body',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const variantId = req.params.variantId!
+    const detailBefore = await inventoryService.getAdminVariantStockDetail({
+      variantId,
+    })
+    const result = await inventoryService.markUnitsDamaged({
+      variantId,
+      unitIds: parsed.data.unitIds,
+      adminId: adminReq(req).admin!.id,
+    })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'MARK_DAMAGED',
+      entityType: 'variant',
+      entityId: variantId,
+      entityLabel: `${detailBefore.color} / ${detailBefore.size} — ${detailBefore.productCode}`,
+      beforeJson: { unitIds: parsed.data.unitIds },
+      afterJson: { markedCount: result.markedCount },
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+const adjustOutBodySchema = z.object({
+  unitIds: z.array(z.string().uuid()).min(1),
+  note: z.string().max(500).optional(),
+})
+
+// POST /admin/inventory/variants/:variantId/adjust-out
+router.post(
+  '/admin/inventory/variants/:variantId/adjust-out',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const parsed = adjustOutBodySchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid request body',
+          details: parsed.error.flatten().fieldErrors,
+        },
+      })
+    }
+    const variantId = req.params.variantId!
+    const detailBefore = await inventoryService.getAdminVariantStockDetail({
+      variantId,
+    })
+    const result = await inventoryService.markUnitsAdjustedOut({
+      variantId,
+      unitIds: parsed.data.unitIds,
+      note: parsed.data.note,
+      adminId: adminReq(req).admin!.id,
+    })
+    void writeAuditLog({
+      req: adminReq(req),
+      action: 'ADJUST_OUT',
+      entityType: 'variant',
+      entityId: variantId,
+      entityLabel: `${detailBefore.color} / ${detailBefore.size} — ${detailBefore.productCode}`,
+      beforeJson: { unitIds: parsed.data.unitIds, note: parsed.data.note ?? null },
+      afterJson: { markedCount: result.markedCount },
+    })
+    res.status(200).json({ data: result })
   },
 )
 
@@ -175,7 +408,7 @@ router.post(
 )
 
 const thresholdBodySchema = z.object({
-  threshold: z.number().int().min(0),
+  threshold: z.number().int().min(0).max(100),
 })
 
 // PATCH /admin/inventory/variants/:variantId/threshold
@@ -193,12 +426,12 @@ router.patch(
         },
       })
     }
-    const stock = await inventoryService.updateLowStockThreshold({
+    await inventoryService.updateLowStockThreshold({
       variantId: req.params.variantId!,
       threshold: parsed.data.threshold,
       adminId: adminReq(req).admin!.id,
     })
-    res.status(200).json({ data: { stock } })
+    res.status(200).json({ data: { ok: true } })
   },
 )
 
@@ -286,16 +519,12 @@ router.get(
   },
 )
 
-const resolveLogBodySchema = z.object({
-  resolvedNote: z.string().min(1),
-})
-
 // PATCH /admin/inventory/reconciliation-log/:logId/resolve
 router.patch(
   '/admin/inventory/reconciliation-log/:logId/resolve',
   requireAdmin,
   async (req: Request, res: Response) => {
-    const parsed = resolveLogBodySchema.safeParse(req.body)
+    const parsed = resolveReconciliationBodySchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({
         error: {

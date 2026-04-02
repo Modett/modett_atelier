@@ -7,4 +7,6 @@ export { createLoyaltyAccount } from '@modett/db'
 export {
   earnPointsForOrder,
   redeemPointsForOrder,
+  earnPoints,
+  redeemPoints,
 } from './loyalty.service'

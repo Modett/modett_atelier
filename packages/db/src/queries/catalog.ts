@@ -3,7 +3,7 @@
  * No business logic. RORO. Return null for not-found. Use views where specified.
  */
 
-import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm'
+import { eq, and, isNull, asc, desc, sql, ilike, or } from 'drizzle-orm'
 import { db } from '../client'
 import {
   categories,
@@ -105,6 +105,62 @@ export async function getCategoryBySlug({
     .from(categories)
     .where(and(eq(categories.slug, slug), eq(categories.active, true)))
   return rows[0] ?? null
+}
+
+/** Admin: all categories including inactive */
+export async function listAllCategoriesAdmin(): Promise<Category[]> {
+  return db
+    .select()
+    .from(categories)
+    .orderBy(asc(categories.sortOrder), asc(categories.name))
+}
+
+export async function insertCategory({
+  name,
+  slug,
+  active = true,
+  sortOrder = 0,
+}: {
+  name: string
+  slug: string
+  active?: boolean
+  sortOrder?: number
+}): Promise<Category> {
+  const [row] = await db
+    .insert(categories)
+    .values({ name, slug, active, sortOrder })
+    .returning()
+  if (!row) throw new Error('insertCategory: no row returned')
+  return row
+}
+
+export async function updateCategoryById({
+  id,
+  data,
+}: {
+  id: string
+  data: Partial<{
+    name: string
+    slug: string
+    active: boolean
+    sortOrder: number
+  }>
+}): Promise<Category | null> {
+  const [row] = await db
+    .update(categories)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(categories.id, id))
+    .returning()
+  return row ?? null
+}
+
+/** Hard delete category; products referencing it become uncategorised */
+export async function deleteCategoryById({ id }: { id: string }): Promise<void> {
+  await db
+    .update(products)
+    .set({ categoryId: null, updatedAt: new Date() })
+    .where(eq(products.categoryId, id))
+  await db.delete(categories).where(eq(categories.id, id))
 }
 
 // —— Storefront listing (view + stock aggregate) ——
@@ -621,25 +677,102 @@ export async function getProductById({
   } as Product & { prices: ProductPrice; images: ProductImage[] }
 }
 
+/** Admin product editor: non-deleted variants with stock row */
+export async function listProductVariantsWithStockForAdmin({
+  productId,
+}: {
+  productId: string
+}): Promise<
+  Array<{
+    id: string
+    productId: string
+    color: string
+    colorHex: string | null
+    size: string
+    skuGroup: string
+    deletedAt: Date | null
+    inStockQty: number
+    heldQty: number
+    availableQty: number
+    lowStockThreshold: number
+  }>
+> {
+  const rows = await db
+    .select({
+      id: productVariants.id,
+      productId: productVariants.product_id,
+      color: productVariants.color,
+      colorHex: productVariants.color_hex,
+      size: productVariants.size,
+      skuGroup: productVariants.sku_group,
+      deletedAt: productVariants.deleted_at,
+      inStockQty: variantStock.in_stock_qty,
+      heldQty: variantStock.held_qty,
+      availableQty: variantStock.available_qty,
+      lowStockThreshold: variantStock.low_stock_threshold,
+    })
+    .from(productVariants)
+    .innerJoin(variantStock, eq(productVariants.id, variantStock.variant_id))
+    .where(
+      and(eq(productVariants.product_id, productId), isNull(productVariants.deleted_at)),
+    )
+    .orderBy(asc(productVariants.color), asc(productVariants.size))
+
+  return rows.map((r) => ({
+    id: r.id,
+    productId: r.productId,
+    color: r.color,
+    colorHex: r.colorHex ?? null,
+    size: r.size,
+    skuGroup: r.skuGroup,
+    deletedAt: r.deletedAt ?? null,
+    inStockQty: r.inStockQty,
+    heldQty: r.heldQty,
+    availableQty: r.availableQty ?? 0,
+    lowStockThreshold: r.lowStockThreshold,
+  }))
+}
+
 export async function listAllProducts({
   page = 1,
   limit = 50,
   includeInactive = false,
+  categoryId,
+  search,
 }: {
   page?: number
   limit?: number
   includeInactive?: boolean
+  categoryId?: string | null
+  search?: string | null
 }): Promise<{
   products: Array<
-    Product & { prices: ProductPrice; images: ProductImage[]; variantCount: number }
+    Product & {
+      prices: ProductPrice
+      images: ProductImage[]
+      variantCount: number
+      categoryName: string | null
+    }
   >
   total: number
 }> {
   const offset = (page - 1) * limit
   const baseWhere = isNull(products.deletedAt)
-  const where = includeInactive
-    ? baseWhere
-    : and(baseWhere, eq(products.active, true))
+  const activeClause = includeInactive ? undefined : eq(products.active, true)
+  const categoryClause =
+    categoryId != null && categoryId !== ''
+      ? eq(products.categoryId, categoryId)
+      : undefined
+  const trimmed = search?.trim() ?? ''
+  const searchClause =
+    trimmed.length > 0
+      ? or(
+          ilike(products.displayName, `%${trimmed}%`),
+          ilike(products.productCode, `%${trimmed}%`),
+          ilike(products.shortName, `%${trimmed}%`),
+        )
+      : undefined
+  const where = and(baseWhere, activeClause, categoryClause, searchClause)
 
   const countResult = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -648,17 +781,27 @@ export async function listAllProducts({
   const total = countResult[0]?.count ?? 0
 
   const productRows = await db
-    .select()
+    .select({
+      product: products,
+      categoryName: categories.name,
+    })
     .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(where)
     .orderBy(desc(products.updatedAt))
     .limit(limit)
     .offset(offset)
 
   const result: Array<
-    Product & { prices: ProductPrice; images: ProductImage[]; variantCount: number }
+    Product & {
+      prices: ProductPrice
+      images: ProductImage[]
+      variantCount: number
+      categoryName: string | null
+    }
   > = []
-  for (const p of productRows) {
+  for (const row of productRows) {
+    const p = row.product
     const [priceRow] = await db
       .select()
       .from(productPrices)
@@ -679,10 +822,12 @@ export async function listAllProducts({
         prices: priceRow,
         images: imageRows,
         variantCount,
+        categoryName: row.categoryName ?? null,
       } as Product & {
         prices: ProductPrice
         images: ProductImage[]
         variantCount: number
+        categoryName: string | null
       })
     }
   }
@@ -833,6 +978,23 @@ export async function deleteProductImage({
     .where(and(eq(productImages.id, id), eq(productImages.productId, productId)))
 }
 
+export async function updateProductImageById({
+  id,
+  productId,
+  data,
+}: {
+  id: string
+  productId: string
+  data: Partial<{ altText: string | null; sortOrder: number }>
+}): Promise<ProductImage | null> {
+  const [row] = await db
+    .update(productImages)
+    .set(data)
+    .where(and(eq(productImages.id, id), eq(productImages.productId, productId)))
+    .returning()
+  return row ?? null
+}
+
 export async function setKeyImage({
   productId,
   imageId,
@@ -871,11 +1033,13 @@ export async function reorderImages({
 export async function createVariant({
   productId,
   color,
+  colorHex,
   size,
   skuGroup,
 }: {
   productId: string
   color: string
+  colorHex?: string | null
   size: string
   skuGroup: string
 }): Promise<ProductVariant> {
@@ -885,6 +1049,7 @@ export async function createVariant({
       .values({
         product_id: productId,
         color,
+        color_hex: colorHex ?? null,
         size,
         sku_group: skuGroup,
       })
@@ -1090,13 +1255,24 @@ export async function updateBanner({
   return row ?? null
 }
 
+/** Only one storefront banner active: deactivate all others, then enable `id`. */
 export async function enableBanner({ id }: { id: string }): Promise<Banner | null> {
-  const [row] = await db
-    .update(banners)
-    .set({ enabled: true, updatedAt: new Date() })
-    .where(eq(banners.id, id))
-    .returning()
-  return row ?? null
+  return await db.transaction(async (tx) => {
+    await tx
+      .update(banners)
+      .set({ enabled: false, updatedAt: new Date() })
+    const [row] = await tx
+      .update(banners)
+      .set({ enabled: true, updatedAt: new Date() })
+      .where(eq(banners.id, id))
+      .returning()
+    return row ?? null
+  })
+}
+
+export async function deleteBanner({ id }: { id: string }): Promise<boolean> {
+  const deleted = await db.delete(banners).where(eq(banners.id, id)).returning({ id: banners.id })
+  return deleted.length > 0
 }
 
 export async function disableBanner({ id }: { id: string }): Promise<Banner | null> {

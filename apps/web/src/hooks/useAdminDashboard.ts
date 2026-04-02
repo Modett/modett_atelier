@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import type { AdminReviewsListResponse } from '@modett/types'
 import { api } from '@/lib/api'
 import type { CurrencyCode } from '@/types'
 import type {
@@ -26,6 +27,7 @@ export const ADMIN_DASHBOARD_KEYS = {
   lowStock:         ['admin', 'dashboard', 'low-stock'] as const,
   notifyMeDemand:   ['admin', 'dashboard', 'notify-me-demand'] as const,
   flaggedReviews:   ['admin', 'dashboard', 'flagged-reviews'] as const,
+  reconciliation:   ['admin', 'dashboard', 'reconciliation-unresolved'] as const,
 } as const
 
 interface OrderSummaryApiRow {
@@ -106,16 +108,6 @@ interface NotifyMeDemandApiRow {
   lastClickAt: string
 }
 
-interface FlaggedReviewApiRow {
-  id: string
-  productId: string
-  rating: number
-  body: string | null
-  reason: string
-  createdAt: string
-  flaggedAt: string
-}
-
 function toIso(d: string | Date | undefined): string {
   if (d == null) return new Date().toISOString()
   if (d instanceof Date) return d.toISOString()
@@ -133,7 +125,7 @@ export function useRecentOrders() {
           limit: number
           total: number
         }
-      }>('/admin/orders', { params: { page: '1', limit: '10' } })
+      }>('/admin/orders', { params: { page: '1', limit: '5' } })
       const { page, limit, total, orders: raw } = res.data
       return {
         orders: raw.map(mapOrderRow),
@@ -310,47 +302,44 @@ export function useNotifyMeDemand() {
   })
 }
 
+// AUDIT FIX: unresolved inventory reconciliation count for dashboard
+export function useUnresolvedReconciliationCount() {
+  return useQuery({
+    queryKey: ADMIN_DASHBOARD_KEYS.reconciliation,
+    queryFn: async () => {
+      const res = await api.get<{ data: { logs: unknown[] } }>(
+        '/admin/inventory/reconciliation/unresolved',
+      )
+      return res.data.logs.length
+    },
+    staleTime:     60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
+  })
+}
+
 export function useFlaggedReviews() {
   return useQuery({
     queryKey: ADMIN_DASHBOARD_KEYS.flaggedReviews,
     queryFn: async () => {
-      const res = await api.get<{
-        data: {
-          reviews: FlaggedReviewApiRow[]
-          page: number
-          limit: number
-          total: number
-        }
-      }>('/admin/reviews/flagged', { params: { limit: '10', page: '1' } })
+      const res = await api.get<{ data: AdminReviewsListResponse }>('/admin/reviews', {
+        params: { flagged: 'true', limit: '10', page: '1' },
+        credentials: 'include',
+      })
       const { page, limit, total, reviews: raw } = res.data
-      const productIds = [...new Set(raw.map((r) => r.productId))]
-      const nameEntries = await Promise.all(
-        productIds.map(async (productId) => {
-          try {
-            const p = await api.get<{ data: { product: { displayName: string } } }>(
-              `/admin/catalog/products/${productId}`,
-            )
-            return [productId, p.data.product.displayName] as const
-          } catch {
-            return [productId, 'Product'] as const
-          }
-        }),
-      )
-      const nameById = new Map<string, string>(nameEntries)
       const reviews: FlaggedReview[] = raw.map((r) => ({
-        id:           r.id,
-        productId:    r.productId,
-        productName:  nameById.get(r.productId) ?? 'Product',
-        rating:       r.rating,
-        body:         r.body,
-        customerName: 'Customer',
-        flagReason:   r.reason,
-        flaggedAt:    toIso(r.flaggedAt),
-        createdAt:    toIso(r.createdAt),
+        id: r.id,
+        productId: r.productId,
+        productName: r.productName,
+        rating: r.rating,
+        body: r.body,
+        customerName: r.reviewerFirstName,
+        flagReason: r.flag?.reason ?? '',
+        flaggedAt: toIso(r.flag?.createdAt ?? r.createdAt),
+        createdAt: toIso(r.createdAt),
       }))
       return { reviews, page, limit, total } satisfies FlaggedReviewsResponse
     },
-    staleTime:     60 * 1000,
+    staleTime: 60 * 1000,
     refetchInterval: 2 * 60 * 1000,
   })
 }

@@ -118,10 +118,10 @@ export class InsufficientPointsError extends Error {
 }
 
 export class LoyaltyRulesNotFoundError extends Error {
-  readonly code = 'LOYALTY_RULES_NOT_FOUND'
+  readonly code = 'RULES_NOT_FOUND'
   readonly statusCode: number
 
-  constructor(statusCode = 404, message = 'LOYALTY_RULES_NOT_FOUND') {
+  constructor(statusCode = 404, message = 'RULES_NOT_FOUND') {
     super(message)
     this.name = 'LoyaltyRulesNotFoundError'
     this.statusCode = statusCode

@@ -133,6 +133,7 @@ export function ProductInfoPanel({
         {allOOSForColour && selectedColour && (
           <div className="mt-5 pt-5 border-t border-muted/60">
             <NotifyMeForm
+              productId={product.id}
               productSlug={product.slug}
               selectedColour={selectedColour}
               variants={product.variants}

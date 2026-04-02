@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import { useCheckoutStore } from '@/store/checkout.store'
 import { useSession, useInvalidateSession } from '@/hooks/useSession'
 import { useCurrency } from '@/hooks/useCurrency'
+import { Analytics } from '@/lib/analytics'
 import type { ApiError, User } from '@/types'
 
 const emailSchema = z.string().email()
@@ -17,6 +18,7 @@ type EmailState = 'unknown' | 'checking' | 'registered' | 'guest'
 export function EmailStep() {
   const { setEmail: storeEmail, setStep, setReservation, setCartId, setOrderTotal } = useCheckoutStore()
   const { user, isLoggedIn } = useSession()
+  const sessionUserId = user?.id
   const invalidateSession = useInvalidateSession()
   const currency = useCurrency()
   const [email, setEmail] = useState(useCheckoutStore.getState().email ?? '')
@@ -83,6 +85,13 @@ export function EmailStep() {
       if (res.data.summary?.total) {
         setOrderTotal(res.data.summary.total)
       }
+      Analytics.checkoutStart({
+        cartId:     res.data.summary?.cartId,
+        itemCount:  res.data.summary?.itemCount ?? 0,
+        totalValue: res.data.summary?.total ?? '0',
+        currency,
+        userId:     sessionUserId,
+      })
       storeEmail(emailValue, isGuest)
       setStep('shipping')
     } catch (err) {

@@ -1,12 +1,14 @@
 /**
  * Loyalty query functions — accounts, ledger, rules, grants, balance mutations.
- * No business logic. RORO. Balance mutations use withLoyaltyLock + db.transaction();
- * ledger INSERT + accounts UPDATE in same tx. Never UPDATE/DELETE ledger rows.
+ * Balance mutations: use withLoyaltyLock (service) + insertLedgerEntryInTx + updateBalanceInTx in one db.transaction().
+ * Never UPDATE/DELETE ledger rows.
  */
 
 import { randomUUID } from 'node:crypto'
+import Decimal from 'decimal.js'
 import { eq, and, desc, sql } from 'drizzle-orm'
 import { db } from '../client'
+import type { TransactionClient } from '../client'
 import { redis } from '../redis'
 import {
   loyaltyAccounts,
@@ -18,6 +20,7 @@ import type {
   LoyaltyAccount,
   LoyaltyLedgerRow,
   LoyaltyRules,
+  LoyaltyGrant,
 } from '../schema/loyalty'
 import {
   LoyaltyAccountNotFoundError,
@@ -27,7 +30,7 @@ import {
   LoyaltyLockNotAcquiredError,
 } from '../errors'
 
-// —— Lock helper (RULE 3) ——
+// —— Lock helper ——
 
 export async function withLoyaltyLock<T>(
   userId: string,
@@ -35,7 +38,7 @@ export async function withLoyaltyLock<T>(
 ): Promise<T> {
   const key = `lock:loyalty:${userId}`
   const lockId = randomUUID()
-  const acquired = await redis.set(key, lockId, 'EX', 5, 'NX')
+  const acquired = await redis.set(key, lockId, 'EX', 10, 'NX')
   if (!acquired) {
     throw new LoyaltyLockNotAcquiredError()
   }
@@ -52,6 +55,30 @@ export async function withLoyaltyLock<T>(
       lockId,
     )
   }
+}
+
+// —— Pure composite score (Decimal.js) ——
+
+export function computeCompositeScore({
+  orderCount,
+  earnedPoints,
+  frequencyWeight,
+  spendWeight,
+  spendNormalisationFactor,
+}: {
+  orderCount: number
+  earnedPoints: number
+  frequencyWeight: number
+  spendWeight: number
+  spendNormalisationFactor: number
+}): number {
+  const norm = new Decimal(spendNormalisationFactor)
+  if (norm.lte(0)) return 0
+  const normalisedSpend = new Decimal(earnedPoints).div(norm)
+  const score = new Decimal(orderCount)
+    .mul(frequencyWeight)
+    .plus(normalisedSpend.mul(spendWeight))
+  return score.toDecimalPlaces(4, Decimal.ROUND_HALF_UP).toNumber()
 }
 
 // —— Account queries ——
@@ -94,16 +121,20 @@ export async function getLoyaltyAccountOrThrow({
   return account
 }
 
-// —— Rules query ——
+// —— Rules ——
 
-export async function getLoyaltyRules(): Promise<LoyaltyRules> {
+export async function getLoyaltyRulesNullable(): Promise<LoyaltyRules | null> {
   const rows = await db
     .select()
     .from(loyaltyRules)
     .orderBy(desc(loyaltyRules.updated_at))
     .limit(1)
-  const row = rows[0]
-  if (!row) throw new LoyaltyRulesNotFoundError(500)
+  return rows[0] ?? null
+}
+
+export async function getLoyaltyRules(): Promise<LoyaltyRules> {
+  const row = await getLoyaltyRulesNullable()
+  if (!row) throw new LoyaltyRulesNotFoundError(404)
   return row
 }
 
@@ -115,6 +146,11 @@ export async function updateLoyaltyRules({
   minRedeem,
   maxRedeemPercent,
   noStackWithSale,
+  frequencyWeight,
+  spendWeight,
+  spendNormalisationFactor,
+  evaluationWindowMonths,
+  pointsExpiryMonths,
   updatedByAdminId,
 }: {
   earnRateJson?: Record<string, { points: number; per_amount: number }>
@@ -124,6 +160,11 @@ export async function updateLoyaltyRules({
   minRedeem?: number
   maxRedeemPercent?: number
   noStackWithSale?: boolean
+  frequencyWeight?: number
+  spendWeight?: number
+  spendNormalisationFactor?: number
+  evaluationWindowMonths?: number
+  pointsExpiryMonths?: number
   updatedByAdminId: string
 }): Promise<LoyaltyRules> {
   const updates: Record<string, unknown> = {
@@ -131,17 +172,37 @@ export async function updateLoyaltyRules({
     updated_by_admin_id: updatedByAdminId,
   }
   if (earnRateJson !== undefined) updates.earn_rate_json = earnRateJson
-  if (redemptionRateByCurrencyJson !== undefined)
+  if (redemptionRateByCurrencyJson !== undefined) {
     updates.redemption_rate_by_currency_json = redemptionRateByCurrencyJson
-  if (tierThresholdsJson !== undefined)
+  }
+  if (tierThresholdsJson !== undefined) {
     updates.tier_thresholds_json = tierThresholdsJson
-  if (multipliersJson !== undefined)
+  }
+  if (multipliersJson !== undefined) {
     updates.multipliers_json = multipliersJson
+  }
   if (minRedeem !== undefined) updates.min_redeem = minRedeem
-  if (maxRedeemPercent !== undefined)
+  if (maxRedeemPercent !== undefined) {
     updates.max_redeem_percent = String(maxRedeemPercent)
-  if (noStackWithSale !== undefined)
+  }
+  if (noStackWithSale !== undefined) {
     updates.no_stack_with_sale = noStackWithSale
+  }
+  if (frequencyWeight !== undefined) {
+    updates.frequency_weight = String(frequencyWeight)
+  }
+  if (spendWeight !== undefined) {
+    updates.spend_weight = String(spendWeight)
+  }
+  if (spendNormalisationFactor !== undefined) {
+    updates.spend_normalisation_factor = spendNormalisationFactor
+  }
+  if (evaluationWindowMonths !== undefined) {
+    updates.evaluation_window_months = evaluationWindowMonths
+  }
+  if (pointsExpiryMonths !== undefined) {
+    updates.points_expiry_months = pointsExpiryMonths
+  }
 
   const result = await db
     .update(loyaltyRules)
@@ -151,7 +212,145 @@ export async function updateLoyaltyRules({
   return result[0] as LoyaltyRules
 }
 
-// —— Ledger read queries ——
+// —— Dual-axis window stats ——
+
+export async function getOrderCountInWindow({
+  userId,
+  windowMonths,
+}: {
+  userId: string
+  windowMonths: number
+}): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COUNT(DISTINCT o.id)::int AS cnt
+    FROM orders.orders o
+    WHERE o.user_id = ${userId}
+      AND o.payment_state = 'PAID'
+      AND o.created_at >= now() - (${String(windowMonths)} || ' months')::interval
+  `)
+  const row = result.rows[0] as { cnt: number } | undefined
+  return row?.cnt ?? 0
+}
+
+export async function getEarnedPointsInWindow({
+  userId,
+  windowMonths,
+}: {
+  userId: string
+  windowMonths: number
+}): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COALESCE(SUM(points), 0)::int AS total
+    FROM loyalty.loyalty_ledger
+    WHERE user_id = ${userId}
+      AND type IN ('EARN', 'BONUS')
+      AND points > 0
+      AND created_at >= now() - (${String(windowMonths)} || ' months')::interval
+  `)
+  const row = result.rows[0] as { total: number } | undefined
+  return row?.total ?? 0
+}
+
+export async function updateCompositeScoreAndTier({
+  userId,
+  compositeScore,
+  tier,
+}: {
+  userId: string
+  compositeScore: number
+  tier: 'BRONZE' | 'SILVER' | 'GOLD'
+}): Promise<void> {
+  const result = await db.execute(sql`
+    UPDATE loyalty.loyalty_accounts
+    SET composite_score = ${String(compositeScore)},
+        tier = ${tier}::loyalty.tier_level,
+        tier_evaluated_at = now()
+    WHERE user_id = ${userId}
+    RETURNING user_id
+  `)
+  if (result.rows.length === 0) throw new LoyaltyAccountNotFoundError()
+}
+
+// —— Ledger (inside tx) ——
+
+export async function insertLedgerEntryInTx({
+  tx,
+  userId,
+  type,
+  points,
+  orderId,
+  metadataJson,
+}: {
+  tx: TransactionClient
+  userId: string
+  type: 'EARN' | 'REDEEM' | 'BONUS' | 'EXPIRY' | 'ADJUST'
+  points: number
+  orderId?: string | null
+  metadataJson?: Record<string, unknown>
+}): Promise<LoyaltyLedgerRow> {
+  const [row] = await tx
+    .insert(loyaltyLedger)
+    .values({
+      user_id: userId,
+      type,
+      points,
+      order_id: orderId ?? null,
+      metadata_json: metadataJson ?? {},
+    })
+    .returning()
+  if (!row) throw new Error('insertLedgerEntryInTx: no row')
+  return row
+}
+
+export async function updateBalanceInTx({
+  tx,
+  userId,
+  delta,
+}: {
+  tx: TransactionClient
+  userId: string
+  delta: number
+}): Promise<{ balance: number }> {
+  const result = await tx.execute(sql`
+    UPDATE loyalty.loyalty_accounts
+    SET balance = balance + ${delta},
+        lifetime_earned = lifetime_earned + GREATEST(${delta}, 0),
+        last_activity_at = CASE WHEN ${delta} > 0 THEN now() ELSE last_activity_at END
+    WHERE user_id = ${userId}
+      AND balance + ${delta} >= 0
+    RETURNING balance
+  `)
+  if (result.rows.length === 0) throw new InsufficientPointsError()
+  return { balance: (result.rows[0] as { balance: number }).balance }
+}
+
+export async function insertGrantInTx({
+  tx,
+  userId,
+  points,
+  reason,
+  grantedByAdminId,
+}: {
+  tx: TransactionClient
+  userId: string
+  points: number
+  reason: string
+  grantedByAdminId: string
+}): Promise<LoyaltyGrant> {
+  const [row] = await tx
+    .insert(loyaltyGrants)
+    .values({
+      user_id: userId,
+      points,
+      reason,
+      granted_by_admin_id: grantedByAdminId,
+    })
+    .returning()
+  if (!row) throw new Error('insertGrantInTx: no row')
+  return row
+}
+
+// —— Ledger reads ——
 
 export interface GetLedgerForUserResult {
   ledger: LoyaltyLedgerRow[]
@@ -208,232 +407,148 @@ export async function getLedgerForUser({
   return { ledger, page, limit: safeLimit, total }
 }
 
-export async function getRolling12MonthEarned({
+export async function getLedgerPointsSum({
   userId,
 }: {
   userId: string
 }): Promise<number> {
-  const result = await db.execute(sql`
-    SELECT COALESCE(SUM(points), 0)::int AS earned
+  const sumResult = await db.execute(sql`
+    SELECT COALESCE(SUM(points), 0)::int AS ledger_sum
     FROM loyalty.loyalty_ledger
     WHERE user_id = ${userId}
-      AND type IN ('EARN', 'BONUS')
-      AND points > 0
-      AND created_at >= now() - INTERVAL '12 months'
   `)
-  const row = result.rows[0] as { earned: number } | undefined
-  return row?.earned ?? 0
+  return (
+    (sumResult.rows[0] as { ledger_sum: number } | undefined)?.ledger_sum ?? 0
+  )
 }
 
-export async function reconcileBalance({
+// —— Grants ——
+
+export async function getGrantsForUser({
   userId,
 }: {
   userId: string
-}): Promise<{ correctedBalance: number; ledgerSum: number }> {
-  return withLoyaltyLock(userId, async () => {
-    const sumResult = await db.execute(sql`
-      SELECT COALESCE(SUM(points), 0)::int AS ledger_sum
-      FROM loyalty.loyalty_ledger
-      WHERE user_id = ${userId}
-    `)
-    const ledgerSum =
-      (sumResult.rows[0] as { ledger_sum: number } | undefined)?.ledger_sum ?? 0
-
-    const updateResult = await db.execute(sql`
-      UPDATE loyalty.loyalty_accounts
-      SET balance = ${ledgerSum}, last_activity_at = now()
-      WHERE user_id = ${userId}
-      RETURNING balance
-    `)
-    if (updateResult.rows.length === 0) throw new LoyaltyAccountNotFoundError()
-    const correctedBalance = (updateResult.rows[0] as { balance: number })
-      .balance
-    return { correctedBalance, ledgerSum }
-  })
+}): Promise<LoyaltyGrant[]> {
+  return db
+    .select()
+    .from(loyaltyGrants)
+    .where(eq(loyaltyGrants.user_id, userId))
+    .orderBy(desc(loyaltyGrants.created_at))
 }
 
-// —— Balance mutation queries (all use withLoyaltyLock + db.transaction) ——
+// —— Admin search / leaderboard ——
 
-export async function earnPoints({
-  userId,
-  points,
-  orderId,
-  metadataJson,
-}: {
-  userId: string
-  points: number
-  orderId?: string | null
-  metadataJson?: Record<string, unknown>
-}): Promise<{ newBalance: number }> {
-  return withLoyaltyLock(userId, async () => {
-    return db.transaction(async (tx) => {
-      await tx.insert(loyaltyLedger).values({
-        user_id: userId,
-        type: 'EARN',
-        points,
-        order_id: orderId ?? null,
-        metadata_json: metadataJson ?? {},
-      })
-      const result = await tx.execute(sql`
-        UPDATE loyalty.loyalty_accounts
-        SET balance = balance + ${points},
-            lifetime_earned = lifetime_earned + ${points},
-            last_activity_at = now()
-        WHERE user_id = ${userId}
-        RETURNING balance
-      `)
-      if (result.rows.length === 0) throw new LoyaltyAccountNotFoundError()
-      return {
-        newBalance: (result.rows[0] as { balance: number }).balance,
-      }
-    })
-  })
+export interface SearchUserByEmailRow {
+  user_id: string
+  email: string
+  first_name: string
+  last_name: string
+  balance: number | null
+  tier: string | null
+  composite_score: string | null
+  last_activity_at: Date | null
+  frequency_last12m: number
+  spend_last12m: number
 }
 
-export async function redeemPoints({
-  userId,
-  points,
-  orderId,
-  metadataJson,
+export async function searchUserByEmail({
+  email,
+  evaluationWindowMonths,
 }: {
-  userId: string
-  points: number
-  orderId: string
-  metadataJson?: Record<string, unknown>
-}): Promise<{ newBalance: number }> {
-  return withLoyaltyLock(userId, async () => {
-    return db.transaction(async (tx) => {
-      await tx.insert(loyaltyLedger).values({
-        user_id: userId,
-        type: 'REDEEM',
-        points: -points,
-        order_id: orderId,
-        metadata_json: metadataJson ?? {},
-      })
-      const result = await tx.execute(sql`
-        UPDATE loyalty.loyalty_accounts
-        SET balance = balance - ${points},
-            last_activity_at = now()
-        WHERE user_id = ${userId}
-          AND balance >= ${points}
-        RETURNING balance
-      `)
-      if (result.rows.length === 0) throw new InsufficientPointsError()
-      return {
-        newBalance: (result.rows[0] as { balance: number }).balance,
-      }
-    })
-  })
+  email: string
+  evaluationWindowMonths: number
+}): Promise<SearchUserByEmailRow[]> {
+  const pattern = `%${email}%`
+  const result = await db.execute(sql`
+    SELECT
+      u.id AS user_id,
+      u.email,
+      u.first_name,
+      u.last_name,
+      la.balance,
+      la.tier::text AS tier,
+      la.composite_score::text AS composite_score,
+      la.last_activity_at,
+      (
+        SELECT COUNT(DISTINCT o.id)::int
+        FROM orders.orders o
+        WHERE o.user_id = u.id
+          AND o.payment_state = 'PAID'
+          AND o.created_at >= now() - (${String(evaluationWindowMonths)} || ' months')::interval
+      ) AS frequency_last12m,
+      (
+        SELECT COALESCE(SUM(ll.points), 0)::int
+        FROM loyalty.loyalty_ledger ll
+        WHERE ll.user_id = u.id
+          AND ll.type IN ('EARN', 'BONUS')
+          AND ll.points > 0
+          AND ll.created_at >= now() - (${String(evaluationWindowMonths)} || ' months')::interval
+      ) AS spend_last12m
+    FROM iam.users u
+    LEFT JOIN loyalty.loyalty_accounts la ON la.user_id = u.id
+    WHERE u.deleted_at IS NULL
+      AND (u.email ILIKE ${pattern} OR u.email = ${email})
+    ORDER BY u.email ASC
+    LIMIT 10
+  `)
+  return result.rows as unknown as SearchUserByEmailRow[]
 }
 
-export async function adjustPoints({
-  userId,
-  points,
-  reason,
-  adminId,
-}: {
-  userId: string
-  points: number
-  reason: string
-  adminId: string
-}): Promise<{ newBalance: number }> {
-  return withLoyaltyLock(userId, async () => {
-    return db.transaction(async (tx) => {
-      const balanceRow = await tx.execute(sql`
-        SELECT balance FROM loyalty.loyalty_accounts
-        WHERE user_id = ${userId}
-        FOR UPDATE
-      `)
-      const balanceResult = balanceRow.rows[0] as { balance: number } | undefined
-      if (!balanceResult) throw new LoyaltyAccountNotFoundError()
-      const balance = balanceResult.balance
-      if (balance + points < 0) throw new BalanceWouldGoNegativeError()
-
-      await tx.insert(loyaltyLedger).values({
-        user_id: userId,
-        type: 'ADJUST',
-        points,
-        order_id: null,
-        metadata_json: { reason, adminId },
-      })
-      const result = await tx.execute(sql`
-        UPDATE loyalty.loyalty_accounts
-        SET balance = balance + ${points},
-            last_activity_at = now()
-        WHERE user_id = ${userId}
-        RETURNING balance
-      `)
-      if (result.rows.length === 0) throw new LoyaltyAccountNotFoundError()
-      return {
-        newBalance: (result.rows[0] as { balance: number }).balance,
-      }
-    })
-  })
+export interface TopLoyaltyUserRow {
+  user_id: string
+  email: string
+  first_name: string
+  last_name: string
+  tier: string
+  balance: number
+  composite_score: string
 }
 
-export async function grantPoints({
-  userId,
-  points,
-  reason,
-  adminId,
+export async function listTopLoyaltyUsers({
+  limit = 25,
 }: {
-  userId: string
-  points: number
-  reason: string
-  adminId: string
-}): Promise<{ newBalance: number }> {
-  const [grantRow] = await db
-    .insert(loyaltyGrants)
-    .values({
-      user_id: userId,
-      points,
-      reason,
-      granted_by_admin_id: adminId,
-    })
-    .returning({ id: loyaltyGrants.id })
-  const grantId = grantRow?.id
-  return earnPoints({
-    userId,
-    points,
-    orderId: null,
-    metadataJson: {
-      type: 'admin_grant',
-      grantId,
-      reason,
-    },
-  })
+  limit?: number
+}): Promise<TopLoyaltyUserRow[]> {
+  const safeLimit = Math.min(Math.max(1, limit), 100)
+  const result = await db.execute(sql`
+    SELECT
+      u.id AS user_id,
+      u.email,
+      u.first_name,
+      u.last_name,
+      la.tier::text AS tier,
+      la.balance,
+      la.composite_score::text AS composite_score
+    FROM loyalty.loyalty_accounts la
+    INNER JOIN iam.users u ON u.id = la.user_id
+    WHERE u.deleted_at IS NULL
+    ORDER BY
+      CASE la.tier::text
+        WHEN 'GOLD' THEN 3
+        WHEN 'SILVER' THEN 2
+        ELSE 1
+      END DESC,
+      la.composite_score DESC,
+      la.balance DESC
+    LIMIT ${safeLimit}
+  `)
+  return result.rows as unknown as TopLoyaltyUserRow[]
 }
 
-export async function updateTier({
-  userId,
-}: {
-  userId: string
-}): Promise<{ newTier: 'BRONZE' | 'SILVER' | 'GOLD'; earned12m: number }> {
-  const earned12m = await getRolling12MonthEarned({ userId })
-  const rules = await getLoyaltyRules()
-  const thresholds = rules.tier_thresholds_json as {
-    BRONZE: number
-    SILVER: number
-    GOLD: number
-  }
-  const newTier: 'BRONZE' | 'SILVER' | 'GOLD' =
-    earned12m >= thresholds.GOLD
-      ? 'GOLD'
-      : earned12m >= thresholds.SILVER
-        ? 'SILVER'
-        : 'BRONZE'
+// —— Expiry batch ——
 
-  const result = await db
-    .update(loyaltyAccounts)
-    .set({
-      tier: newTier,
-      tier_evaluated_at: new Date(),
-    })
-    .where(eq(loyaltyAccounts.user_id, userId))
-    .returning({ tier: loyaltyAccounts.tier })
-  if (result.length === 0) throw new LoyaltyAccountNotFoundError()
-  return {
-    newTier: result[0].tier as 'BRONZE' | 'SILVER' | 'GOLD',
-    earned12m,
-  }
+export async function getUsersDueForExpiry({
+  expiryMonths,
+}: {
+  expiryMonths: number
+}): Promise<Array<{ userId: string; balance: number }>> {
+  const result = await db.execute(sql`
+    SELECT user_id, balance
+    FROM loyalty.loyalty_accounts
+    WHERE balance > 0
+      AND last_activity_at < now() - (${String(expiryMonths)} || ' months')::interval
+  `)
+  return (result.rows as Array<{ user_id: string; balance: number }>).map(
+    (r) => ({ userId: r.user_id, balance: r.balance }),
+  )
 }

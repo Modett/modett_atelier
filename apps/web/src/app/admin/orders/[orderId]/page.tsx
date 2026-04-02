@@ -35,6 +35,9 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 import {
   useAdminOrderDetail,
   useOrderPackingStatus,
@@ -45,6 +48,7 @@ import {
   useCancelOrder,
   useScanUnit,
   useRemoveAllocation,
+  useUpdateOrderShippingAddress,
 } from '@/hooks/useAdminOrders'
 import type { ApiError } from '@/types'
 import type {
@@ -158,6 +162,21 @@ function OrderDetailContent({ data, orderId }: { data: OrderDetailResponse; orde
   const outForDeliveryMutation = useMarkOrderOutForDelivery()
   const deliverMutation = useMarkOrderDelivered()
   const cancelMutation = useCancelOrder()
+  const updateAddrMut = useUpdateOrderShippingAddress()
+
+  const [editingShippingAddress, setEditingShippingAddress] = useState(false)
+  const [addrForm, setAddrForm] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    line1: '',
+    line2: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: '',
+    countryCode: '',
+  })
 
   const canPack = order.fulfillmentState === 'NOT_STARTED' && order.paymentState === 'PAID'
   const canShip = order.fulfillmentState === 'PACKED'
@@ -413,26 +432,198 @@ function OrderDetailContent({ data, orderId }: { data: OrderDetailResponse; orde
                     <MapPin className="h-4 w-4" />
                     Shipping Address
                   </span>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" type="button" disabled>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    type="button"
+                    onClick={() => {
+                      if (editingShippingAddress) {
+                        setEditingShippingAddress(false)
+                        return
+                      }
+                      const nm = shippingAddress.addressJson.fullName.trim().split(/\s+/)
+                      setAddrForm({
+                        firstName: nm[0] ?? '',
+                        lastName: nm.slice(1).join(' ') ?? '',
+                        phone: contact?.primaryPhone ?? '',
+                        line1: shippingAddress.addressJson.line1,
+                        line2: shippingAddress.addressJson.line2 ?? '',
+                        city: shippingAddress.addressJson.city,
+                        state: shippingAddress.addressJson.state ?? '',
+                        postalCode: shippingAddress.addressJson.postalCode,
+                        country: shippingAddress.addressJson.country,
+                        countryCode: shippingAddress.countryCode,
+                      })
+                      setEditingShippingAddress(true)
+                    }}
+                  >
                     <Edit2 className="h-4 w-4" />
                   </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-1 text-sm">
-                  <div className="font-medium">{shippingAddress.addressJson.fullName}</div>
-                  <div>{shippingAddress.addressJson.line1}</div>
-                  {shippingAddress.addressJson.line2 && (
-                    <div>{shippingAddress.addressJson.line2}</div>
-                  )}
-                  <div>
-                    {shippingAddress.addressJson.city}
-                    {shippingAddress.addressJson.state &&
-                      `, ${shippingAddress.addressJson.state}`}{' '}
-                    {shippingAddress.addressJson.postalCode}
+                {editingShippingAddress ? (
+                  <div className="space-y-3 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="addr-fn">First name</Label>
+                        <Input
+                          id="addr-fn"
+                          value={addrForm.firstName}
+                          onChange={(e) =>
+                            setAddrForm((f) => ({ ...f, firstName: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="addr-ln">Last name</Label>
+                        <Input
+                          id="addr-ln"
+                          value={addrForm.lastName}
+                          onChange={(e) =>
+                            setAddrForm((f) => ({ ...f, lastName: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="addr-ph">Phone</Label>
+                      <Input
+                        id="addr-ph"
+                        value={addrForm.phone}
+                        onChange={(e) => setAddrForm((f) => ({ ...f, phone: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="addr-l1">Address line 1</Label>
+                      <Input
+                        id="addr-l1"
+                        value={addrForm.line1}
+                        onChange={(e) => setAddrForm((f) => ({ ...f, line1: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="addr-l2">Address line 2</Label>
+                      <Input
+                        id="addr-l2"
+                        value={addrForm.line2}
+                        onChange={(e) => setAddrForm((f) => ({ ...f, line2: e.target.value }))}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="addr-city">City</Label>
+                        <Input
+                          id="addr-city"
+                          value={addrForm.city}
+                          onChange={(e) => setAddrForm((f) => ({ ...f, city: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="addr-st">State / region</Label>
+                        <Input
+                          id="addr-st"
+                          value={addrForm.state}
+                          onChange={(e) => setAddrForm((f) => ({ ...f, state: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor="addr-pc">Postal code</Label>
+                        <Input
+                          id="addr-pc"
+                          value={addrForm.postalCode}
+                          onChange={(e) =>
+                            setAddrForm((f) => ({ ...f, postalCode: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="addr-cc">Country code</Label>
+                        <Input
+                          id="addr-cc"
+                          value={addrForm.countryCode}
+                          onChange={(e) =>
+                            setAddrForm((f) => ({
+                              ...f,
+                              countryCode: e.target.value.toUpperCase().slice(0, 2),
+                            }))
+                          }
+                          maxLength={2}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="addr-ct">Country</Label>
+                      <Input
+                        id="addr-ct"
+                        value={addrForm.country}
+                        onChange={(e) => setAddrForm((f) => ({ ...f, country: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={updateAddrMut.isPending}
+                        onClick={() => {
+                          void updateAddrMut
+                            .mutateAsync({
+                              orderId,
+                              countryCode: addrForm.countryCode.trim().toUpperCase(),
+                              addressJson: {
+                                fullName:
+                                  `${addrForm.firstName} ${addrForm.lastName}`.trim(),
+                                line1: addrForm.line1.trim(),
+                                line2: addrForm.line2.trim() || undefined,
+                                city: addrForm.city.trim(),
+                                state: addrForm.state.trim() || undefined,
+                                postalCode: addrForm.postalCode.trim(),
+                                country: addrForm.country.trim(),
+                                ...(addrForm.phone.trim()
+                                  ? { phone: addrForm.phone.trim() }
+                                  : {}),
+                              },
+                            })
+                            .then(() => {
+                              toast.success('Shipping address updated.')
+                              setEditingShippingAddress(false)
+                            })
+                            .catch((e: ApiError) => {
+                              toast.error(e.message ?? 'Update failed')
+                            })
+                        }}
+                      >
+                        Save address
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingShippingAddress(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
                   </div>
-                  <div>{shippingAddress.addressJson.country}</div>
-                </div>
+                ) : (
+                  <div className="space-y-1 text-sm">
+                    <div className="font-medium">{shippingAddress.addressJson.fullName}</div>
+                    <div>{shippingAddress.addressJson.line1}</div>
+                    {shippingAddress.addressJson.line2 && (
+                      <div>{shippingAddress.addressJson.line2}</div>
+                    )}
+                    <div>
+                      {shippingAddress.addressJson.city}
+                      {shippingAddress.addressJson.state &&
+                        `, ${shippingAddress.addressJson.state}`}{' '}
+                      {shippingAddress.addressJson.postalCode}
+                    </div>
+                    <div>{shippingAddress.addressJson.country}</div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

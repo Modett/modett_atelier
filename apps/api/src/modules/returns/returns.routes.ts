@@ -10,6 +10,7 @@ import { requireAuth, requireAdmin } from '../../middleware/auth'
 import type { AuthRequest, AdminRequest } from '../../middleware/auth'
 import { validate, validateQuery } from '../../middleware/validate'
 import * as returnsService from './returns.service'
+import { writeAuditLog } from '../../middleware/audit'
 
 const router: IRouter = Router()
 
@@ -193,10 +194,20 @@ router.post(
     const authReq = req as AdminRequest
     const body = (req as Request & { body: z.infer<typeof approveBodySchema> })
       .body
+    const returnRequestId = req.params.returnRequestId as string
     await returnsService.adminApprove({
-      returnRequestId: req.params.returnRequestId as string,
+      returnRequestId,
       adminId: authReq.admin.id,
       adminNote: body.adminNote,
+    })
+    void writeAuditLog({
+      req: authReq,
+      action: 'APPROVE_RETURN',
+      entityType: 'return_request',
+      entityId: returnRequestId,
+      entityLabel: returnRequestId,
+      beforeJson: null,
+      afterJson: { status: 'APPROVED' },
     })
     res.status(200).json({ data: { ok: true } })
   },
@@ -217,11 +228,21 @@ router.post(
     const authReq = req as AdminRequest
     const body = (req as Request & { body: z.infer<typeof rejectBodySchema> })
       .body
+    const returnRequestId = req.params.returnRequestId as string
     await returnsService.adminReject({
-      returnRequestId: req.params.returnRequestId as string,
+      returnRequestId,
       adminId: authReq.admin.id,
       reason: body.reason,
       adminNote: body.adminNote,
+    })
+    void writeAuditLog({
+      req: authReq,
+      action: 'REJECT_RETURN',
+      entityType: 'return_request',
+      entityId: returnRequestId,
+      entityLabel: returnRequestId,
+      beforeJson: null,
+      afterJson: { status: 'REJECTED', reason: body.reason },
     })
     res.status(200).json({ data: { ok: true } })
   },
@@ -241,10 +262,20 @@ router.post(
     const authReq = req as AdminRequest
     const body = (req as Request & { body: z.infer<typeof fulfilBodySchema> })
       .body
+    const returnRequestId = req.params.returnRequestId as string
     await returnsService.adminFulfil({
-      returnRequestId: req.params.returnRequestId as string,
+      returnRequestId,
       adminId: authReq.admin.id,
       adminNote: body.adminNote,
+    })
+    void writeAuditLog({
+      req: authReq,
+      action: 'FULFIL_RETURN',
+      entityType: 'return_request',
+      entityId: returnRequestId,
+      entityLabel: returnRequestId,
+      beforeJson: null,
+      afterJson: { status: 'FULFILLED' },
     })
     res.status(200).json({ data: { ok: true } })
   },

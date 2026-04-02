@@ -4,15 +4,18 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/hooks/useSession'
 import { api } from '@/lib/api'
+import { Analytics } from '@/lib/analytics'
 import type { ProductVariant } from '@/types'
 
 interface NotifyMeFormProps {
+  productId:      string
   productSlug:    string
   selectedColour: string
   variants:       ProductVariant[]
 }
 
 export function NotifyMeForm({
+  productId,
   productSlug: _productSlug,
   selectedColour,
   variants,
@@ -36,6 +39,11 @@ export function NotifyMeForm({
       await api.post('/messaging/notify-me', {
         variantId: variantForColour.id,
         email: email.trim(),
+      })
+      Analytics.notifyMeClick({
+        variantId: variantForColour.id,
+        productId,
+        userId: user?.id,
       })
       setIsSuccess(true)
     } catch {

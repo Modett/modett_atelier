@@ -103,7 +103,7 @@ export async function adminListOrders({
 
 export async function adminGetOrderDetail({ orderId }: { orderId: string }) {
   const full = await getOrderWithFullDetail({ id: orderId })
-  if (!full) throw new AppError('ORDER_NOT_FOUND', 404)
+  if (!full || !full.order) throw new AppError('ORDER_NOT_FOUND', 404)
   return {
     order: full.order,
     items: full.items,
