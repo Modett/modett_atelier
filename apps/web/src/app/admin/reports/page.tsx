@@ -306,10 +306,6 @@ export default function AdminReportsPage() {
     key_image_url: string | null
   }>
 
-  const funnel = funnelQ.data?.data.funnel as
-    | Record<string, string>
-    | undefined
-
   return (
     <div className="p-4 md:p-8 max-w-[1400px] mx-auto space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
