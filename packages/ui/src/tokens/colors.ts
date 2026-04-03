@@ -17,7 +17,7 @@ export const colors = {
 
   primitive: {
     warmWhite:      '#F8F5F2',
-    alabaster:      '#E5E0D6',
+    alabaster:      '#EFECE5',
     silverSage:     '#C1D2CC',
     warmTaupe:      '#BBA496',
     brushedGold:    '#C1AB85',

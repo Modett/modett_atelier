@@ -47,7 +47,7 @@ const config: Config = {
         // ── Primitives (design reference only) ────────────
         primitive: {
           'warm-white':      '#F8F5F2',
-          'alabaster':       '#E5E0D6',
+          'alabaster':       '#EFECE5',
           'silver-sage':     '#C1D2CC',
           'warm-taupe':      '#BBA496',
           'brushed-gold':    '#C1AB85',
@@ -57,10 +57,10 @@ const config: Config = {
           'graphite':        '#232D35',
         },
         // ── Semantic tokens (use these in components) ──────
-        background:         '#E5E0D6',
+        background:         '#EFECE5',
         foreground:         '#232D35',
         surface:            '#F8F5F2',
-        'surface-raised':   '#E5E0D6',
+        'surface-raised':   '#EFECE5',
         text:               '#232D35',
         ink:                '#232D35',
         graphite:           '#232D35',
