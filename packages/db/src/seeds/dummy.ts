@@ -1230,7 +1230,7 @@ async function seedCampaigns(client: pg.PoolClient) {
       ($1, $2, $3, 'EMAIL', 'SENT', $5),
       ($4, $2, $6, 'EMAIL', 'SENT', $5)
   `,
-    [uuid(), sentId, CUSTOMER_1_ID, uuid(), CUSTOMER_2_ID, sentAt],
+    [uuid(), sentId, CUSTOMER_1_ID, uuid(), sentAt, CUSTOMER_2_ID],
   )
 
   console.log('   ✓ 2 campaigns (1 DRAFT, 1 SENT) + 2 delivery records')
