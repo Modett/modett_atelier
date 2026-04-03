@@ -46,6 +46,8 @@ export interface ProductListItemRow {
   isSale: boolean
   keyImageUrl: string | null
   keyImageAltText: string | null
+  hoverImageUrl: string | null
+  hoverImageAltText: string | null
   lkrAmount: string
   sgdAmount: string
   usdAmount: string
@@ -176,6 +178,25 @@ const stockStatusSubquery = sql`
   GROUP BY va.product_id
 `
 
+/**
+ * Next gallery image after the key image (sort_order, then id).
+ * Requires `img` from: LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
+ */
+const listHoverImageLateral = sql`
+  LEFT JOIN LATERAL (
+    SELECT pi2.url AS "hoverImageUrl", pi2.alt_text AS "hoverImageAltText"
+    FROM catalog.product_images pi2
+    WHERE pi2.product_id = v.id
+      AND img.id IS NOT NULL
+      AND (
+        pi2.sort_order > img.sort_order
+        OR (pi2.sort_order = img.sort_order AND pi2.id > img.id)
+      )
+    ORDER BY pi2.sort_order ASC, pi2.id ASC
+    LIMIT 1
+  ) hover_img ON true
+`
+
 /** Storefront listing sort — uses product_prices via view columns for price modes */
 export type ProductListSort = 'newest' | 'price-asc' | 'price-desc'
 
@@ -251,6 +272,8 @@ export async function listProducts({
       v.is_sale AS "isSale",
       img.url AS "keyImageUrl",
       img.alt_text AS "keyImageAltText",
+      hover_img."hoverImageUrl" AS "hoverImageUrl",
+      hover_img."hoverImageAltText" AS "hoverImageAltText",
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
@@ -258,6 +281,7 @@ export async function listProducts({
       COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.active_products_with_prices v
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
+    ${listHoverImageLateral}
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
     LEFT JOIN LATERAL (
       SELECT json_agg(
@@ -310,6 +334,8 @@ export async function listActiveProductListRowsByIds({
       img.sort_order AS "keyImageSortOrder",
       img.url AS "keyImageUrl",
       img.alt_text AS "keyImageAltText",
+      hover_img."hoverImageUrl" AS "hoverImageUrl",
+      hover_img."hoverImageAltText" AS "hoverImageAltText",
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
@@ -317,6 +343,7 @@ export async function listActiveProductListRowsByIds({
       COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.active_products_with_prices v
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
+    ${listHoverImageLateral}
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
     LEFT JOIN LATERAL (
       SELECT json_agg(
@@ -381,6 +408,8 @@ export async function searchProducts({
       v.is_sale AS "isSale",
       img.url AS "keyImageUrl",
       img.alt_text AS "keyImageAltText",
+      hover_img."hoverImageUrl" AS "hoverImageUrl",
+      hover_img."hoverImageAltText" AS "hoverImageAltText",
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
@@ -388,6 +417,7 @@ export async function searchProducts({
       COALESCE(var_agg.variants, '[]'::json) AS variants
     FROM catalog.active_products_with_prices v
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
+    ${listHoverImageLateral}
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
     LEFT JOIN LATERAL (
       SELECT json_agg(
@@ -431,6 +461,8 @@ export async function getFeaturedProducts({
       v.is_sale AS "isSale",
       img.url AS "keyImageUrl",
       img.alt_text AS "keyImageAltText",
+      hover_img."hoverImageUrl" AS "hoverImageUrl",
+      hover_img."hoverImageAltText" AS "hoverImageAltText",
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
@@ -439,6 +471,7 @@ export async function getFeaturedProducts({
     FROM catalog.bestseller_list bl
     JOIN catalog.active_products_with_prices v ON v.id = bl.product_id
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
+    ${listHoverImageLateral}
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
     LEFT JOIN LATERAL (
       SELECT json_agg(
@@ -577,6 +610,8 @@ export async function getRelatedProducts({
       v.is_sale AS "isSale",
       img.url AS "keyImageUrl",
       img.alt_text AS "keyImageAltText",
+      hover_img."hoverImageUrl" AS "hoverImageUrl",
+      hover_img."hoverImageAltText" AS "hoverImageAltText",
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
@@ -585,6 +620,7 @@ export async function getRelatedProducts({
     FROM catalog.product_relations pr
     JOIN catalog.active_products_with_prices v ON v.id = pr.related_product_id
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
+    ${listHoverImageLateral}
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
     LEFT JOIN LATERAL (
       SELECT json_agg(
@@ -1142,6 +1178,8 @@ export async function getBestsellerList(): Promise<
       v.is_sale AS "isSale",
       img.url AS "keyImageUrl",
       img.alt_text AS "keyImageAltText",
+      hover_img."hoverImageUrl" AS "hoverImageUrl",
+      hover_img."hoverImageAltText" AS "hoverImageAltText",
       v.lkr_amount AS "lkrAmount",
       v.sgd_amount AS "sgdAmount",
       v.usd_amount AS "usdAmount",
@@ -1149,6 +1187,7 @@ export async function getBestsellerList(): Promise<
     FROM catalog.bestseller_list bl
     JOIN catalog.active_products_with_prices v ON v.id = bl.product_id
     LEFT JOIN catalog.product_images img ON img.id = v.key_image_id
+    ${listHoverImageLateral}
     LEFT JOIN (${stockStatusSubquery}) agg ON agg.product_id = v.id
     ORDER BY bl.sort_order ASC
   `)

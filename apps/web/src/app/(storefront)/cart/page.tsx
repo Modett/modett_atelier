@@ -109,9 +109,11 @@ export default function CartPage() {
               </div>
             )}
 
-            {/* You may also be interested in */}
+            {/* You may also be interested in — desktop only (shown inline with left column) */}
             {!isLoading && (
-              <CartInterestedIn cartItems={items} />
+              <div className="hidden lg:block">
+                <CartInterestedIn cartItems={items} />
+              </div>
             )}
           </div>
 
@@ -125,6 +127,13 @@ export default function CartPage() {
           </div>
 
         </div>
+
+        {/* You may also be interested in — mobile only (below order summary) */}
+        {!isLoading && (
+          <div className="lg:hidden">
+            <CartInterestedIn cartItems={items} />
+          </div>
+        )}
       </div>
 
       {/* Edit item drawer */}

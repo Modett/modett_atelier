@@ -372,6 +372,15 @@ function rowToWishlistProductSummary(
             sortOrder: row.keyImageSortOrder ?? 0,
           }
         : null,
+    hoverImage:
+      row.hoverImageUrl != null
+        ? {
+            id: '',
+            url: row.hoverImageUrl,
+            altText: row.hoverImageAltText ?? null,
+            sortOrder: 0,
+          }
+        : null,
     price: resolveWishlistPrice({ row, currency }),
     variants: row.variants.map((v) => ({
       variantId: v.variantId,

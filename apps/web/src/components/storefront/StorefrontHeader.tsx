@@ -55,7 +55,6 @@ export function StorefrontHeader() {
           className={cn(
             'hidden md:flex items-center justify-between',
             'px-4 md:px-6 lg:px-8 h-9',
-            'bg-white',
             'border-b border-muted/50',
           )}
         >
@@ -66,7 +65,7 @@ export function StorefrontHeader() {
                 'flex items-center gap-1.5',
                 'font-body font-light text-[11px]',
                 'uppercase tracking-[0.15em]',
-                'text-umber hover:text-ink',
+                'text-muted-foreground hover:text-umber',
                 'transition-colors duration-200',
               )}
             >
@@ -79,7 +78,7 @@ export function StorefrontHeader() {
                 'flex items-center gap-1.5',
                 'font-body font-light text-[11px]',
                 'uppercase tracking-[0.15em]',
-                'text-umber hover:text-ink',
+                'text-muted-foreground hover:text-umber',
                 'transition-colors duration-200',
               )}
             >
@@ -92,7 +91,7 @@ export function StorefrontHeader() {
                 'flex items-center gap-1.5',
                 'font-body font-light text-[11px]',
                 'uppercase tracking-[0.15em]',
-                'text-umber hover:text-ink',
+                'text-muted-foreground hover:text-umber',
                 'transition-colors duration-200',
               )}
             >
@@ -105,14 +104,14 @@ export function StorefrontHeader() {
             <Link
               href="/search"
               aria-label="Search"
-              className="text-umber hover:text-ink transition-colors duration-200"
+              className="text-muted-foreground hover:text-umber transition-colors duration-200"
             >
               <SearchIcon size={16} />
             </Link>
             <Link
               href="/account/wishlist"
               aria-label="Wishlist"
-              className="text-umber hover:text-ink transition-colors duration-200"
+              className="text-muted-foreground hover:text-umber transition-colors duration-200"
             >
               <WishlistIcon size={16} />
             </Link>
@@ -133,13 +132,13 @@ export function StorefrontHeader() {
                 type="button"
                 onClick={handleAccountIconClick}
                 aria-label="Sign in or create account"
-                className="text-umber hover:text-ink transition-colors duration-200"
+                className="text-muted-foreground hover:text-umber transition-colors duration-200"
               >
                 <AccountIcon size={16} />
               </button>
             )}
             <CartButton
-              className="text-umber hover:text-ink"
+              className="text-muted-foreground hover:text-umber"
               iconSize="w-4 h-4"
             />
           </div>
