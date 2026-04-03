@@ -140,9 +140,9 @@ export function HeroNav() {
               <Image
                 src="/images/vlogo_transparent.png"
                 alt="Modett"
-                height={44}
-                width={160}
-                className="h-11 w-auto object-contain"
+                height={56}
+                width={204}
+                className="h-14 w-auto object-contain"
                 priority
               />
             </Link>
@@ -168,9 +168,9 @@ export function HeroNav() {
               <Image
                 src="/images/vlogo_transparent.png"
                 alt="Modett"
-                height={56}
-                width={200}
-                className="h-14 w-auto object-contain"
+                height={80}
+                width={286}
+                className="h-20 w-auto object-contain"
                 priority
               />
             </Link>
