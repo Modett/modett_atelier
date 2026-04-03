@@ -992,7 +992,21 @@ async function seedInboxMessages(client: pg.PoolClient) {
 async function seedLoyaltyRules(client: pg.PoolClient) {
   console.log('📐 Seeding loyalty rules...')
 
-  await client.query(
+  const earnRate = JSON.stringify({
+    LKR: { points: 1, per_amount: 100 },
+    SGD: { points: 1, per_amount: 1 },
+    USD: { points: 1, per_amount: 1 },
+  })
+  const redemptionRates = JSON.stringify({
+    LKR: { points: 100, value: 150.0 },
+    SGD: { points: 100, value: 1.5 },
+    USD: { points: 100, value: 1.5 },
+  })
+  const tierThresholds = JSON.stringify({ BRONZE: 0, SILVER: 6.0, GOLD: 12.0 })
+  const multipliers = JSON.stringify({ BRONZE: 1.0, SILVER: 1.25, GOLD: 1.5 })
+  const ruleParams = [earnRate, redemptionRates, tierThresholds, multipliers]
+
+  const updateResult = await client.query(
     `
     UPDATE loyalty.loyalty_rules
     SET
@@ -1005,25 +1019,27 @@ async function seedLoyaltyRules(client: pg.PoolClient) {
       no_stack_with_sale = true,
       updated_at = NOW()
   `,
-    [
-      JSON.stringify({
-        LKR: { points: 1, per_amount: 100 },
-        SGD: { points: 1, per_amount: 1 },
-        USD: { points: 1, per_amount: 1 },
-      }),
-      JSON.stringify({
-        LKR: { points: 100, value: 150.0 },
-        SGD: { points: 100, value: 1.5 },
-        USD: { points: 100, value: 1.5 },
-      }),
-      JSON.stringify({ BRONZE: 0, SILVER: 6.0, GOLD: 12.0 }),
-      JSON.stringify({ BRONZE: 1.0, SILVER: 1.25, GOLD: 1.5 }),
-    ],
+    ruleParams,
   )
 
-  const { rows } = await client.query(`SELECT COUNT(*)::text AS c FROM loyalty.loyalty_rules`)
-  if (parseInt(rows[0].c, 10) === 0) {
-    throw new Error('loyalty_rules has no rows — check that migrations ran first')
+  if (updateResult.rowCount === 0) {
+    await client.query(
+      `
+      INSERT INTO loyalty.loyalty_rules (
+        earn_rate_json,
+        redemption_rate_by_currency_json,
+        tier_thresholds_json,
+        multipliers_json,
+        min_redeem,
+        max_redeem_percent,
+        no_stack_with_sale
+      )
+      VALUES ($1, $2, $3, $4, 200, '15.00', true)
+    `,
+      ruleParams,
+    )
+    console.log('   ✓ Loyalty rules inserted (dual-axis tier system — table was empty)')
+    return
   }
 
   console.log('   ✓ Loyalty rules updated (dual-axis tier system)')
