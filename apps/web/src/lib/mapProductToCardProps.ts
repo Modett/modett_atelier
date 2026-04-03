@@ -85,6 +85,14 @@ export function mapProductSummaryToCardProps(
     primaryImage: product.keyImage
       ? { url: product.keyImage.url, altText: product.keyImage.altText ?? product.displayName }
       : { url: productImagePlaceholderUrl, altText: product.displayName },
+    ...(product.hoverImage?.url
+      ? {
+          secondaryImage: {
+            url: product.hoverImage.url,
+            altText: product.hoverImage.altText ?? product.displayName,
+          },
+        }
+      : {}),
     colours: Array.from(colourMap.entries()).map(([name, data]) => ({
       value:   name,
       name:    name.charAt(0).toUpperCase() + name.slice(1),

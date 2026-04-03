@@ -7,10 +7,8 @@ import { useSession } from '@/hooks/useSession'
 import { useAddToCart } from '@/hooks/useCartMutations'
 import { useWishlist, useToggleWishlist } from '@/hooks/useWishlist'
 import { useAuthPanel } from '@/components/providers/AuthProvider'
-import { formatMoney } from '@/hooks/useCurrency'
-import { COLOUR_HEX_MAP } from './ColourSelector'
+import { mapProductSummaryToCardProps } from '@/lib/mapProductToCardProps'
 import type { ProductSummary } from '@/types'
-import { productImagePlaceholderUrl } from '@/lib/assets'
 
 interface WearItWithProps {
   relations: ProductSummary[]
@@ -63,7 +61,7 @@ export function WearItWith({ relations }: WearItWithProps) {
   if (!relations || relations.length === 0) return null
 
   const cardProps: ProductCardProps[] = relations.map((p) =>
-    mapToCardProps(p, wishlistIds),
+    mapProductSummaryToCardProps(p, wishlistIds),
   )
 
   return (
@@ -102,67 +100,4 @@ export function WearItWith({ relations }: WearItWithProps) {
       </div>
     </section>
   )
-}
-
-function mapToCardProps(
-  product: ProductSummary,
-  wishlistIds: Set<string>,
-): ProductCardProps {
-  const variants = product.variants ?? []
-
-  const colourMap = new Map<string, { hex: string; inStock: boolean }>()
-  for (const v of variants) {
-    const existing = colourMap.get(v.color)
-    if (!existing) {
-      colourMap.set(v.color, {
-        hex: COLOUR_HEX_MAP[v.color.toLowerCase()] ?? '#888888',
-        inStock: v.stockStatus !== 'OUT_OF_STOCK',
-      })
-    } else if (v.stockStatus !== 'OUT_OF_STOCK') {
-      existing.inStock = true
-    }
-  }
-
-  const defaultColour =
-    variants.find((v) => v.stockStatus !== 'OUT_OF_STOCK')?.color
-    ?? variants[0]?.color
-    ?? null
-
-  const sizeMap = new Map<string, boolean>()
-  for (const v of variants) {
-    if (!sizeMap.has(v.size)) {
-      const inStockForDefault =
-        defaultColour !== null &&
-        variants.some(
-          (vv) =>
-            vv.size === v.size &&
-            vv.color === defaultColour &&
-            vv.stockStatus !== 'OUT_OF_STOCK',
-        )
-      sizeMap.set(v.size, inStockForDefault)
-    }
-  }
-
-  return {
-    id:           product.id,
-    slug:         product.slug,
-    displayName:  product.displayName,
-    price:        formatMoney(product.price),
-    isSale:       product.isSale,
-    isWishlisted: wishlistIds.has(product.id),
-    primaryImage: product.keyImage
-      ? { url: product.keyImage.url, altText: product.keyImage.altText ?? product.displayName }
-      : { url: productImagePlaceholderUrl, altText: product.displayName },
-    colours: Array.from(colourMap.entries()).map(([name, data]) => ({
-      value:   name,
-      name:    name.charAt(0).toUpperCase() + name.slice(1),
-      hex:     data.hex,
-      inStock: data.inStock,
-    })),
-    sizes: Array.from(sizeMap.entries()).map(([size, inStock]) => ({
-      value: size,
-      label: size,
-      inStock,
-    })),
-  }
 }

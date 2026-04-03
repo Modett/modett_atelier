@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import Image from 'next/image'
 import Link from 'next/link'
 import {
   GlobeIcon,
@@ -18,6 +17,7 @@ import { useAuthPanel } from '@/components/providers/AuthProvider'
 import { useSession } from '@/hooks/useSession'
 import { storePostAuthPath } from '@/lib/postAuthRedirect'
 import { NAV_LINKS } from '@/lib/nav-links'
+import { ModettLogo } from '@/components/shared/ModettLogo'
 import { CartButton } from '@/components/shared/CartButton'
 
 export function HeroNav() {
@@ -136,16 +136,7 @@ export function HeroNav() {
         <div className="flex items-center justify-center pt-6 pb-4 md:pt-5 md:pb-3">
           {/* Mobile: logo left + hamburger right */}
           <div className="flex md:hidden items-center justify-between w-full px-4">
-            <Link href="/" aria-label="Modett — return to homepage">
-              <Image
-                src="/images/vlogo_transparent.png"
-                alt="Modett"
-                height={56}
-                width={204}
-                className="h-14 w-auto object-contain"
-                priority
-              />
-            </Link>
+            <ModettLogo variant="light" size="md" href="/" />
             <div className="flex items-center gap-3">
               <CartButton
                 className="text-background"
@@ -164,16 +155,7 @@ export function HeroNav() {
 
           {/* Desktop: centred logo */}
           <div className="hidden md:block">
-            <Link href="/" aria-label="Modett — return to homepage">
-              <Image
-                src="/images/vlogo_transparent.png"
-                alt="Modett"
-                height={80}
-                width={286}
-                className="h-20 w-auto object-contain"
-                priority
-              />
-            </Link>
+            <ModettLogo variant="light" size="lg" href="/" />
           </div>
         </div>
 
@@ -185,11 +167,12 @@ export function HeroNav() {
               href={link.href}
               aria-current={pathname === link.href ? 'page' : undefined}
               className={cn(
-                'font-body font-light text-[14px] leading-6',
+                'font-body font-light text-[11px]',
                 'uppercase tracking-[0.25em]',
+                'transition-opacity duration-200',
                 pathname === link.href
-                  ? 'text-[#F8F5F2] underline underline-offset-4'
-                  : 'text-[#F8F5F2]/80 hover:text-[#F8F5F2]',
+                  ? 'text-background underline underline-offset-4'
+                  : 'text-background/80 hover:text-background',
               )}
             >
               {link.label}

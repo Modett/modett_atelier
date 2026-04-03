@@ -97,6 +97,8 @@ export interface ProductListItem {
   shortName: string
   isSale: boolean
   keyImage: { url: string; altText: string | null } | null
+  /** Next gallery image after the key image — used for card hover / touch peek */
+  hoverImage: { url: string; altText: string | null } | null
   price: Money
   stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
   variants: ProductListVariant[]
@@ -140,6 +142,10 @@ function rowToProductListItem(
     keyImage:
       row.keyImageUrl != null
         ? { url: row.keyImageUrl, altText: row.keyImageAltText }
+        : null,
+    hoverImage:
+      row.hoverImageUrl != null
+        ? { url: row.hoverImageUrl, altText: row.hoverImageAltText }
         : null,
     price: resolvePriceForCurrency({
       lkrAmount: row.lkrAmount,

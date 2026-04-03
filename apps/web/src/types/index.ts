@@ -88,6 +88,8 @@ export interface ProductSummary {
   isSale:      boolean
   categoryId:  string | null
   keyImage:    ProductImage | null
+  /** Next image after the key image in gallery order — card hover / touch peek */
+  hoverImage?: ProductImage | null
   price:       Money
   variants:    ProductListingVariant[]
 }

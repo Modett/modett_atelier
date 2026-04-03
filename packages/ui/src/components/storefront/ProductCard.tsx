@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '../../lib/utils'
 import { FilledButton } from '../ui/FilledButton'
@@ -92,6 +92,9 @@ function isLightColour(hex: string): boolean {
   const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
   return luminance > 0.7
 }
+
+/** Hold-to-peek second image on touch (avoids fighting scroll vs tap). */
+const IMAGE_TOUCH_PEEK_MS = 280
 
 // ── Icons (inline SVGs) ─────────────────────────────────────────────────
 
@@ -187,17 +190,29 @@ export function ProductCard({
 }: ProductCardProps): React.ReactElement {
   const [isHovered, setIsHovered] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isTouchAltVisible, setIsTouchAltVisible] = useState(false)
+  const touchPeekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const firstInStockColour = colours.find((c) => c.inStock)
   const [selectedColourValue, setSelectedColourValue] = useState<string | null>(
     firstInStockColour?.value ?? colours[0]?.value ?? null
   )
   const [selectedSizeValue, setSelectedSizeValue] = useState<string | null>(null)
 
+  const clearTouchPeekTimer = useCallback(() => {
+    if (touchPeekTimerRef.current != null) {
+      clearTimeout(touchPeekTimerRef.current)
+      touchPeekTimerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => () => clearTouchPeekTimer(), [clearTouchPeekTimer])
+
   const suffix = imageSuffix ?? ''
   const primaryUrl = primaryImage.url + suffix
   const secondaryUrl = secondaryImage?.url ? secondaryImage.url + suffix : ''
   const isCompact = cardSize === 'compact'
-  const showSecondaryImage = (isHovered || isExpanded) && secondaryUrl
+  const showSecondaryImage =
+    (isHovered || isExpanded || isTouchAltVisible) && Boolean(secondaryUrl)
 
   const handleImageClick = useCallback(
     (e: React.MouseEvent) => {
@@ -261,6 +276,32 @@ export function ProductCard({
         className="relative aspect-[3/4] w-full overflow-hidden"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onTouchStart={() => {
+          if (!secondaryUrl) return
+          if (
+            typeof window !== 'undefined' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ) {
+            return
+          }
+          clearTouchPeekTimer()
+          touchPeekTimerRef.current = setTimeout(() => {
+            touchPeekTimerRef.current = null
+            setIsTouchAltVisible(true)
+          }, IMAGE_TOUCH_PEEK_MS)
+        }}
+        onTouchMove={() => {
+          clearTouchPeekTimer()
+          setIsTouchAltVisible(false)
+        }}
+        onTouchEnd={() => {
+          clearTouchPeekTimer()
+          setIsTouchAltVisible(false)
+        }}
+        onTouchCancel={() => {
+          clearTouchPeekTimer()
+          setIsTouchAltVisible(false)
+        }}
       >
         {/* Clickable image area — navigates to PDP */}
         <button
