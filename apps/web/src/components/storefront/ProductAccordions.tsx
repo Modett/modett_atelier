@@ -34,6 +34,7 @@ export function ProductAccordions({
   const sections: AccordionSection[] = [
     {
       title: 'Design & Fit',
+      defaultOpen: true,
       content: product.description ?? 'Design and fit information coming soon.',
     },
     {
@@ -54,7 +55,6 @@ export function ProductAccordions({
     },
     {
       title: 'The Modett Promise',
-      defaultOpen: true,
       content: (
         <p className="font-display font-bold italic text-[15px] text-umber whitespace-pre-line">
           {MODETT_PROMISE}
@@ -72,7 +72,7 @@ export function ProductAccordions({
           defaultOpen={section.defaultOpen ?? false}
         >
           {typeof section.content === 'string' ? (
-            <p className="font-body font-light text-[13px] text-umber/80 leading-relaxed">
+            <p className="font-body font-light text-[13px] text-graphite leading-relaxed">
               {section.content}
             </p>
           ) : (
@@ -108,7 +108,7 @@ function ProductAccordion({
         </span>
         <ChevronDown
           className={cn(
-            'w-4 h-4 text-muted-foreground flex-shrink-0',
+            'w-4 h-4 text-umber flex-shrink-0',
             'transition-transform duration-200',
             isOpen ? 'rotate-180' : 'rotate-0',
           )}

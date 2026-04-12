@@ -179,7 +179,7 @@ export function FitChartDrawer({
                 <span className="font-body text-[12px] text-umber font-medium">
                   {label}:{' '}
                 </span>
-                <span className="font-body font-light text-[12px] text-umber/80 leading-relaxed">
+                <span className="font-body font-light text-[12px] text-umber leading-relaxed">
                   {text}
                 </span>
               </div>

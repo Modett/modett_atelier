@@ -66,8 +66,11 @@ export function ColourSelector({
 }: ColourSelectorProps) {
   return (
     <div className={cn('', className)}>
-      <p className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber">
-        Colour{selectedColour ? ` : ${selectedColour}` : ''}
+      <p className="font-body font-light text-[11px] uppercase tracking-[0.15em]">
+        <span className="text-umber">Colour</span>
+        {selectedColour ? (
+          <span className="text-graphite">{` : ${selectedColour}`}</span>
+        ) : null}
       </p>
 
       <div

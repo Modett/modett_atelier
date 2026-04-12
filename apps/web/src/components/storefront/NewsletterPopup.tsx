@@ -248,7 +248,7 @@ function RightPanelContent({
             You&apos;re in!
           </p>
           <p className="font-body font-light text-[14px]
-                        text-umber/80 leading-relaxed">
+                        text-umber leading-relaxed">
             Your exclusive promo code is on its way to your
             inbox. Use it at checkout for 15% off.
           </p>
@@ -281,7 +281,7 @@ function RightPanelContent({
           </div>
 
           <p className="font-body font-light text-[14px]
-                        text-umber/80 leading-relaxed
+                        text-umber leading-relaxed
                         max-w-[340px]">
             Be the first to know about new arrivals,
             exclusive offers and more.
@@ -319,7 +319,7 @@ function RightPanelContent({
               )}
               {error && (
                 <p className="font-body font-light text-[12px]
-                               text-umber/70 mt-1">
+                               text-umber mt-1">
                   {error}
                 </p>
               )}
@@ -357,7 +357,7 @@ function RightPanelContent({
               type="button"
               onClick={onDecline}
               className="w-full font-body font-light
-                         text-[13px] text-umber/70
+                         text-[13px] text-umber
                          underline underline-offset-2
                          hover:text-umber transition-colors
                          duration-200 py-1"
