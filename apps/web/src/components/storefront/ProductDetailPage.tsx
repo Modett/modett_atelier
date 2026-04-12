@@ -63,6 +63,18 @@ export function ProductDetailPage({ slug }: ProductDetailPageProps) {
     })
   }, [product?.id, selectedColour, selectedSize, user?.id])
 
+  useEffect(() => {
+    if (!product) return
+    setSelectedSize(null)
+    const firstInStockColour = [...new Set(product.variants.map((v) => v.color))].find(
+      (colour) =>
+        product.variants
+          .filter((v) => v.color === colour)
+          .some((v) => v.stockStatus !== 'OUT_OF_STOCK'),
+    )
+    setSelectedColour(firstInStockColour ?? null)
+  }, [product?.id])
+
   function handleColourChange(colour: string) {
     setSelectedColour(colour)
     setSelectedSize(null)

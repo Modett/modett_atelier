@@ -91,6 +91,8 @@ export interface ProductSummary {
   /** Next image after the key image in gallery order — card hover / touch peek */
   hoverImage?: ProductImage | null
   price:       Money
+  /** When on sale and provided by API: discounted price; `price` is shown struck through */
+  salePrice?:  Money
   variants:    ProductListingVariant[]
 }
 

@@ -18,7 +18,7 @@
   --color-text:             var(--color-graphite);
   --color-ink:              var(--color-graphite);
   --color-muted:            var(--color-alabaster);
-  --color-muted-foreground: var(--color-warm-taupe);
+  --color-muted-foreground: var(--color-rich-umber); /* CHANGED: was warm-taupe #BBA496 → now rich-umber #765C4D */
   --color-border:           var(--color-graphite);
   --color-accent:           var(--color-graphite);
   --color-highlight:        var(--color-brushed-gold);

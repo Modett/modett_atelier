@@ -86,7 +86,7 @@ export function SizeSelector({
         <button
           type="button"
           onClick={() => setFitChartOpen(true)}
-          className="font-body font-light text-[11px] text-muted-foreground underline underline-offset-2 hover:text-umber transition-colors duration-200 cursor-pointer"
+          className="font-body font-light text-[11px] text-umber underline underline-offset-2 hover:text-graphite transition-colors duration-200 cursor-pointer"
         >
           Fit Chart
         </button>
@@ -102,13 +102,13 @@ export function SizeSelector({
           ghostSizes.map((size) => (
             <div
               key={size}
-              className="h-10 min-w-[44px] px-3 border border-muted/40 flex items-center justify-center font-body font-light text-[12px] text-muted-foreground/30 cursor-default"
+              className="h-10 min-w-[44px] px-3 border border-umber/25 flex items-center justify-center font-body font-light text-[12px] text-umber/40 cursor-default"
             >
               {size}
             </div>
           ))
         ) : sortedSizes.length === 0 ? (
-          <p className="font-body text-[12px] text-muted-foreground">
+          <p className="font-body text-[12px] text-graphite">
             No sizes available
           </p>
         ) : (
@@ -131,11 +131,11 @@ export function SizeSelector({
                   'cursor-pointer transition-all duration-200',
                   isSelected
                     ? isOOS
-                      ? 'bg-umber/60 text-background border border-umber/60'
-                      : 'bg-umber text-background border border-umber'
+                      ? 'bg-umber/60 text-surface border border-umber/60'
+                      : 'bg-graphite text-surface border border-graphite'
                     : isOOS
-                      ? 'border border-muted text-muted-foreground/40 line-through'
-                      : 'border border-muted text-umber hover:border-umber',
+                      ? 'border border-umber/25 text-umber/40 line-through'
+                      : 'border border-umber/40 text-graphite hover:border-umber hover:bg-umber/5',
                 )}
               >
                 {variant.size}
@@ -147,13 +147,13 @@ export function SizeSelector({
 
       {/* OOS warning */}
       {isSelectedOOS && (
-        <p className="font-body font-light text-[11px] text-muted-foreground mt-2">
+        <p className="font-body font-light text-[11px] text-umber mt-2">
           This size is sold out. Select a different size to add to cart.
         </p>
       )}
 
       {/* Model info */}
-      <p className="font-body font-light text-[11px] text-muted-foreground italic mt-3">
+      <p className="font-body font-light text-[11px] text-umber mt-3">
         Model is 5&apos;10&quot; and wears a size UK 10.
       </p>
 

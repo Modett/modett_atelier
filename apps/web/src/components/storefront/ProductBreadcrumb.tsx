@@ -15,27 +15,27 @@ export function ProductBreadcrumb({ product }: ProductBreadcrumbProps) {
           <li className="flex-shrink-0">
             <Link
               href="/"
-              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-umber transition-colors duration-200 whitespace-nowrap"
+              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber hover:text-graphite transition-colors duration-200 whitespace-nowrap"
             >
               Home
             </Link>
           </li>
-          <li className="flex-shrink-0 font-body text-[11px] text-muted-foreground">
+          <li className="flex-shrink-0 font-body text-[11px] text-umber/50">
             /
           </li>
           <li className="flex-shrink-0">
             <Link
               href={categoryHref}
-              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-umber transition-colors duration-200 whitespace-nowrap"
+              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber hover:text-graphite transition-colors duration-200 whitespace-nowrap"
             >
               Collection
             </Link>
           </li>
-          <li className="flex-shrink-0 font-body text-[11px] text-muted-foreground">
+          <li className="flex-shrink-0 font-body text-[11px] text-umber/50">
             /
           </li>
           <li className="min-w-0">
-            <span className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground block truncate">
+            <span className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-graphite block truncate">
               <span className="hidden md:inline">{product.displayName}</span>
               <span className="md:hidden">{product.shortName}</span>
             </span>
