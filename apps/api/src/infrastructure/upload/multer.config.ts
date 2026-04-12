@@ -6,19 +6,24 @@ import multer from 'multer'
 
 const storage = multer.memoryStorage()
 
+/** Admin catalog product images — keep in sync with apps/web dropzone (20MB). */
+const ADMIN_PRODUCT_IMAGE_MAX_BYTES = 20 * 1024 * 1024
+
 export const imageUpload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max for images
+    fileSize: ADMIN_PRODUCT_IMAGE_MAX_BYTES,
     files: 6,
   },
   fileFilter: (_req, file, cb) => {
     const allowedMimes = [
       'image/jpeg',
+      'image/pjpeg',
       'image/png',
       'image/webp',
       'image/tiff',
       'image/heic',
+      'image/heif',
     ]
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true)
@@ -89,10 +94,12 @@ export const reviewPhotoUpload = multer({
   fileFilter: (_req, file, cb) => {
     const allowedMimes = [
       'image/jpeg',
+      'image/pjpeg',
       'image/png',
       'image/webp',
       'image/tiff',
       'image/heic',
+      'image/heif',
     ]
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true)

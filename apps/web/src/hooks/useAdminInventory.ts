@@ -235,6 +235,22 @@ export function useAdminUnresolvedDrift(variantId?: string) {
   })
 }
 
+export function useInitializeMissingStock() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.post<{ data: { initialized: number } }>(
+        '/admin/inventory/initialize-all',
+        {},
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ADMIN_INVENTORY_KEYS.all })
+    },
+  })
+}
+
 export function useRestockVariant() {
   const queryClient = useQueryClient()
   return useMutation({

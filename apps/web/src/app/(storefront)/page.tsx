@@ -7,7 +7,7 @@ import { HOMEPAGE_CAROUSEL_SLIDES } from '@/lib/placeholder-data'
 export default function HomePage() {
   return (
     <>
-      <HomepageHero imageUrl="/images/hero-placeholder.png" />
+      <HomepageHero imageUrl="/images/hero-image.jpg" />
 
       <HomepageBestsellers />
 

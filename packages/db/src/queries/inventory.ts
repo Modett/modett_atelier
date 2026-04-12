@@ -882,3 +882,21 @@ export async function updateInStockUnitsToStatus({
   `)
   return (result.rows as { id: string }[]).map((r) => r.id)
 }
+
+/** Inserts zero-quantity variant_stock rows for active variants missing one. */
+export async function initializeMissingVariantStockRows(): Promise<{
+  initialized: number
+}> {
+  const result = await db.execute(sql`
+    INSERT INTO inventory.variant_stock (variant_id, in_stock_qty, held_qty, low_stock_threshold)
+    SELECT pv.id, 0, 0, 3
+    FROM inventory.product_variants pv
+    WHERE pv.deleted_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM inventory.variant_stock vs WHERE vs.variant_id = pv.id
+      )
+    RETURNING variant_id
+  `)
+  const initialized = (result.rows as { variant_id: string }[]).length
+  return { initialized }
+}

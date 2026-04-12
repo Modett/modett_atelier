@@ -51,6 +51,16 @@ router.get(
   },
 )
 
+// POST /admin/inventory/initialize-all
+router.post(
+  '/admin/inventory/initialize-all',
+  requireAdmin,
+  async (_req: Request, res: Response) => {
+    const { initialized } = await inventoryService.initializeAllMissingStock()
+    res.status(200).json({ data: { initialized } })
+  },
+)
+
 const unresolvedReconciliationQuerySchema = z.object({
   variantId: z.string().uuid().optional(),
 })

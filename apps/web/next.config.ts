@@ -30,6 +30,12 @@ const nextConfig: NextConfig = {
         hostname: '**.r2.dev',
       },
       {
+        // Cloudflare R2 — Modett production custom domain
+        // Configure in R2 bucket settings > Custom Domains
+        protocol: 'https',
+        hostname: 'images.modett.com',
+      },
+      {
         // Cloudflare R2 — dev seed bucket (exact host + pathname for optimizer)
         protocol: 'https',
         hostname: 'pub-8804bb39c26f4399a33c5a5d1c2182f9.r2.dev',

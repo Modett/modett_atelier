@@ -14,7 +14,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
   await db.execute(sql`
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'product_views', jsonb_build_object('product_id', product_id),
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT payload_json->>'productId' AS product_id,
              date_trunc('day', created_at) AS day_start
@@ -35,7 +35,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
              'color', color,
              'size', size
            ),
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT payload_json->>'productId' AS product_id,
              payload_json->>'color' AS color,
@@ -58,7 +58,9 @@ export async function runAnalyticsAggregation(): Promise<void> {
              'color', item->>'color',
              'size', item->>'size'
            ),
-           SUM((item->>'qty')::int)::text, 'daily', day_start
+           SUM((item->>'qty')::int)::numeric,
+           'daily',
+           date_trunc('day', created_at)
     FROM analytics.events,
          jsonb_array_elements(payload_json->'items') AS item
     WHERE type = 'PURCHASE_COMPLETE'
@@ -72,7 +74,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'traffic_source',
            jsonb_build_object('source', src, 'utm_source', utm_src),
-           COUNT(DISTINCT session_id)::text, 'daily', day_start
+           COUNT(DISTINCT session_id)::numeric, 'daily', day_start
     FROM (
       SELECT session_id,
              date_trunc('day', created_at) AS day_start,
@@ -108,7 +110,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'device_type',
            jsonb_build_object('device_type', coalesce(device_type, 'unknown')),
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT device_type, date_trunc('day', created_at) AS day_start
       FROM analytics.events
@@ -123,7 +125,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'wishlist_adds',
            jsonb_build_object('product_id', product_id),
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT payload_json->>'productId' AS product_id,
              date_trunc('day', created_at) AS day_start
@@ -139,7 +141,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
   await db.execute(sql`
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'checkout_starts', '{}'::jsonb,
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT date_trunc('day', created_at) AS day_start
       FROM analytics.events
@@ -153,7 +155,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
   await db.execute(sql`
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'purchase_count', '{}'::jsonb,
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT date_trunc('day', created_at) AS day_start
       FROM analytics.events
@@ -168,7 +170,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'user_type_purchase',
            jsonb_build_object('user_type', user_type),
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT CASE WHEN user_id IS NULL THEN 'guest' ELSE 'registered' END AS user_type,
              date_trunc('day', created_at) AS day_start
@@ -183,7 +185,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
   await db.execute(sql`
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'account_creations', '{}'::jsonb,
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT date_trunc('day', created_at) AS day_start
       FROM analytics.events
@@ -198,7 +200,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'variant_select_color',
            jsonb_build_object('color', color),
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT payload_json->>'color' AS color,
              date_trunc('day', created_at) AS day_start
@@ -215,7 +217,7 @@ export async function runAnalyticsAggregation(): Promise<void> {
     INSERT INTO analytics.analytics_aggregates (metric, dimension_json, value, period, period_start)
     SELECT 'variant_select_size',
            jsonb_build_object('size', size),
-           COUNT(*)::text, 'daily', day_start
+           COUNT(*)::numeric, 'daily', day_start
     FROM (
       SELECT payload_json->>'size' AS size,
              date_trunc('day', created_at) AS day_start

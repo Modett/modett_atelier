@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Camera, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
@@ -39,6 +39,7 @@ import {
   useDeleteProduct,
 } from '@/hooks/useAdminCatalog'
 import type { AdminProductListItem } from '@modett/types'
+import { productImageAdminThumbCandidates } from '@/lib/productImageUrl'
 
 function useDebouncedValue<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -50,17 +51,17 @@ function useDebouncedValue<T>(value: T, ms: number): T {
 }
 
 function ProductThumb({ url }: { url: string | null }) {
-  const [phase, setPhase] = useState<'thumb' | 'base' | 'none'>('thumb')
-  const src =
-    url == null
-      ? null
-      : phase === 'thumb'
-        ? `${url}-thumb.webp`
-        : phase === 'base'
-          ? url
-          : null
+  const candidates = useMemo(
+    () => (url == null ? [] : productImageAdminThumbCandidates(url)),
+    [url],
+  )
+  const [i, setI] = useState(0)
 
-  if (!src) {
+  useEffect(() => {
+    setI(0)
+  }, [url])
+
+  if (url == null || i >= candidates.length) {
     return (
       <div className="flex h-12 w-12 items-center justify-center rounded-md bg-gray-100 text-gray-400">
         <Camera className="h-5 w-5" />
@@ -71,16 +72,13 @@ function ProductThumb({ url }: { url: string | null }) {
   return (
     <div className="relative h-12 w-12 overflow-hidden rounded-md bg-gray-100">
       <Image
-        src={src}
+        src={candidates[i]!}
         alt=""
         fill
         className="object-cover"
         sizes="48px"
         unoptimized
-        onError={() => {
-          if (phase === 'thumb') setPhase('base')
-          else setPhase('none')
-        }}
+        onError={() => setI((x) => x + 1)}
       />
     </div>
   )

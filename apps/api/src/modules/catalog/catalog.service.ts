@@ -689,27 +689,32 @@ export async function adminGetPresignedProductImageUploadUrl({
 }): Promise<{ uploadUrl: string; key: string; publicUrl: string; expiresIn: number }> {
   const product = await getProductById({ id: productId })
   if (!product) throw new AppError('PRODUCT_NOT_FOUND', 404)
-  if (!contentType.startsWith('image/')) {
+  const normalizedType =
+    contentType === 'image/jpg' ? 'image/jpeg' : contentType
+  if (!normalizedType.startsWith('image/')) {
     throw new AppError('INVALID_CONTENT_TYPE', 400)
   }
   const { randomUUID } = await import('node:crypto')
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200)
   const subPath = `${product.slug}/${randomUUID()}-${safeName || 'image'}`
-  const storage = getStorageService()
   try {
+    const storage = getStorageService()
     const { uploadUrl, key, expiresIn } = await storage.getPresignedUploadUrl(
       'product_images',
       subPath,
-      contentType,
+      normalizedType,
       3600,
     )
     const publicUrl = storage.getPublicUrl(key)
     return { uploadUrl, key, publicUrl, expiresIn }
   } catch (err) {
+    if (err instanceof AppError) throw err
     if (err instanceof StorageError) {
       throw new AppError('STORAGE_ERROR', 500, err.message)
     }
-    throw err
+    const message =
+      err instanceof Error ? err.message : 'Storage operation failed'
+    throw new AppError('STORAGE_ERROR', 500, message)
   }
 }
 
@@ -875,13 +880,15 @@ export async function adminUploadProductImagesFromFiles({
   let sortOrder = nextSortOrder
 
   for (const file of files) {
-    let variants
+    let uploaded
+    const mime =
+      file.mimetype === 'image/jpg' ? 'image/jpeg' : file.mimetype
     try {
-      variants = await storage.uploadProductImage(
+      uploaded = await storage.uploadProductImageOriginal(
         product.slug,
         file.buffer,
         file.originalname,
-        sortOrder,
+        mime,
       )
     } catch (err) {
       if (err instanceof StorageError) {
@@ -889,7 +896,7 @@ export async function adminUploadProductImagesFromFiles({
       }
       throw err
     }
-    const baseUrl = variants.full.url.replace(/-full\.webp$/, '')
+    const baseUrl = uploaded.url
     const altText = `${product.displayName} - Image ${sortOrder + 1}`
     const image = await createProductImage({
       productId,

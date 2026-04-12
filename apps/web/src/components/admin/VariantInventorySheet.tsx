@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { UnitStatus } from '@modett/types'
-import type { RestockResult } from '@modett/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -26,6 +25,12 @@ import {
   useRunReconciliation,
   useSetLowStockThreshold,
 } from '@/hooks/useAdminInventory'
+
+export type InventoryManagerTab =
+  | 'overview'
+  | 'restock'
+  | 'units'
+  | 'movements'
 
 function formatShortDate(iso: string): string {
   const d = new Date(iso)
@@ -116,16 +121,19 @@ export interface VariantInventorySheetProps {
   variantId: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onRestockSuccess: (result: RestockResult) => void
+  /** Which tab opens with the sheet (Manage vs quick restock). */
+  initialTab?: InventoryManagerTab
 }
 
 export function VariantInventorySheet({
   variantId,
   open,
   onOpenChange,
-  onRestockSuccess,
+  initialTab,
 }: VariantInventorySheetProps) {
   const { data: detail, isLoading, error } = useAdminVariantStock(variantId)
+  const [activeTab, setActiveTab] = useState<InventoryManagerTab>('overview')
+  const appliedDefaultRef = useRef('')
   const [unitFilter, setUnitFilter] = useState<'ALL' | UnitStatus>('ALL')
   const { data: unitsData } = useAdminVariantUnits(
     variantId,
@@ -139,8 +147,6 @@ export function VariantInventorySheet({
 
   const [thresholdInput, setThresholdInput] = useState('')
   const [restockQty, setRestockQty] = useState(1)
-  const [restockPhase, setRestockPhase] = useState<'form' | 'done'>('form')
-  const [lastRestock, setLastRestock] = useState<RestockResult | null>(null)
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [damageConfirmOpen, setDamageConfirmOpen] = useState(false)
@@ -165,17 +171,31 @@ export function VariantInventorySheet({
 
   useEffect(() => {
     if (!open) {
+      appliedDefaultRef.current = ''
+      setActiveTab('overview')
       setUnitFilter('ALL')
       setMovementPage(1)
       setSelectedIds(new Set())
       setDamageConfirmOpen(false)
       setAdjustOpen(false)
       setAdjustNote('')
-      setRestockPhase('form')
-      setLastRestock(null)
       setRestockQty(1)
     }
   }, [open, variantId])
+
+  useEffect(() => {
+    if (!open) return
+    if (!detail) return
+    const sessionKey = `${variantId}:${initialTab ?? 'auto'}`
+    if (appliedDefaultRef.current === sessionKey) return
+    appliedDefaultRef.current = sessionKey
+    setActiveTab(
+      initialTab ??
+        (detail.stock.inStockQty === 0 && detail.stock.heldQty === 0
+          ? 'restock'
+          : 'overview'),
+    )
+  }, [open, variantId, detail, initialTab])
 
   const units = unitsData?.units ?? []
 
@@ -277,7 +297,11 @@ export function VariantInventorySheet({
             <p className="text-sm text-red-600">Failed to load variant.</p>
           )}
           {detail && !isLoading && (
-            <Tabs defaultValue="overview" className="flex min-h-0 flex-col gap-4">
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as InventoryManagerTab)}
+              className="flex min-h-0 flex-col gap-4"
+            >
               <TabsList className="flex w-full flex-wrap justify-start gap-1">
                 <TabsTrigger value="overview">Stock Overview</TabsTrigger>
                 <TabsTrigger value="restock">Restock</TabsTrigger>
@@ -430,102 +454,76 @@ export function VariantInventorySheet({
                     <p className="text-sm font-medium">
                       Restock — {detail.color} / {detail.size}
                     </p>
-                    {restockPhase === 'form' ? (
-                      <>
-                        <div>
-                          <label className="text-sm text-gray-600">
-                            Units to add *
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={500}
-                            step={1}
-                            className="mt-1 block h-9 w-full max-w-[200px] rounded-md border border-gray-200 px-2 text-sm"
-                            value={restockQty}
-                            onChange={(e) =>
-                              setRestockQty(
-                                Math.max(
-                                  1,
-                                  Math.min(
-                                    500,
-                                    Number.parseInt(e.target.value, 10) || 1,
-                                  ),
-                                ),
-                              )
-                            }
-                          />
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          Preview: This will create {restockQty} new barcoded
-                          units. New in-stock total:{' '}
-                          {detail.stock.inStockQty + restockQty} units
-                        </p>
-                        <Button
-                          type="button"
-                          disabled={restockMut.isPending}
-                          onClick={() => {
-                            restockMut.mutate(
-                              { variantId, qty: restockQty },
-                              {
-                                onSuccess: (result) => {
-                                  toast.success(
-                                    `Stock added. ${restockQty} units created.`,
-                                  )
-                                  setLastRestock(result)
-                                  setRestockPhase('done')
-                                },
-                                onError: (e: Error & { message?: string }) => {
-                                  toast.error(e.message ?? 'Restock failed.')
-                                },
-                              },
-                            )
-                          }}
+                    {detail.stock.inStockQty === 0 &&
+                      detail.stock.heldQty === 0 && (
+                        <div
+                          role="status"
+                          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
                         >
-                          {restockMut.isPending ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Adding stock…
-                            </>
-                          ) : (
-                            'Add Stock & Generate Barcodes'
-                          )}
-                        </Button>
-                      </>
-                    ) : (
-                      lastRestock && (
-                        <div className="space-y-3">
-                          <p className="text-sm font-medium text-green-700">
-                            {lastRestock.newUnits.length} units added successfully
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            Barcode range:{' '}
-                            {lastRestock.newUnits[0]?.barcodeValue ?? '—'} →{' '}
-                            {lastRestock.newUnits[lastRestock.newUnits.length - 1]
-                              ?.barcodeValue ?? '—'}
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              variant="default"
-                              onClick={() => onRestockSuccess(lastRestock)}
-                            >
-                              Print Barcode Sheet
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => {
-                                setRestockPhase('form')
-                                setLastRestock(null)
-                              }}
-                            >
-                              Add More Stock
-                            </Button>
-                          </div>
+                          This variant has no stock yet. Add units below to
+                          generate barcodes.
                         </div>
-                      )
-                    )}
+                      )}
+                    <div>
+                      <label className="text-sm text-gray-600">
+                        Units to add *
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={500}
+                        step={1}
+                        className="mt-1 block h-9 w-full max-w-[200px] rounded-md border border-gray-200 px-2 text-sm"
+                        value={restockQty}
+                        onChange={(e) =>
+                          setRestockQty(
+                            Math.max(
+                              1,
+                              Math.min(
+                                500,
+                                Number.parseInt(e.target.value, 10) || 1,
+                              ),
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Preview: This will create {restockQty} new barcoded units.
+                      New in-stock total: {detail.stock.inStockQty + restockQty}{' '}
+                      units
+                    </p>
+                    <Button
+                      type="button"
+                      disabled={restockMut.isPending}
+                      onClick={() => {
+                        restockMut.mutate(
+                          { variantId, qty: restockQty },
+                          {
+                            onSuccess: () => {
+                              toast.success(
+                                `Stock added. ${restockQty} units created.`,
+                              )
+                              setActiveTab('units')
+                              setUnitFilter('ALL')
+                              setRestockQty(1)
+                            },
+                            onError: (e: Error & { message?: string }) => {
+                              toast.error(e.message ?? 'Restock failed.')
+                            },
+                          },
+                        )
+                      }}
+                    >
+                      {restockMut.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Adding stock…
+                        </>
+                      ) : (
+                        'Add Stock & Generate Barcodes'
+                      )}
+                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>

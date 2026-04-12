@@ -1,8 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { AlertTriangle, Camera, ChevronDown, ChevronUp } from 'lucide-react'
+import Link from 'next/link'
+import {
+  AlertTriangle,
+  Camera,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -24,17 +31,18 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { VariantInventorySheet } from '@/components/admin/VariantInventorySheet'
+import {
+  VariantInventorySheet,
+  type InventoryManagerTab,
+} from '@/components/admin/VariantInventorySheet'
 import {
   useAdminInventoryList,
   useAdminUnresolvedDrift,
+  useInitializeMissingStock,
   useResolveReconciliation,
 } from '@/hooks/useAdminInventory'
-import type {
-  InventoryVariantRow,
-  RestockResult,
-  StockStatus,
-} from '@modett/types'
+import type { InventoryVariantRow, StockStatus } from '@modett/types'
+import { productImageAdminThumbCandidates } from '@/lib/productImageUrl'
 
 function useDebouncedValue<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -46,17 +54,17 @@ function useDebouncedValue<T>(value: T, ms: number): T {
 }
 
 function ProductThumb({ url }: { url: string | null }) {
-  const [phase, setPhase] = useState<'thumb' | 'base' | 'none'>('thumb')
-  const src =
-    url == null
-      ? null
-      : phase === 'thumb'
-        ? `${url}-thumb.webp`
-        : phase === 'base'
-          ? url
-          : null
+  const candidates = useMemo(
+    () => (url == null ? [] : productImageAdminThumbCandidates(url)),
+    [url],
+  )
+  const [i, setI] = useState(0)
 
-  if (!src) {
+  useEffect(() => {
+    setI(0)
+  }, [url])
+
+  if (url == null || i >= candidates.length) {
     return (
       <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gray-100 text-gray-400">
         <Camera className="h-5 w-5" />
@@ -67,16 +75,13 @@ function ProductThumb({ url }: { url: string | null }) {
   return (
     <div className="relative h-10 w-10 overflow-hidden rounded-md bg-gray-100">
       <Image
-        src={src}
+        src={candidates[i]!}
         alt=""
         fill
         className="object-cover"
         sizes="40px"
         unoptimized
-        onError={() => {
-          if (phase === 'thumb') setPhase('base')
-          else setPhase('none')
-        }}
+        onError={() => setI((x) => x + 1)}
       />
     </div>
   )
@@ -127,6 +132,9 @@ export default function AdminInventoryPage() {
   const [page, setPage] = useState(1)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheetInitialTab, setSheetInitialTab] = useState<
+    InventoryManagerTab | undefined
+  >(undefined)
   const [reconOpen, setReconOpen] = useState(true)
   const [resolvingLogId, setResolvingLogId] = useState<string | null>(null)
   const [resolveNote, setResolveNote] = useState('')
@@ -142,6 +150,7 @@ export default function AdminInventoryPage() {
 
   const { data: driftData } = useAdminUnresolvedDrift()
   const resolveMut = useResolveReconciliation()
+  const initStockMut = useInitializeMissingStock()
 
   const driftCount = driftData?.logs.length ?? 0
 
@@ -149,19 +158,19 @@ export default function AdminInventoryPage() {
     setPage(1)
   }, [debouncedSearch, statusFilter])
 
-  function openVariant(id: string) {
+  function openVariant(id: string, tab?: InventoryManagerTab) {
     setSelectedVariantId(id)
+    setSheetInitialTab(tab)
     setSheetOpen(true)
   }
 
-  function handleRestockSuccess(result: RestockResult) {
-    const unitIds = result.newUnits.map((u) => u.id).join(',')
-    const q = new URLSearchParams({
-      variantId: result.variantId,
-      unitIds,
-    })
-    window.open(`/admin/barcodes/print?${q.toString()}`, '_blank')
-  }
+  const noListFilters = !debouncedSearch && statusFilter === 'ALL'
+  const showInitializeStock =
+    !isLoading &&
+    !error &&
+    listData != null &&
+    listData.total === 0 &&
+    noListFilters
 
   return (
     <div className="space-y-6">
@@ -174,6 +183,31 @@ export default function AdminInventoryPage() {
             </p>
           )}
         </div>
+        {showInitializeStock && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            disabled={initStockMut.isPending}
+            onClick={() => {
+              initStockMut.mutate(undefined, {
+                onSuccess: (data) => {
+                  toast.success(
+                    data.initialized > 0
+                      ? `Initialized ${data.initialized} missing stock row${data.initialized === 1 ? '' : 's'}.`
+                      : 'All variants already have stock rows.',
+                  )
+                },
+                onError: (e: Error & { message?: string }) => {
+                  toast.error(e.message ?? 'Could not initialize stock rows.')
+                },
+              })
+            }}
+          >
+            Initialize Missing Stock Rows
+          </Button>
+        )}
       </div>
 
       {driftCount > 0 && (
@@ -250,7 +284,7 @@ export default function AdminInventoryPage() {
                   <TableHead className="text-right">Available</TableHead>
                   <TableHead className="text-right">Threshold</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
+                  <TableHead className="w-[150px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -279,9 +313,30 @@ export default function AdminInventoryPage() {
                         colSpan={9}
                         className="py-12 text-center text-gray-500"
                       >
-                        {debouncedSearch || statusFilter !== 'ALL'
-                          ? 'Try adjusting filters.'
-                          : 'No inventory data found.'}
+                        {debouncedSearch || statusFilter !== 'ALL' ? (
+                          'No variants match your filters. Try adjusting search or status.'
+                        ) : listData.total === 0 ? (
+                          <span className="mx-auto flex max-w-md flex-col gap-3 text-sm">
+                            <span className="font-medium text-gray-800">
+                              No inventory yet
+                            </span>
+                            <span>
+                              If you already have products with variants, use
+                              &quot;Initialize Missing Stock Rows&quot; above to
+                              create stock records. Otherwise, create products
+                              first in{' '}
+                              <Link
+                                href="/admin/products"
+                                className="font-medium text-blue-600 underline"
+                              >
+                                Admin → Products
+                              </Link>
+                              .
+                            </span>
+                          </span>
+                        ) : (
+                          'No variants on this page.'
+                        )}
                       </TableCell>
                     </TableRow>
                   )}
@@ -350,17 +405,30 @@ export default function AdminInventoryPage() {
                         <StockStatusBadge status={row.stock.stockStatus} />
                       </TableCell>
                       <TableCell>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openVariant(row.variantId)
-                          }}
+                        <div
+                          className="flex items-center justify-end gap-1"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          Manage
-                        </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8 shrink-0"
+                            title="Quick restock"
+                            aria-label="Quick restock"
+                            onClick={() => openVariant(row.variantId, 'restock')}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openVariant(row.variantId)}
+                          >
+                            Manage
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -539,11 +607,14 @@ export default function AdminInventoryPage() {
       <VariantInventorySheet
         variantId={selectedVariantId}
         open={sheetOpen}
+        initialTab={sheetInitialTab}
         onOpenChange={(o) => {
           setSheetOpen(o)
-          if (!o) setSelectedVariantId(null)
+          if (!o) {
+            setSelectedVariantId(null)
+            setSheetInitialTab(undefined)
+          }
         }}
-        onRestockSuccess={handleRestockSuccess}
       />
 
     </div>

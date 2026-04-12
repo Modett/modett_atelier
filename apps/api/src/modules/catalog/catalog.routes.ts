@@ -547,7 +547,7 @@ router.delete(
  * /admin/catalog/products/{id}/images:
  *   post:
  *     tags: [Admin Catalog]
- *     summary: Upload product images (multipart, max 6)
+ *     summary: Upload product images (multipart, max 6 files, 20MB each)
  *     security: [{ adminCookieAuth: [] }]
  *     parameters:
  *       - in: path

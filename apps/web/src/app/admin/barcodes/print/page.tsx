@@ -30,7 +30,7 @@ function ensurePrintStyles() {
     width: 100% !important;
     background: white !important;
   }
-  @page { size: A4 portrait; margin: 10mm; }
+  @page { size: A4 portrait; margin: 8mm; }
 }
 `
   document.head.appendChild(style)
@@ -111,14 +111,16 @@ function PrintInner() {
 
       <div id={printRootId} className="mx-auto max-w-[190mm] bg-white p-4">
         {data && data.units.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 print:grid-cols-2 print:sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 print:grid-cols-3 print:gap-2">
             {data.units.map((unit) => (
               <BarcodeLabel
                 key={unit.id}
+                layout="print"
                 unit={unit}
                 productName={data.product.displayName}
                 color={data.variant.color}
                 size={data.variant.size}
+                skuGroup={data.variant.skuGroup}
               />
             ))}
           </div>

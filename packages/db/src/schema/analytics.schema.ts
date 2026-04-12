@@ -10,6 +10,7 @@ import {
   timestamp,
   jsonb,
   unique,
+  numeric,
 } from 'drizzle-orm/pg-core'
 import { users } from './iam.schema'
 import { currencyCodeEnum } from './orders.schema'
@@ -36,7 +37,7 @@ export const analyticsAggregates = analytics.table(
     id: uuid('id').primaryKey().defaultRandom(),
     metric: text('metric').notNull(),
     dimension_json: jsonb('dimension_json').notNull().default({}),
-    value: text('value').notNull(),
+    value: numeric('value', { precision: 20, scale: 4 }).notNull(),
     period: text('period').notNull(),
     period_start: timestamp('period_start', { withTimezone: true }).notNull(),
     computed_at: timestamp('computed_at', { withTimezone: true })

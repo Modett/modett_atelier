@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { ProductDetailPage } from '@/components/storefront/ProductDetailPage'
+import { productImageVariantUrl } from '@/lib/productImageUrl'
 
 const API_BASE_URL =
   `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'}/api`
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         product?.description ?? 'Crafted with intention. Built to last.',
       openGraph: {
         images: product?.keyImage?.url
-          ? [{ url: product.keyImage.url }]
+          ? [{ url: productImageVariantUrl(product.keyImage.url, 'full') }]
           : [],
       },
     }

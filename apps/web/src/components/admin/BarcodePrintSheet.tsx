@@ -18,6 +18,13 @@ export interface BarcodeLabelProps {
   productName: string
   color: string
   size: string
+  /** Variant SKU group (e.g. CSLK-BLK) — shown on compact print labels */
+  skuGroup?: string
+  /**
+   * `print` — ~50×25mm label, Code128 on canvas (thermal / sheet).
+   * `default` — larger sheet layout for dialog preview.
+   */
+  layout?: 'default' | 'print'
 }
 
 export function BarcodeSvg({ barcodeValue }: { barcodeValue: string }) {
@@ -46,7 +53,67 @@ export function BarcodeSvg({ barcodeValue }: { barcodeValue: string }) {
   return <svg ref={ref} className="mx-auto block h-[50px] max-w-full" />
 }
 
-export function BarcodeLabel({ unit, productName, color, size }: BarcodeLabelProps) {
+function BarcodeCanvas({ barcodeValue }: { barcodeValue: string }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = ref.current
+    if (!canvas) return
+    try {
+      JsBarcode(canvas, barcodeValue, {
+        format: 'CODE128',
+        width: 1,
+        height: 22,
+        displayValue: false,
+        margin: 0,
+        background: '#ffffff',
+        lineColor: '#000000',
+      })
+    } catch {
+      // invalid value — leave empty
+    }
+  }, [barcodeValue])
+
+  return <canvas ref={ref} className="mx-auto block max-h-[9mm] w-full" />
+}
+
+export function BarcodeLabel({
+  unit,
+  productName,
+  color,
+  size,
+  skuGroup,
+  layout = 'default',
+}: BarcodeLabelProps) {
+  if (layout === 'print') {
+    return (
+      <div
+        className="box-border flex flex-col border border-gray-900 bg-white px-1 py-0.5 print:break-inside-avoid"
+        style={{
+          width: '50mm',
+          height: '25mm',
+          pageBreakInside: 'avoid',
+        }}
+      >
+        <p className="truncate text-[6px] font-medium leading-tight text-black">
+          {productName}
+        </p>
+        <p className="text-[5px] leading-tight text-gray-700">
+          {color} / {size}
+        </p>
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden py-0.5">
+          <BarcodeCanvas barcodeValue={unit.barcodeValue} />
+        </div>
+        <p className="truncate text-center font-mono text-[5px] text-gray-800">
+          {unit.barcodeValue}
+        </p>
+        <p className="truncate text-center font-mono text-[5px] text-gray-600">
+          {skuGroup ?? unit.unitSku}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div
       className="box-border flex flex-col border border-gray-200 bg-white p-2 print:break-inside-avoid"

@@ -7,6 +7,7 @@ import {
   useCallback,
   type RefObject,
 } from 'react'
+import Image from 'next/image'
 import { X }                      from 'lucide-react'
 import { cn }                     from '@/lib/utils'
 import { useNewsletterSubscribe } from '@/hooks/useNewsletterSubscribe'
@@ -15,9 +16,7 @@ const LAST_SHOWN_KEY    = 'modett_newsletter_last_shown'
 const DECLINED_KEY      = 'modett_newsletter_declined'
 const SUBSCRIBED_KEY    = 'modett_newsletter_subscribed'
 const SHOW_DELAY_MS     = 3000
-// TODO: Replace EDITORIAL_IMAGE with real R2 URL
-// e.g. 'https://pub-xxx.r2.dev/editorial/newsletter-hero.jpg'
-const EDITORIAL_IMAGE   = '/images/newsletter-editorial.jpg'
+const EDITORIAL_IMAGE   = 'https://pub-8804bb39c26f4399a33c5a5d1c2182f9.r2.dev/product_images/newsletter/DSC06294%20-%20Edited.jpg'
 
 function getTodayString(): string {
   return new Date().toISOString().slice(0, 10)
@@ -104,8 +103,6 @@ export function NewsletterPopup() {
   useEffect(() => {
     if (!isSuccess) return
     markSubscribed()
-    const t = setTimeout(() => setIsOpen(false), 3000)
-    return () => clearTimeout(t)
   }, [isSuccess])
 
   function handleDecline() {
@@ -129,7 +126,6 @@ export function NewsletterPopup() {
     <>
       <div
         aria-hidden="true"
-        onClick={handleClose}
         className="fixed inset-0 z-[90] bg-graphite/60
                    transition-opacity duration-300"
       />
@@ -146,14 +142,15 @@ export function NewsletterPopup() {
         )}
       >
         <div className="w-[45%] flex-shrink-0 relative overflow-hidden">
-          <div
-            className="absolute inset-0 bg-[#B8C4B0]"
-            style={{
-              backgroundImage: `url(${EDITORIAL_IMAGE})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center top',
-            }}
-          />
+          <div className="absolute inset-0 bg-[#B8C4B0]">
+            <Image
+              src={EDITORIAL_IMAGE}
+              alt="Newsletter editorial"
+              fill
+              sizes="387px"
+              className="object-cover object-top"
+            />
+          </div>
         </div>
 
         <div className="flex-1 bg-[#D4E2DC] flex flex-col
@@ -267,10 +264,6 @@ function RightPanelContent({
               {promoCode}
             </p>
           </div>
-          <p className="font-body font-light text-[12px]
-                        text-umber/60">
-            Closing in a moment…
-          </p>
         </div>
       ) : (
         <div className="space-y-5">

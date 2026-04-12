@@ -3,12 +3,7 @@
 import { useState, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import {
-  SearchIcon,
-  WishlistIcon,
-  AccountIcon,
-  MobileMenu,
-} from '@modett/ui'
+import { MobileMenu } from '@modett/ui'
 import { cn } from '@/lib/utils'
 import { useAuthPanel } from '@/components/providers/AuthProvider'
 import { useSession } from '@/hooks/useSession'
@@ -16,6 +11,12 @@ import { storePostAuthPath } from '@/lib/postAuthRedirect'
 import { NAV_LINKS } from '@/lib/nav-links'
 import { ModettLogo } from '@/components/shared/ModettLogo'
 import { CartButton } from '@/components/shared/CartButton'
+import {
+  NavbarMenuIcon,
+  NavbarSearchIcon,
+  NavbarUserIcon,
+  NavbarWishlistIcon,
+} from '@/components/shared/NavbarTrayIcons'
 
 export function SolidHeader() {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -81,24 +82,25 @@ export function SolidHeader() {
                 aria-label="Search"
                 className="hidden md:flex text-umber hover:text-ink transition-colors duration-200"
               >
-                <SearchIcon size={20} />
+                <NavbarSearchIcon />
               </Link>
               <Link
                 href="/account/wishlist"
                 aria-label="Wishlist"
                 className="hidden md:flex text-umber hover:text-ink transition-colors duration-200"
               >
-                <WishlistIcon size={20} />
+                <NavbarWishlistIcon />
               </Link>
               {isLoggedIn ? (
                 <Link
                   href="/account"
                   aria-label={`My account — ${user?.firstName}`}
-                  className="flex items-center justify-center
-                             w-6 h-6 rounded-full
-                             bg-surface-raised text-umber
-                             font-body font-bold text-[11px]
-                             hover:bg-muted transition-colors duration-200"
+                  className={cn(
+                    'flex h-7 w-7 items-center justify-center rounded-full',
+                    'bg-surface-raised font-body text-xs font-bold text-umber',
+                    'ring-[1.5px] ring-current hover:bg-muted',
+                    'transition-colors duration-200',
+                  )}
                 >
                   {user?.firstName?.charAt(0)?.toUpperCase() ?? '?'}
                 </Link>
@@ -109,20 +111,17 @@ export function SolidHeader() {
                   aria-label="Sign in or create account"
                   className="text-umber hover:text-ink transition-colors duration-200"
                 >
-                  <AccountIcon size={20} />
+                  <NavbarUserIcon />
                 </button>
               )}
-              <CartButton
-                className="text-umber hover:text-ink"
-                iconSize="w-5 h-5"
-              />
+              <CartButton className="text-umber hover:text-ink" />
               <button
                 type="button"
                 onClick={openMenu}
                 aria-label="Open menu"
                 className="md:hidden text-umber hover:text-ink transition-colors duration-200"
               >
-                <HamburgerIcon />
+                <NavbarMenuIcon />
               </button>
             </div>
           </nav>
@@ -136,25 +135,5 @@ export function SolidHeader() {
         navLinks={NAV_LINKS.map((l) => ({ label: l.label.toUpperCase(), href: l.href }))}
       />
     </>
-  )
-}
-
-function HamburgerIcon() {
-  return (
-    <svg
-      width={24}
-      height={24}
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M3 6h18M3 12h18M3 18h18"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinecap="square"
-      />
-    </svg>
   )
 }
