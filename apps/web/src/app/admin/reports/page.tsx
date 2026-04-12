@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import {
@@ -45,6 +45,7 @@ import {
   type ReportPeriod,
 } from '@/hooks'
 import { cn } from '@/lib/utils'
+import { productImageAdminThumbCandidates } from '@/lib/productImageUrl'
 
 const PERIODS: { value: ReportPeriod; label: string }[] = [
   { value: '7d', label: '7d' },
@@ -109,21 +110,33 @@ function AdminPageSkeleton() {
 }
 
 function ProductThumb({ url, name }: { url: string | null; name: string }) {
-  if (!url) {
+  const candidates = useMemo(
+    () => (url == null ? [] : productImageAdminThumbCandidates(url)),
+    [url],
+  )
+  const [i, setI] = useState(0)
+
+  useEffect(() => {
+    setI(0)
+  }, [url])
+
+  if (url == null || i >= candidates.length) {
     return (
       <div className="h-10 w-10 shrink-0 bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
         —
       </div>
     )
   }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element -- admin report thumbnails; arbitrary R2 URLs
     <img
-      src={url}
+      src={candidates[i]}
       alt={name}
       width={40}
       height={40}
       className="h-10 w-10 object-cover shrink-0"
+      onError={() => setI((x) => x + 1)}
     />
   )
 }

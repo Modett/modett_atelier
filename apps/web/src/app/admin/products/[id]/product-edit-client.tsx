@@ -50,17 +50,23 @@ import {
   useAdminCategories,
   useUpdateProduct,
   useDeleteProduct,
-  useRegisterProductImage,
   useSetKeyImage,
   useReorderImages,
   useDeleteProductImage,
   usePatchProductImageAlt,
   useCreateVariant,
   useDeleteVariant,
-  fetchProductImageUploadUrl,
+  useUploadProductImagesMultipart,
 } from '@/hooks/useAdminCatalog'
+import {
+  productImageAdminGridCandidates,
+  productImageAdminThumbCandidates,
+} from '@/lib/productImageUrl'
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+/** Must match API multer limit for `images` field array length. */
+const PRODUCT_IMAGE_UPLOAD_CHUNK = 6
 
 function slugFromDisplayName(name: string): string {
   return name
@@ -122,15 +128,17 @@ const STANDARD_UK = [
 const STANDARD_EU = ['34', '36', '38', '40', '42', '44'] as const
 
 function KeyImageThumb({ baseUrl }: { baseUrl: string }) {
-  const [phase, setPhase] = useState<'thumb' | 'base' | 'none'>('thumb')
-  const src =
-    phase === 'thumb'
-      ? `${baseUrl}-thumb.webp`
-      : phase === 'base'
-        ? baseUrl
-        : ''
+  const candidates = useMemo(
+    () => productImageAdminThumbCandidates(baseUrl),
+    [baseUrl],
+  )
+  const [i, setI] = useState(0)
 
-  if (!src) {
+  useEffect(() => {
+    setI(0)
+  }, [baseUrl])
+
+  if (i >= candidates.length) {
     return (
       <div className="flex h-full items-center justify-center text-gray-400">
         <Camera className="h-5 w-5" />
@@ -140,16 +148,13 @@ function KeyImageThumb({ baseUrl }: { baseUrl: string }) {
 
   return (
     <Image
-      src={src}
+      src={candidates[i]!}
       alt=""
       fill
       className="object-cover"
       sizes="40px"
       unoptimized
-      onError={() => {
-        if (phase === 'thumb') setPhase('base')
-        else setPhase('none')
-      }}
+      onError={() => setI((x) => x + 1)}
     />
   )
 }
@@ -169,7 +174,11 @@ function ProductImageCard({
   total: number
   sortedIds: string[]
 }) {
-  const [phase, setPhase] = useState<'card' | 'base' | 'none'>('card')
+  const candidates = useMemo(
+    () => productImageAdminGridCandidates(image.url),
+    [image.url],
+  )
+  const [i, setI] = useState(0)
   const [confirmDel, setConfirmDel] = useState(false)
   const setKey = useSetKeyImage()
   const reorder = useReorderImages()
@@ -181,12 +190,9 @@ function ProductImageCard({
     setAlt(image.altText ?? '')
   }, [image.altText])
 
-  const src =
-    phase === 'card'
-      ? `${image.url}-card.webp`
-      : phase === 'base'
-        ? image.url
-        : ''
+  useEffect(() => {
+    setI(0)
+  }, [image.url])
 
   const isKey = keyImageId === image.id
 
@@ -212,18 +218,15 @@ function ProductImageCard({
         }`}
       >
         <div className="relative aspect-[3/4] w-full">
-          {src ? (
+          {i < candidates.length ? (
             <Image
-              src={src}
+              src={candidates[i]!}
               alt={alt || ''}
               fill
               className="object-cover"
               sizes="(max-width:768px) 50vw, 33vw"
               unoptimized
-              onError={() => {
-                if (phase === 'card') setPhase('base')
-                else setPhase('none')
-              }}
+              onError={() => setI((x) => x + 1)}
             />
           ) : (
             <div className="flex h-full items-center justify-center bg-gray-100 text-gray-400">
@@ -324,7 +327,7 @@ export function ProductEditClient({ productId }: { productId: string }) {
   const { data: categories = [] } = useAdminCategories()
   const updateMut = useUpdateProduct()
   const deleteMut = useDeleteProduct()
-  const registerImg = useRegisterProductImage()
+  const uploadImagesMut = useUploadProductImagesMultipart()
 
   const slugManual = useRef(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -373,57 +376,57 @@ export function ProductEditClient({ productId }: { productId: string }) {
     async (accepted: File[]) => {
       if (!product) return
       const batch = accepted.slice(0, 10)
-      for (let i = 0; i < batch.length; i++) {
-        const file = batch[i]!
-        const uid = `${file.name}-${file.size}-${i}`
-        setUploadErrors((e) => {
-          const n = { ...e }
-          delete n[uid]
-          return n
-        })
-        setUploading((u) => ({ ...u, [uid]: true }))
-        try {
-          const { uploadUrl, publicUrl } = await fetchProductImageUploadUrl({
-            productId: product.id,
-            filename: file.name,
-            contentType: file.type,
-          })
-          const put = await fetch(uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: { 'Content-Type': file.type },
-          })
-          if (!put.ok) {
-            throw new Error(`Upload failed (${put.status})`)
-          }
-          const isFirst = product.images.length === 0 && i === 0
-          await registerImg.mutateAsync({
-            productId: product.id,
-            url: publicUrl,
-            setAsKey: isFirst,
-          })
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Upload failed'
-          setUploadErrors((e) => ({ ...e, [uid]: msg }))
-        } finally {
-          setUploading((u) => {
-            const n = { ...u }
+      for (let start = 0; start < batch.length; start += PRODUCT_IMAGE_UPLOAD_CHUNK) {
+        const chunk = batch.slice(start, start + PRODUCT_IMAGE_UPLOAD_CHUNK)
+        const uids = chunk.map(
+          (f, j) => `${f.name}-${f.size}-${start + j}`,
+        )
+        for (const uid of uids) {
+          setUploadErrors((e) => {
+            const n = { ...e }
             delete n[uid]
             return n
           })
+          setUploading((u) => ({ ...u, [uid]: true }))
+        }
+        try {
+          await uploadImagesMut.mutateAsync({
+            productId: product.id,
+            files: chunk,
+          })
+        } catch (err: unknown) {
+          const msg =
+            err &&
+            typeof err === 'object' &&
+            'message' in err &&
+            typeof (err as { message: unknown }).message === 'string'
+              ? (err as { message: string }).message
+              : 'Upload failed'
+          for (const uid of uids) {
+            setUploadErrors((e) => ({ ...e, [uid]: msg }))
+          }
+        } finally {
+          for (const uid of uids) {
+            setUploading((u) => {
+              const n = { ...u }
+              delete n[uid]
+              return n
+            })
+          }
         }
       }
     },
-    [product, registerImg],
+    [product, uploadImagesMut],
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/jpeg': [],
-      'image/png': [],
-      'image/webp': [],
-      'image/tiff': [],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+      'image/tiff': ['.tif', '.tiff'],
+      'image/heic': ['.heic', '.heif'],
     },
     maxSize: 20 * 1024 * 1024,
     maxFiles: 10,

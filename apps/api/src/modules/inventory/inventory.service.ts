@@ -38,6 +38,7 @@ import {
   updateInStockUnitsToStatus,
   getProductById,
   listAdminVariantBarcodes,
+  initializeMissingVariantStockRows,
 } from '@modett/db'
 import type {
   AdminInventoryListRow,
@@ -258,6 +259,12 @@ export async function listAdminInventory({
     page: safePage,
     limit: safeLimit,
   }
+}
+
+export async function initializeAllMissingStock(): Promise<{
+  initialized: number
+}> {
+  return await initializeMissingVariantStockRows()
 }
 
 export async function getAdminVariantStockDetail({

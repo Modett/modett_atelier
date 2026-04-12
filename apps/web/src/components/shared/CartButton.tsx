@@ -1,18 +1,19 @@
 'use client'
 
-import { CartIcon } from '@modett/ui'
 import { cn } from '@/lib/utils'
 import { useCartCount } from '@/hooks/useCartCount'
 import { useUIStore } from '@/store/ui.store'
+import { NavbarCartIcon } from '@/components/shared/NavbarTrayIcons'
 
 interface CartButtonProps {
   className?: string
-  iconSize?: string
+  /** Optional extra classes on the icon (e.g. Tailwind size overrides). */
+  iconClassName?: string
 }
 
 export function CartButton({
   className,
-  iconSize = 'w-5 h-5',
+  iconClassName,
 }: CartButtonProps) {
   const count   = useCartCount()
   const openBag = useUIStore(s => s.openBag)
@@ -24,7 +25,7 @@ export function CartButton({
       aria-label={`Shopping bag${count > 0 ? ` — ${count} item${count > 1 ? 's' : ''}` : ''}`}
       className={cn('relative transition-colors duration-200', className)}
     >
-      <CartIcon size={20} className={iconSize} />
+      <NavbarCartIcon className={iconClassName} />
       {count > 0 && (
         <span
           className={cn(

@@ -34,6 +34,9 @@ export function getR2Client(): S3Client {
         accessKeyId: process.env.R2_ACCESS_KEY_ID!,
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
       },
+      // Virtual-hosted-style presigns use https://<bucket>.<account>.r2... which
+      // can fail TLS (handshake alert 40). Path-style matches R2’s cert.
+      forcePathStyle: true,
     })
   }
   return client

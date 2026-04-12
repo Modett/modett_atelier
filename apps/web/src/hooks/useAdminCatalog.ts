@@ -323,6 +323,46 @@ export function useDeleteProduct() {
   })
 }
 
+/** Max files per request — must match API multer `imageUpload` `files` limit. */
+const PRODUCT_IMAGE_MULTIPART_MAX = 6
+
+/**
+ * Upload product images via API multipart (server writes to R2).
+ * Avoids browser → R2 CORS preflight (OPTIONS) that returns 403 without bucket CORS rules.
+ */
+export function useUploadProductImagesMultipart() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      productId,
+      files,
+    }: {
+      productId: string
+      files: File[]
+    }) => {
+      if (files.length === 0) {
+        throw new Error('No files to upload')
+      }
+      if (files.length > PRODUCT_IMAGE_MULTIPART_MAX) {
+        throw new Error(
+          `At most ${PRODUCT_IMAGE_MULTIPART_MAX} images per request`,
+        )
+      }
+      const fd = new FormData()
+      for (const file of files) {
+        fd.append('images', file)
+      }
+      return api.postForm<{
+        data: { images: Array<Record<string, unknown>> }
+      }>(`/admin/catalog/products/${productId}/images`, fd)
+    },
+    onSuccess: (_data, { productId }) => {
+      void queryClient.invalidateQueries({ queryKey: adminProductDetailKey(productId) })
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'products'] })
+    },
+  })
+}
+
 export function useRegisterProductImage() {
   const queryClient = useQueryClient()
   return useMutation({

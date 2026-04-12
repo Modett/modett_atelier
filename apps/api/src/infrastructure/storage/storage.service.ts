@@ -45,6 +45,45 @@ export class StorageService {
   }
 
   /**
+   * Upload one product image as original bytes (JPEG, PNG, WebP, TIFF, HEIC)
+   * under product_images/{slug}/ — same shape as the browser presigned flow.
+   */
+  async uploadProductImageOriginal(
+    productSlug: string,
+    fileBuffer: Buffer,
+    originalName: string,
+    contentType: string,
+  ): Promise<{ key: string; url: string; size: number }> {
+    if (!isImageContentType(contentType)) {
+      throw new StorageError('Invalid content type for product image')
+    }
+    const { randomUUID } = await import('node:crypto')
+    const safeBase =
+      originalName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'image'
+    const key = `product_images/${productSlug}/${randomUUID()}-${safeBase}`
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: fileBuffer,
+          ContentType: contentType,
+          CacheControl: CACHE_CONTROL,
+        }),
+      )
+      return {
+        key,
+        url: this.getPublicUrl(key),
+        size: fileBuffer.length,
+      }
+    } catch (err) {
+      throw new StorageError(
+        `Product image upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      )
+    }
+  }
+
+  /**
    * Upload a product image with three WebP variants (full, card, thumb).
    * Key pattern: products/{slug}/{sortOrder:02d}-{variant}.webp
    */
