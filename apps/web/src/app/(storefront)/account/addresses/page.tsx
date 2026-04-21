@@ -220,7 +220,7 @@ export default function AccountAddressesPage() {
       </div>
 
       {list.length === 0 && mode === 'idle' ? (
-        <p className="font-body font-light text-[14px] text-muted-foreground mb-8">
+        <p className="font-body font-light text-[14px] text-umber mb-8">
           No saved addresses yet.
         </p>
       ) : (
@@ -233,7 +233,7 @@ export default function AccountAddressesPage() {
                     'font-body text-[13px]',
                     row.is_default
                       ? 'font-medium text-umber'
-                      : 'font-light text-muted-foreground',
+                      : 'font-light text-umber',
                   )}
                 >
                   {row.is_default ? 'Default address' : row.label ?? 'Saved address'}
@@ -258,7 +258,7 @@ export default function AccountAddressesPage() {
                   onClick={() => setDeleteId(row.id)}
                   className={cn(
                     'font-body font-light text-[11px] uppercase tracking-[0.15em]',
-                    'text-muted-foreground underline underline-offset-2 hover:text-red-500',
+                    'text-umber underline underline-offset-2 hover:text-red-500',
                   )}
                 >
                   Delete
@@ -270,7 +270,7 @@ export default function AccountAddressesPage() {
                     onClick={() => setAsDefault(row.id)}
                     className={cn(
                       'font-body font-light text-[11px] uppercase tracking-[0.15em]',
-                      'text-muted-foreground underline underline-offset-2 hover:text-umber',
+                      'text-umber underline underline-offset-2 hover:text-graphite',
                       'disabled:opacity-50',
                     )}
                   >
@@ -288,7 +288,7 @@ export default function AccountAddressesPage() {
           <h2 className="font-body font-medium text-[15px] text-umber mb-5">
             {mode === 'add' ? 'Enter new delivery address' : 'Edit address'}
           </h2>
-          <p className="font-body font-light text-[11px] text-muted-foreground mb-4">
+          <p className="font-body font-light text-[11px] text-umber mb-4">
             * Required fields
           </p>
 
@@ -320,7 +320,7 @@ export default function AccountAddressesPage() {
                     'border px-4 py-2 cursor-pointer font-body font-light text-[12px] rounded-none transition-colors',
                     form.title === t
                       ? 'bg-umber text-background border-umber'
-                      : 'border-muted text-muted-foreground hover:border-umber',
+                      : 'border-muted text-umber hover:border-umber',
                   )}
                 >
                   {TITLE_LABELS[t]}
@@ -478,7 +478,7 @@ export default function AccountAddressesPage() {
             <button
               type="button"
               onClick={resetForm}
-              className="font-body font-light text-[12px] text-muted-foreground lowercase hover:text-umber"
+              className="font-body font-light text-[12px] text-umber lowercase hover:text-graphite"
             >
               cancel
             </button>

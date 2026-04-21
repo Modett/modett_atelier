@@ -76,7 +76,7 @@ export default function AccountLoyaltyPage() {
 
   return (
     <div className="space-y-10">
-      <h1 className="font-display font-bold text-[24px] text-umber">
+      <h1 className="font-display font-bold text-[24px] text-graphite">
         Loyalty
       </h1>
 
@@ -84,15 +84,15 @@ export default function AccountLoyaltyPage() {
         <div className="flex flex-wrap items-end gap-4">
           <TierBadgeLarge tier={tier} />
           <div>
-            <p className="font-display font-bold text-[48px] text-umber leading-none tabular-nums">
+            <p className="font-display font-bold text-[48px] text-graphite leading-none tabular-nums">
               {account.balance.toLocaleString()}
             </p>
-            <p className="font-body font-light text-[14px] uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="font-body font-light text-[14px] uppercase tracking-[0.2em] text-umber">
               Points
             </p>
           </div>
         </div>
-        <p className="font-body font-light text-[12px] text-muted-foreground mt-3">
+        <p className="font-body font-light text-[12px] text-umber mt-3">
           {tier} · Score: {compositeScore.toFixed(2)} · {detail.frequencyLast12m} orders ·{' '}
           {detail.spendLast12m} pts earned in last {rules.evaluationWindowMonths} mo.
         </p>
@@ -104,7 +104,7 @@ export default function AccountLoyaltyPage() {
             </p>
           ) : (
             <>
-              <div className="flex justify-between font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+              <div className="flex justify-between font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber mb-2">
                 <span>{tier}</span>
                 <span>{detail.nextTierName ?? ''}</span>
               </div>
@@ -115,7 +115,7 @@ export default function AccountLoyaltyPage() {
                 />
               </div>
               {detail.pointsUntilNextTier > 0 && (
-                <p className="font-body font-light text-[12px] text-muted-foreground mt-2">
+                <p className="font-body font-light text-[12px] text-umber mt-2">
                   {compositeScore.toFixed(2)} / {nextTh.toFixed(1)} toward {detail.nextTierName}
                 </p>
               )}
@@ -155,7 +155,7 @@ export default function AccountLoyaltyPage() {
       </section>
 
       <section>
-        <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
+        <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-4">
           Tier benefits
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -192,20 +192,20 @@ export default function AccountLoyaltyPage() {
       </section>
 
       <section>
-        <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
+        <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-4">
           Points history
         </h2>
         <div className="border border-muted hidden md:block overflow-x-auto">
           <table className="w-full text-left min-w-[480px]">
             <thead>
               <tr className="border-b border-muted bg-surface-raised/30">
-                <th className="px-4 py-3 font-body font-light text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                <th className="px-4 py-3 font-body font-light text-[11px] uppercase tracking-[0.1em] text-umber">
                   Date
                 </th>
-                <th className="px-4 py-3 font-body font-light text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                <th className="px-4 py-3 font-body font-light text-[11px] uppercase tracking-[0.1em] text-umber">
                   Description
                 </th>
-                <th className="px-4 py-3 font-body font-light text-[11px] uppercase tracking-[0.1em] text-muted-foreground text-right">
+                <th className="px-4 py-3 font-body font-light text-[11px] uppercase tracking-[0.1em] text-umber text-right">
                   Points
                 </th>
               </tr>
@@ -242,7 +242,7 @@ export default function AccountLoyaltyPage() {
       </section>
 
       <section className="border border-muted p-6 bg-surface-raised/20">
-        <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-3">
+        <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-3">
           How to earn
         </h2>
         <div className="font-body font-light text-[14px] text-umber leading-relaxed space-y-2">
@@ -307,7 +307,7 @@ function BenefitCard({
       <p
         className={cn(
           'font-body font-medium text-[14px] mb-2',
-          active ? 'text-umber' : 'text-umber/70',
+          active ? 'text-graphite' : 'text-umber',
         )}
       >
         {tier}
@@ -315,7 +315,7 @@ function BenefitCard({
       <ul
         className={cn(
           'font-body font-light text-[13px] space-y-1 list-disc list-inside',
-          active ? 'text-muted-foreground' : 'text-muted-foreground/80',
+          active ? 'text-graphite' : 'text-umber',
         )}
       >
         {lines.map((l) => (
@@ -330,10 +330,10 @@ function LedgerRow({ row }: { row: LoyaltyLedgerRow }) {
   const pos = row.points > 0
   return (
     <tr className="border-b border-muted last:border-0">
-      <td className="px-4 py-3 font-body font-light text-[13px] text-muted-foreground">
+      <td className="px-4 py-3 font-body font-light text-[13px] text-graphite">
         {ledgerDate(row)}
       </td>
-      <td className="px-4 py-3 font-body text-[13px] text-umber">
+      <td className="px-4 py-3 font-body text-[13px] text-graphite">
         {ledgerDescription(row)}
       </td>
       <td
@@ -354,7 +354,7 @@ function LedgerRowMobile({ row }: { row: LoyaltyLedgerRow }) {
   return (
     <div>
       <div className="flex justify-between gap-2">
-        <span className="font-body font-light text-[12px] text-muted-foreground">
+        <span className="font-body font-light text-[12px] text-graphite">
           {ledgerDate(row)}
         </span>
         <span
@@ -367,7 +367,7 @@ function LedgerRowMobile({ row }: { row: LoyaltyLedgerRow }) {
           {Math.abs(row.points)}
         </span>
       </div>
-      <p className="font-body text-[13px] text-umber mt-2">{ledgerDescription(row)}</p>
+      <p className="font-body text-[13px] text-graphite mt-2">{ledgerDescription(row)}</p>
     </div>
   )
 }

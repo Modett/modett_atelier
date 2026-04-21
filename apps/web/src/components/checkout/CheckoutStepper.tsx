@@ -40,8 +40,8 @@ export function CheckoutStepper() {
             className={cn(
               'font-body text-[13px] transition-colors duration-200 whitespace-nowrap',
               isActive && 'text-umber font-medium cursor-default',
-              isCompleted && 'text-muted-foreground font-light cursor-pointer hover:text-umber',
-              isLocked && 'text-muted-foreground/40 font-light cursor-default',
+              isCompleted && 'text-umber font-light cursor-pointer hover:text-graphite',
+              isLocked && 'text-umber/40 font-light cursor-default',
             )}
             aria-current={isActive ? 'step' : undefined}
           >

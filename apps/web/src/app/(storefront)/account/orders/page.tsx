@@ -58,13 +58,13 @@ export default function AccountOrdersPage() {
 
   return (
     <div>
-      <h1 className="font-display font-bold text-[24px] text-umber mb-6">
+      <h1 className="font-display font-bold text-[24px] text-graphite mb-6">
         Order Details
       </h1>
 
       {rows.length === 0 ? (
         <div className="text-center py-16 border border-muted px-6">
-          <p className="font-body font-light text-[14px] text-muted-foreground mb-6">
+          <p className="font-body font-light text-[14px] text-umber mb-6">
             You haven&apos;t placed any orders yet.
           </p>
           <Link
@@ -84,22 +84,22 @@ export default function AccountOrdersPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-muted">
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 pr-2 text-left">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 pr-2 text-left">
                     Order
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-left">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 px-2 text-left">
                     Date
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-left">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 px-2 text-left">
                     Payment status
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-left">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 px-2 text-left">
                     Fulfillment status
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-right">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 px-2 text-right">
                     Total
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 pl-2 text-right w-[1%] whitespace-nowrap" />
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 pl-2 text-right w-[1%] whitespace-nowrap" />
                 </tr>
               </thead>
               <tbody>
@@ -130,7 +130,7 @@ export default function AccountOrdersPage() {
                   className={cn(
                     p === page
                       ? 'text-umber font-medium underline'
-                      : 'text-muted-foreground hover:text-umber',
+                      : 'text-umber hover:text-graphite',
                   )}
                 >
                   {p}
@@ -141,7 +141,7 @@ export default function AccountOrdersPage() {
                   type="button"
                   onClick={() => setPage((x) => x + 1)}
                   disabled={isFetching}
-                  className="text-muted-foreground hover:text-umber p-0.5"
+                  className="text-umber hover:text-graphite p-0.5"
                   aria-label="Next page"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -167,16 +167,16 @@ function OrderTableRow({ o }: { o: OrderSummaryRow }) {
           {o.order_ref}
         </Link>
       </td>
-      <td className="py-4 px-2 font-body font-light text-[13px] text-muted-foreground align-top">
+      <td className="py-4 px-2 font-body font-light text-[13px] text-graphite align-top">
         {formatOrderDate(o.placed_at)}
       </td>
-      <td className="py-4 px-2 font-body font-light text-[13px] text-umber align-top">
+      <td className="py-4 px-2 font-body font-light text-[13px] text-graphite align-top">
         {paymentStatusLabel(o.payment_state)}
       </td>
-      <td className="py-4 px-2 font-body font-light text-[13px] text-umber align-top">
+      <td className="py-4 px-2 font-body font-light text-[13px] text-graphite align-top">
         {fulfillmentStatusLabel(o.fulfillment_state)}
       </td>
-      <td className="py-4 px-2 font-body text-[13px] text-umber text-right align-top tabular-nums">
+      <td className="py-4 px-2 font-body text-[13px] text-graphite text-right align-top tabular-nums">
         {formatTotalNumber(o.total)}
       </td>
       <td className="py-4 pl-2 text-right align-top">
@@ -206,11 +206,11 @@ function OrderMobileRow({ o }: { o: OrderSummaryRow }) {
           {fulfillmentStatusLabel(o.fulfillment_state)}
         </span>
       </div>
-      <p className="font-body font-light text-[12px] text-muted-foreground mt-2">
+      <p className="font-body font-light text-[12px] text-graphite mt-2">
         {formatOrderDate(o.placed_at)}
       </p>
       <div className="flex justify-end items-center gap-3 mt-2">
-        <span className="font-body text-[13px] text-umber tabular-nums">
+        <span className="font-body text-[13px] text-graphite tabular-nums">
           {formatTotalNumber(o.total)}
         </span>
         <Link

@@ -16,13 +16,13 @@ export function getOrderStatusBadge(row: {
   if (row.order_state === 'CANCELLED') {
     return {
       label:     'Cancelled',
-      className: 'bg-muted text-muted-foreground',
+      className: 'bg-surface text-graphite',
     }
   }
   if (row.payment_state === 'FAILED') {
     return {
       label:     'Cancelled',
-      className: 'bg-muted text-muted-foreground',
+      className: 'bg-surface text-graphite',
     }
   }
   const fs = row.fulfillment_state

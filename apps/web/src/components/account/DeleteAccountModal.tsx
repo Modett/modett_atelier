@@ -28,7 +28,7 @@ export function DeleteAccountModal({
         <h2 id="del-acct-title" className="font-display font-bold text-[20px] text-umber">
           Delete your account
         </h2>
-        <p className="font-body font-light text-[13px] text-muted-foreground">
+        <p className="font-body font-light text-[13px] text-umber">
           This action cannot be undone. All your orders, wishlist, and loyalty points will be
           permanently deleted.
         </p>
@@ -62,7 +62,7 @@ export function DeleteAccountModal({
             Cancel
           </button>
         </div>
-        <p className="font-body font-light text-[11px] text-muted-foreground">
+        <p className="font-body font-light text-[11px] text-umber">
           Account deletion via the app is not available yet. This dialog will be connected when
           the API is ready.
         </p>

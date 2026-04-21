@@ -83,7 +83,7 @@ export function ProductImageGallery({
   if (sortedImages.length === 0) {
     return (
       <div className="aspect-[3/4] bg-surface-raised flex items-center justify-center">
-        <span className="text-muted-foreground/40 text-[13px] font-body">
+        <span className="text-umber/40 text-[13px] font-body">
           No images
         </span>
       </div>

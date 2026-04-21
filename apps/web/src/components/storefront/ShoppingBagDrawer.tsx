@@ -107,7 +107,7 @@ export function ShoppingBagDrawer() {
 
           <div className="flex items-center gap-3">
             <ShoppingBag className="w-5 h-5 text-umber flex-shrink-0" />
-            <h2 className="font-body font-light text-[13px] uppercase tracking-[0.2em] text-umber">
+            <h2 className="font-body font-light text-[13px] uppercase tracking-[0.2em] text-graphite">
               Your Shopping Bag ({itemCount})
             </h2>
           </div>
@@ -115,7 +115,7 @@ export function ShoppingBagDrawer() {
           <button
             onClick={closeBag}
             aria-label="Close shopping bag"
-            className="text-muted-foreground hover:text-umber transition-colors duration-200 p-1 -mr-1"
+            className="text-umber hover:text-graphite transition-colors duration-200 p-1 -mr-1"
           >
             <X className="w-5 h-5" />
           </button>
@@ -139,11 +139,11 @@ export function ShoppingBagDrawer() {
             </div>
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-16 text-center">
-              <ShoppingBag className="w-10 h-10 text-muted-foreground/30 mb-4" />
-              <p className="font-display font-bold text-[18px] text-umber mb-2">
+              <ShoppingBag className="w-10 h-10 text-umber/30 mb-4" />
+              <p className="font-display font-bold text-[18px] text-graphite mb-2">
                 Your bag is empty
               </p>
-              <p className="font-body font-light text-[13px] text-muted-foreground mb-6">
+              <p className="font-body font-light text-[13px] text-umber mb-6">
                 Add items to get started
               </p>
               <button
@@ -189,7 +189,7 @@ export function ShoppingBagDrawer() {
               <span className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber">
                 Subtotal
               </span>
-              <span className="font-body font-light text-[15px] text-umber">
+              <span className="font-body font-light text-[15px] text-graphite">
                 {subtotal ? formatMoney(subtotal) : '—'}
               </span>
             </div>
@@ -227,7 +227,7 @@ export function ShoppingBagDrawer() {
             {/* Divider */}
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-muted" />
-              <span className="font-body font-light text-[11px] text-muted-foreground">
+              <span className="font-body font-light text-[11px] text-umber">
                 or
               </span>
               <div className="flex-1 h-px bg-muted" />
@@ -323,7 +323,7 @@ function CartItemRow({
         {/* Top row: name + delete */}
         <div className="flex items-start justify-between gap-2">
           <h3
-            className="font-body font-medium text-[14px] text-umber leading-snug flex-1 cursor-pointer"
+            className="font-body font-medium text-[14px] text-graphite leading-snug flex-1 cursor-pointer"
             onClick={() => {
               onClose()
               router.push(`/products/${item.productSlug}`)
@@ -335,7 +335,7 @@ function CartItemRow({
             onClick={handleRemoveClick}
             disabled={isPending}
             aria-label={`Remove ${item.displayName} from bag`}
-            className="text-muted-foreground hover:text-umber transition-colors duration-200 flex-shrink-0 disabled:opacity-40"
+            className="text-umber hover:text-graphite transition-colors duration-200 flex-shrink-0 disabled:opacity-40"
           >
             <Trash2 className="w-[18px] h-[18px]" />
           </button>
@@ -343,13 +343,13 @@ function CartItemRow({
 
         {/* Details */}
         <div className="mt-1.5 space-y-0.5">
-          <p className="font-body font-light text-[12px] text-muted-foreground">
+          <p className="font-body font-light text-[12px] text-umber">
             Color: {item.color}
           </p>
-          <p className="font-body font-light text-[12px] text-muted-foreground">
+          <p className="font-body font-light text-[12px] text-umber">
             Size: {item.size}
           </p>
-          <p className="font-body font-light text-[11px] text-muted-foreground/60">
+          <p className="font-body font-light text-[11px] text-umber/50">
             SKU: {item.variantId.slice(0, 16).toUpperCase()}
           </p>
         </div>
@@ -365,14 +365,15 @@ function CartItemRow({
             size="sm"
           />
 
-          <p className="font-body font-light text-[15px] text-umber whitespace-nowrap">
+          <p className="font-body font-light text-[15px] text-graphite whitespace-nowrap">
             {formatMoney(item.totalPrice)}
           </p>
         </div>
 
         {/* Stock warnings */}
         {item.stockStatus === 'LOW_STOCK' && (
-          <p className="font-body font-light text-[11px] text-highlight mt-1.5">
+          <p className="font-body font-light text-[11px] text-graphite mt-1.5 flex items-center gap-1.5">
+            <span className="inline-block w-1 h-1 rounded-full bg-terracotta-clay flex-shrink-0" aria-hidden />
             Only {item.availableQty} left
           </p>
         )}

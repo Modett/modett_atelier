@@ -55,7 +55,7 @@ export function ReservationTimer() {
           <h3 className="font-display font-bold text-[22px] text-umber mb-3">
             Your reservation has expired
           </h3>
-          <p className="font-body font-light text-[14px] text-muted-foreground mb-6 leading-relaxed">
+          <p className="font-body font-light text-[14px] text-umber mb-6 leading-relaxed">
             The items in your bag were held for 30 minutes.
             Your selection has been returned to stock.
           </p>
@@ -82,7 +82,7 @@ export function ReservationTimer() {
         'font-body font-light text-[13px] py-2 text-center transition-colors duration-300',
         isCritical && 'text-red-500 bg-red-50',
         isWarning && !isCritical && 'text-highlight bg-highlight/10',
-        !isWarning && 'text-muted-foreground',
+        !isWarning && 'text-umber',
       )}
     >
       Your reservation expires in {display}

@@ -41,17 +41,17 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 mb-8 md:mb-10">
-        <h2 className="font-display font-bold text-[24px] text-umber">Reviews</h2>
+        <h2 className="font-display font-bold text-[24px] text-graphite">Reviews</h2>
         {aggregate !== undefined && aggregate.totalCount > 0 && (
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="font-body font-light text-[18px] text-umber mr-2 tabular-nums">
+            <span className="font-body font-light text-[18px] text-graphite mr-2 tabular-nums">
               {aggregate.averageRating.toFixed(1)}
             </span>
             <StarRow
               rating={aggregate.averageRating}
               className="text-[18px] leading-none"
             />
-            <span className="font-body font-light text-[13px] text-muted-foreground">
+            <span className="font-body font-light text-[13px] text-umber">
               ({aggregate.totalCount}{' '}
               {aggregate.totalCount === 1 ? 'review' : 'reviews'})
             </span>
@@ -69,7 +69,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                 : 0
             return (
               <div key={star} className="flex gap-2 items-center">
-                <span className="text-xs text-muted-foreground w-6 tabular-nums">
+                <span className="text-xs text-umber w-6 tabular-nums">
                   {star}
                 </span>
                 <span className="text-xs text-highlight" aria-hidden>
@@ -81,7 +81,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">
+                <span className="text-xs text-umber w-8 text-right tabular-nums">
                   {count}
                 </span>
               </div>
@@ -102,7 +102,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       )}
 
       {showEmpty && (
-        <p className="font-body font-light text-[13px] text-muted-foreground">
+        <p className="font-body font-light text-[13px] text-umber">
           No reviews yet — be the first to share your thoughts after your
           purchase.
         </p>
@@ -120,7 +120,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
                 <StarRow rating={review.rating} className="text-[14px] leading-none" />
-                <p className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+                <p className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber">
                   Verified Buyer
                   <span className="mx-1.5">·</span>
                   {new Date(review.createdAt).toLocaleDateString('en-GB', {
@@ -130,7 +130,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                 </p>
               </div>
               {review.body != null && review.body.trim() !== '' && (
-                <p className="font-body font-light text-[13px] text-umber/90 leading-relaxed mt-2">
+                <p className="font-body font-light text-[13px] text-graphite leading-relaxed mt-2">
                   &ldquo;{review.body}&rdquo;
                 </p>
               )}
@@ -181,7 +181,7 @@ function StarRow({
   rating,
   className,
   filledClass = 'text-highlight',
-  emptyClass = 'text-muted-foreground',
+  emptyClass = 'text-umber',
 }: {
   rating: number
   className?: string

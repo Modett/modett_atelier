@@ -691,7 +691,7 @@ function FormField({
         {showCounter && maxLength && (
           <span className={cn(
             'font-body text-[11px] tabular-nums',
-            atLimit ? 'text-red-500' : nearLimit ? 'text-amber-600' : 'text-muted-foreground/50',
+            atLimit ? 'text-red-500' : nearLimit ? 'text-amber-600' : 'text-umber/50',
           )}>
             {charCount}/{maxLength}
           </span>
@@ -717,7 +717,7 @@ function FormField({
         )}
       />
       {hint && !error && (
-        <p className="font-body text-[11px] text-muted-foreground/70 mt-0.5">{hint}</p>
+        <p className="font-body text-[11px] text-umber mt-0.5">{hint}</p>
       )}
       {error && (
         <p className="font-body text-[11px] text-red-500 mt-0.5">{error}</p>
@@ -733,7 +733,7 @@ export function InformationSummary() {
   const countryName = ADDRESS_COUNTRIES.find((c) => c.code === addr.countryCode)?.name ?? addr.countryCode
 
   return (
-    <p className="font-body font-light text-[13px] text-muted-foreground">
+    <p className="font-body font-light text-[13px] text-umber">
       {addr.firstName} {addr.lastName}, {addr.city}, {countryName}
     </p>
   )

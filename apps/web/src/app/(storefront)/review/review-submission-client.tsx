@@ -138,7 +138,7 @@ export function ReviewSubmissionClient() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3 pt-16 md:pt-24">
         <Loader2 className="h-8 w-8 animate-spin text-umber" aria-hidden />
-        <p className="font-body font-light text-sm text-muted-foreground">
+        <p className="font-body font-light text-sm text-umber">
           Verifying your review link…
         </p>
       </div>
@@ -178,7 +178,7 @@ export function ReviewSubmissionClient() {
           <p className="font-display font-bold text-[22px] text-umber mb-3">
             Thank you for your review!
           </p>
-          <p className="font-body font-light text-[14px] text-muted-foreground mb-8">
+          <p className="font-body font-light text-[14px] text-umber mb-8">
             Your review will be visible on the product page shortly.
           </p>
           <Link
@@ -218,13 +218,13 @@ export function ReviewSubmissionClient() {
           <h1 className="font-display font-bold text-[20px] text-umber leading-tight">
             {p.displayName}
           </h1>
-          <p className="font-body font-light text-[13px] text-muted-foreground mt-1">
+          <p className="font-body font-light text-[13px] text-umber mt-1">
             {[p.color, p.size].filter(Boolean).join(' · ') || '—'}
           </p>
           <p className="font-body font-light text-[14px] text-umber mt-4">
             Share your thoughts
           </p>
-          <p className="font-body font-light text-[12px] text-muted-foreground mt-1">
+          <p className="font-body font-light text-[12px] text-umber mt-1">
             Your review helps other customers make informed decisions.
           </p>
         </div>
@@ -257,7 +257,7 @@ export function ReviewSubmissionClient() {
               </button>
             ))}
           </div>
-          <p className="text-sm text-muted-foreground font-body font-light mt-2">
+          <p className="text-sm text-umber font-body font-light mt-2">
             {rating > 0 ? RATING_LABELS[rating] : ' '}
           </p>
         </div>
@@ -283,7 +283,7 @@ export function ReviewSubmissionClient() {
               'focus:outline-none focus:ring-1 focus:ring-umber/30',
             )}
           />
-          <p className="text-xs text-muted-foreground font-body font-light mt-1">
+          <p className="text-xs text-umber font-body font-light mt-1">
             {body.length} / 2000
           </p>
         </div>
@@ -292,7 +292,7 @@ export function ReviewSubmissionClient() {
           <p className="font-body font-light text-[13px] text-umber mb-1">
             Add photos (optional)
           </p>
-          <p className="font-body font-light text-[12px] text-muted-foreground mb-4">
+          <p className="font-body font-light text-[12px] text-umber mb-4">
             Share how you styled it
           </p>
           <input
@@ -317,11 +317,11 @@ export function ReviewSubmissionClient() {
               + Upload photos
             </span>
           </label>
-          <p className="font-body font-light text-[11px] text-muted-foreground mt-3">
+          <p className="font-body font-light text-[11px] text-umber mt-3">
             Up to 5 photos · JPEG, PNG, WebP
           </p>
           {Object.keys(uploadProgress).length > 0 && (
-            <p className="text-xs text-muted-foreground mt-2">Uploading…</p>
+            <p className="text-xs text-umber mt-2">Uploading…</p>
           )}
           {mediaUrls.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4">
@@ -344,7 +344,7 @@ export function ReviewSubmissionClient() {
         </div>
 
         {!user && (
-          <p className="font-body font-light text-[13px] text-muted-foreground">
+          <p className="font-body font-light text-[13px] text-umber">
             <Link href="/account/login" className="text-umber underline">
               Log in
             </Link>{' '}
@@ -377,15 +377,15 @@ function InvalidLinkCard() {
       <p className="font-display font-bold text-[18px] text-umber mb-4">
         This review link is no longer valid.
       </p>
-      <p className="font-body font-light text-[13px] text-muted-foreground mb-4">
+      <p className="font-body font-light text-[13px] text-umber mb-4">
         This can happen if:
       </p>
-      <ul className="font-body font-light text-[13px] text-muted-foreground list-disc pl-5 space-y-2 mb-6">
+      <ul className="font-body font-light text-[13px] text-umber list-disc pl-5 space-y-2 mb-6">
         <li>The link has already been used</li>
         <li>The link has expired (30-day limit)</li>
         <li>The link is incorrect</li>
       </ul>
-      <p className="font-body font-light text-[13px] text-muted-foreground">
+      <p className="font-body font-light text-[13px] text-umber">
         If you believe this is an error, please contact us at{' '}
         <a href="mailto:hello@modett.com" className="text-umber underline">
           hello@modett.com

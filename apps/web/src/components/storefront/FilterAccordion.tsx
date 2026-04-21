@@ -30,7 +30,7 @@ export function FilterAccordion({
         </span>
         <ChevronDown
           className={cn(
-            'w-3.5 h-3.5 text-muted-foreground',
+            'w-3.5 h-3.5 text-umber',
             'transition-transform duration-200',
             isOpen ? 'rotate-180' : 'rotate-0',
           )}

@@ -51,16 +51,16 @@ export function CartOrderSummary({
 
   return (
     <div>
-      <h2 className="font-display font-bold text-[20px] text-umber mb-4">
+      <h2 className="font-display font-bold text-[20px] text-graphite mb-4">
         Order Summary
       </h2>
 
       {/* Subtotal (small, first row) */}
       <div className="flex justify-between items-baseline py-3 border-b border-muted">
-        <span className="font-body font-light text-[13px] text-muted-foreground">
+        <span className="font-body font-light text-[13px] text-umber">
           Subtotal
         </span>
-        <span className="font-body font-light text-[13px] text-umber">
+        <span className="font-body font-light text-[13px] text-graphite">
           {summary ? formatMoney(summary.subtotal) : '—'}
         </span>
       </div>
@@ -68,39 +68,39 @@ export function CartOrderSummary({
       {/* Shipping row */}
       <div className="py-3 border-b border-muted">
         <div className="flex justify-between items-baseline">
-          <span className="font-body font-light text-[13px] text-muted-foreground">
+          <span className="font-body font-light text-[13px] text-umber">
             Shipping
           </span>
           {cheapestMethod?.cost.isFree ? (
             <div className="flex items-baseline gap-1.5">
               {cheapestMethod.cost.originalAmount && (
-                <span className="font-body font-light text-[13px] text-muted-foreground line-through">
+                <span className="font-body font-light text-[13px] text-umber line-through">
                   {formatMoney({
                     amount: cheapestMethod.cost.originalAmount,
                     currency: cheapestMethod.cost.currency,
                   })}
                 </span>
               )}
-              <span className="font-body font-medium text-[13px] text-umber">
+              <span className="font-body font-medium text-[13px] text-graphite">
                 FREE
               </span>
             </div>
           ) : (
-            <span className="font-body font-light text-[12px] text-muted-foreground">
+            <span className="font-body font-light text-[12px] text-umber">
               Calculated at checkout
             </span>
           )}
         </div>
         {cheapestMethod?.cost.isFree && (
           <div className="flex items-center gap-1.5 mt-1.5">
-            <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="font-body font-light text-[12px] text-muted-foreground">
+            <Tag className="w-3.5 h-3.5 text-umber" />
+            <span className="font-body font-light text-[12px] text-umber">
               {cheapestMethod.cost.label}
             </span>
           </div>
         )}
         {!cheapestMethod?.cost.isFree && shippingEst?.amountUntilFree && (
-          <p className="font-body font-light text-[12px] text-muted-foreground mt-1.5">
+          <p className="font-body font-light text-[12px] text-umber mt-1.5">
             Add{' '}
             <span className="text-highlight font-medium">
               {formatMoney({
@@ -115,10 +115,10 @@ export function CartOrderSummary({
 
       {/* Total (bold, second row) */}
       <div className="flex justify-between items-baseline py-4 border-b border-muted">
-        <span className="font-body font-medium text-[15px] text-umber">
+        <span className="font-body font-medium text-[15px] text-graphite">
           Subtotal
         </span>
-        <span className="font-body font-medium text-[18px] text-umber">
+        <span className="font-body font-medium text-[18px] text-graphite">
           {summary ? formatMoney(summary.subtotal) : '—'}
         </span>
       </div>
@@ -154,9 +154,9 @@ export function CartOrderSummary({
                   }}
                   placeholder="Enter code"
                   className={cn(
-                    'w-full bg-transparent border-b border-muted-foreground',
+                    'w-full bg-transparent border-b border-umber/40',
                     'font-body font-light text-[13px] text-umber',
-                    'placeholder:text-muted-foreground/60',
+                    'placeholder:text-umber/40',
                     'pb-1 outline-none focus:border-umber',
                     'transition-colors duration-200',
                   )}
@@ -227,7 +227,7 @@ export function CartOrderSummary({
 
       {/* Need help */}
       <div className="mt-8 space-y-1.5">
-        <p className="font-body font-medium text-[13px] text-umber mb-2">
+        <p className="font-body font-medium text-[13px] text-graphite mb-2">
           Need help?
         </p>
         <Link

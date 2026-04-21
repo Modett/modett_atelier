@@ -195,21 +195,19 @@ export function CollectionPage({
               <Link
                 href="/"
                 className="font-body font-light text-[11px] uppercase tracking-[0.15em]
-                           text-muted-foreground hover:text-umber transition-colors duration-200"
+                           text-umber hover:text-graphite transition-colors duration-200"
               >
                 Home
               </Link>
             </li>
-            <li className="font-body text-[11px] text-muted-foreground">/</li>
+            <li className="font-body text-[11px] text-umber/40 mx-0.5">/</li>
             <li>
               <Link
                 href="/collections"
                 className={cn(
                   'font-body font-light text-[11px] uppercase tracking-[0.15em]',
                   'transition-colors duration-200',
-                  activeCategory
-                    ? 'text-muted-foreground hover:text-umber'
-                    : 'text-umber',
+                  'text-umber hover:text-graphite',
                 )}
               >
                 Collection
@@ -217,10 +215,10 @@ export function CollectionPage({
             </li>
             {activeCategory && (
               <>
-                <li className="font-body text-[11px] text-muted-foreground">
+                <li className="font-body text-[11px] text-umber/40 mx-0.5">
                   /
                 </li>
-                <li className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber">
+                <li className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-graphite font-medium">
                   {activeCategory}
                 </li>
               </>
@@ -231,7 +229,7 @@ export function CollectionPage({
 
       {/* Page title */}
       <div className="text-center pb-6 md:pb-8 px-5">
-        <h1 className="font-display font-bold text-[28px] md:text-[36px] text-umber leading-tight">
+        <h1 className="font-display font-bold text-[28px] md:text-[36px] text-graphite leading-tight">
           {pageTitle}
         </h1>
       </div>
@@ -292,7 +290,7 @@ export function CollectionPage({
             />
 
             {hasActiveFilters && (
-              <span className="font-body font-light text-[11px] text-muted-foreground">
+              <span className="font-body font-light text-[11px] text-umber">
                 FILTER BY:{' '}
                 <button
                   type="button"
@@ -310,7 +308,7 @@ export function CollectionPage({
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="font-body font-light text-[11px]
-                               text-muted-foreground uppercase tracking-[0.15em]
+                               text-umber uppercase tracking-[0.15em]
                                hidden md:block">
                 Sort By:
               </span>
@@ -338,7 +336,7 @@ export function CollectionPage({
                 aria-label="3-column grid"
                 className={cn(
                   'p-1 transition-colors duration-200',
-                  gridCols === 3 ? 'text-umber' : 'text-muted-foreground',
+                  gridCols === 3 ? 'text-graphite' : 'text-umber/40',
                 )}
               >
                 <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
@@ -353,7 +351,7 @@ export function CollectionPage({
                 aria-label="2-column grid"
                 className={cn(
                   'p-1 transition-colors duration-200',
-                  gridCols === 2 ? 'text-umber' : 'text-muted-foreground',
+                  gridCols === 2 ? 'text-graphite' : 'text-umber/40',
                 )}
               >
                 <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
@@ -393,7 +391,7 @@ export function CollectionPage({
           <div className="flex-1 min-w-0">
             {isError ? (
               <div className="text-center py-20">
-                <p className="font-body text-[14px] text-muted-foreground mb-4">
+                <p className="font-body text-[14px] text-umber mb-4">
                   Something went wrong. Please try again.
                 </p>
                 <button
@@ -421,7 +419,7 @@ export function CollectionPage({
 
                 {!isLoading && products.length > 0 && (
                   <div className="text-center mt-12">
-                    <p className="font-body font-light text-[12px] text-muted-foreground mb-6">
+                    <p className="font-body font-light text-[12px] text-umber mb-6">
                       1-{products.length} of {total} items
                     </p>
                     {hasNextPage && (
@@ -447,7 +445,7 @@ export function CollectionPage({
 
                 {!isLoading && products.length === 0 && (
                   <div className="text-center py-20">
-                    <p className="font-body text-[14px] text-muted-foreground">
+                    <p className="font-body text-[14px] text-umber">
                       No products found in this category.
                     </p>
                   </div>

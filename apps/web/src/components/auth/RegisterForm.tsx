@@ -104,12 +104,12 @@ export function RegisterForm({
         <h2 className="font-display font-bold text-[28px] text-umber leading-tight mb-2">
           My Modett
         </h2>
-        <p className="font-body font-light text-[13px] text-muted-foreground leading-relaxed">
+        <p className="font-body font-light text-[13px] text-umber leading-relaxed">
           Please enter your email address to login or create a new profile
         </p>
       </div>
 
-      <p className="font-body font-light text-[11px] text-muted-foreground text-right">
+      <p className="font-body font-light text-[11px] text-umber text-right">
         &middot; Required fields
       </p>
 
@@ -152,7 +152,7 @@ export function RegisterForm({
         />
 
         <div className="pt-1">
-          <p className="font-body font-light text-[12px] text-muted-foreground mb-1">
+          <p className="font-body font-light text-[12px] text-umber mb-1">
             The password should contain:
           </p>
           <ul className="flex flex-col gap-0.5">
@@ -185,9 +185,9 @@ export function RegisterForm({
               'border-0 border-b pb-1 pr-6 cursor-pointer',
               errors.title
                 ? 'border-red-400'
-                : 'border-muted-foreground focus:border-umber',
+                : 'border-umber/40 focus:border-umber',
               'transition-colors duration-200',
-              !title && 'text-muted-foreground/60',
+              !title && 'text-umber/60',
             )}
           >
             <option value="" disabled>
@@ -200,7 +200,7 @@ export function RegisterForm({
             <option value="prof">Prof</option>
           </select>
           <ChevronDown
-            className="absolute right-0 bottom-2 w-4 h-4 text-muted-foreground pointer-events-none"
+            className="absolute right-0 bottom-2 w-4 h-4 text-umber pointer-events-none"
           />
         </div>
         {errors.title && (
@@ -260,14 +260,14 @@ export function RegisterForm({
 
       {/* Legal text */}
       <div className="flex flex-col gap-3">
-        <p className="font-body font-light text-[12px] text-muted-foreground leading-relaxed">
+        <p className="font-body font-light text-[12px] text-umber leading-relaxed">
           Modett will process your personal data in compliance with the{' '}
           <Link href="/privacy" className="text-umber underline">
             Privacy Notice
           </Link>{' '}
           and you can withdraw the consent indicated above at any time.
         </p>
-        <p className="font-body font-light text-[12px] text-muted-foreground leading-relaxed">
+        <p className="font-body font-light text-[12px] text-umber leading-relaxed">
           By registering you hereby declare that you are at least 18 years of
           age or older (or the legal minimum age required by your country) and
           that you agree with the{' '}
@@ -326,7 +326,7 @@ function PasswordRule({ met, text }: PasswordRuleProps) {
         'flex items-center gap-1.5',
         'font-body font-light text-[12px]',
         'transition-colors duration-200',
-        met ? 'text-umber' : 'text-muted-foreground',
+        met ? 'text-graphite' : 'text-umber',
       )}
     >
       <span>&middot;</span>
@@ -348,7 +348,7 @@ function AuthCheckbox({ id, checked, onChange, children }: AuthCheckboxProps) {
         />
         <div
           className={cn(
-            'w-4 h-4 border border-muted-foreground',
+            'w-4 h-4 border border-umber/40',
             'flex items-center justify-center',
             'transition-colors duration-200',
             checked ? 'bg-umber border-umber' : 'bg-transparent',

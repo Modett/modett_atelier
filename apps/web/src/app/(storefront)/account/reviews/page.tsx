@@ -37,7 +37,7 @@ export default function AccountReviewsPage() {
       <h1 className="font-display font-bold text-[24px] text-umber mb-8">Reviews</h1>
 
       {allReviews.length === 0 && !isLoading ? (
-        <p className="font-body font-light text-[14px] text-muted-foreground max-w-md">
+        <p className="font-body font-light text-[14px] text-umber max-w-md">
           You haven&apos;t reviewed any purchases yet. Reviews become available
           after your order is delivered.
         </p>
@@ -57,7 +57,7 @@ export default function AccountReviewsPage() {
                     {'★'.repeat(review.rating)}
                     {'☆'.repeat(5 - review.rating)}
                   </span>
-                  <span className="mx-2 text-muted-foreground">·</span>
+                  <span className="mx-2 text-umber">·</span>
                   {review.productSlug ? (
                     <Link
                       href={`/products/${review.productSlug}`}
@@ -68,15 +68,15 @@ export default function AccountReviewsPage() {
                   ) : (
                     <span>{review.productName}</span>
                   )}
-                  <span className="text-muted-foreground mx-1">·</span>
-                  <span className="text-muted-foreground">
+                  <span className="text-umber mx-1">·</span>
+                  <span className="text-umber">
                     {[review.variantColor, review.variantSize]
                       .filter(Boolean)
                       .join(' / ') || '—'}
                   </span>
                 </p>
                 <div className="text-right">
-                  <p className="font-body font-light text-[11px] text-muted-foreground">
+                  <p className="font-body font-light text-[11px] text-umber">
                     {new Date(review.createdAt).toLocaleDateString('en-GB', {
                       month: 'long',
                       year: 'numeric',
@@ -91,7 +91,7 @@ export default function AccountReviewsPage() {
                       <p className="text-gray-400 text-xs font-body font-light mt-1">
                         Hidden ●
                       </p>
-                      <p className="text-muted-foreground text-xs font-body font-light mt-0.5 max-w-[220px] ml-auto">
+                      <p className="text-umber text-xs font-body font-light mt-0.5 max-w-[220px] ml-auto">
                         This review is under review by our team.
                       </p>
                     </>
