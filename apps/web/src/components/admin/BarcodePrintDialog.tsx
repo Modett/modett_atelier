@@ -26,29 +26,6 @@ export interface BarcodePrintDialogProps {
   skuGroup: string
 }
 
-function BarcodeCanvas({ barcodeValue }: { barcodeValue: string }) {
-  const ref = useRef<HTMLCanvasElement>(null)
-
-  useEffect(() => {
-    const canvas = ref.current
-    if (!canvas) return
-    try {
-      JsBarcode(canvas, barcodeValue, {
-        format: 'CODE128',
-        width: 1,
-        height: 22,
-        displayValue: false,
-        margin: 0,
-        background: '#ffffff',
-        lineColor: '#000000',
-      })
-    } catch {
-      // invalid barcode value — leave blank
-    }
-  }, [barcodeValue])
-
-  return <canvas ref={ref} className="mx-auto block max-h-[9mm] w-full" />
-}
 
 function BarcodeSvg({ barcodeValue }: { barcodeValue: string }) {
   const ref = useRef<SVGSVGElement>(null)
