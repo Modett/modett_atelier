@@ -79,7 +79,7 @@ export function ShoppingBagDrawer() {
         aria-hidden="true"
         onClick={closeBag}
         className={cn(
-          'fixed inset-0 z-40 bg-graphite/40',
+          'fixed inset-0 z-[65] bg-graphite/40',
           'transition-opacity duration-200',
           bagOpen
             ? 'opacity-100 pointer-events-auto'
@@ -93,7 +93,7 @@ export function ShoppingBagDrawer() {
         aria-modal="true"
         aria-label="Shopping bag"
         className={cn(
-          'fixed top-0 right-0 bottom-0 z-50',
+          'fixed top-0 right-0 bottom-0 z-[70]',
           'w-full max-w-[480px]',
           'bg-background flex flex-col',
           'shadow-[-6px_0_32px_rgba(35,45,53,0.10)]',

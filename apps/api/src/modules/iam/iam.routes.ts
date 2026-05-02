@@ -27,6 +27,8 @@ import {
   listAdminAuditLogs,
   getAdminById,
   getUserById,
+  getOrCreateReferralCode,
+  getReferralStats,
   type AdminAuditLogListRow,
 } from '@modett/db'
 import { writeAuditLog } from '../../middleware/audit'
@@ -91,6 +93,7 @@ const signupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(100),
   newsletterOptIn: z.boolean().optional().default(false),
+  referralCode: z.string().optional(),
 })
 
 /**
@@ -134,7 +137,10 @@ router.post(
   validate(signupSchema),
   async (req: Request, res: Response) => {
     const body = (req as { body: z.infer<typeof signupSchema> }).body
-    const { user, sessionId } = await iamService.signup(body)
+    const { user, sessionId } = await iamService.signup({
+      ...body,
+      referralCode: body.referralCode,
+    })
     res.cookie('sid', sessionId, { ...CUSTOMER_COOKIE_OPTIONS, maxAge: 7 * 24 * 60 * 60 * 1000 })
     res.status(201).json({ data: { user } })
   },
@@ -1164,6 +1170,33 @@ router.delete(
       inviteId: req.params.inviteId!,
     })
     res.status(200).json({ data: { ok: true } })
+  },
+)
+
+// —— Referral code ——
+
+router.get(
+  '/account/referral',
+  requireAuth,
+  async (req: IamAuthRequest, res: Response) => {
+    const userId = req.user!.id
+    try {
+      const [code, stats] = await Promise.all([
+        getOrCreateReferralCode(userId),
+        getReferralStats(userId),
+      ])
+      res.json({
+        data: {
+          referralCode: code,
+          referralUrl: `${process.env.APP_URL ?? 'https://modett.com'}/account/login?ref=${code}`,
+          totalReferrals: stats.totalReferrals,
+          creditedReferrals: stats.creditedReferrals,
+        },
+      })
+    } catch (err) {
+      console.error('[iam] referral route error:', err)
+      res.status(500).json({ error: { code: 'SERVER_ERROR', message: 'Internal server error' } })
+    }
   },
 )
 

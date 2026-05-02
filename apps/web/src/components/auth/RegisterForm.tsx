@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { z } from 'zod'
 import Link from 'next/link'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { ChevronDown, Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRegister } from '@/hooks/useRegister'
 import { useAuthPanel } from '@/components/providers/AuthProvider'
@@ -33,7 +34,10 @@ export function RegisterForm({
   onSwitchToLogin,
 }: RegisterFormProps) {
   const { registerPrefillEmail, clearRegisterPrefill } = useAuthPanel()
+  const searchParams = useSearchParams()
+  const refCode = searchParams.get('ref') ?? ''
   const [email, setEmail] = useState('')
+  const [referralCode, setReferralCode] = useState(refCode)
 
   useEffect(() => {
     if (registerPrefillEmail) {
@@ -83,6 +87,7 @@ export function RegisterForm({
         email,
         password,
         newsletterOptIn: marketingConsent,
+        referralCode:    referralCode.trim() || undefined,
       },
       {
         onSuccess: () => {
@@ -236,6 +241,25 @@ export function RegisterForm({
         onChange={(e) => setSurname(e.target.value)}
         error={errors.surname}
       />
+
+      {/* Referral code */}
+      {refCode ? (
+        <div className="flex items-center gap-2 border border-highlight/40 bg-highlight/10 px-4 py-3">
+          <Check className="w-4 h-4 text-highlight shrink-0" />
+          <p className="font-body font-light text-[13px] text-umber">
+            Referral code <span className="font-medium">{refCode}</span> applied — you&apos;ll receive 150 bonus points after joining.
+          </p>
+        </div>
+      ) : (
+        <AuthInput
+          label="Referral code (optional)"
+          name="referralCode"
+          type="text"
+          placeholder="MUSE-XXXXXX"
+          value={referralCode}
+          onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+        />
+      )}
 
       {/* Consent checkboxes */}
       <div className="flex flex-col gap-4 pt-2">

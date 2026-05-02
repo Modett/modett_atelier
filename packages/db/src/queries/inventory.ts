@@ -488,7 +488,7 @@ export interface AdminInventoryListRow {
   availableQty: number
   lowStockThreshold: number
   stockStatus: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'
-  stockUpdatedAt: Date
+  stockUpdatedAt: Date | string
 }
 
 function adminInventoryFilterFragments({

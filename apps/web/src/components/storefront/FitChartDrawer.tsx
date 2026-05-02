@@ -65,7 +65,7 @@ export function FitChartDrawer({
         aria-hidden="true"
         onClick={onClose}
         className={cn(
-          'fixed inset-0 z-40 bg-graphite/30',
+          'fixed inset-0 z-[65] bg-graphite/30',
           'transition-opacity duration-200',
           open
             ? 'opacity-100 pointer-events-auto'
@@ -79,7 +79,7 @@ export function FitChartDrawer({
         aria-modal="true"
         aria-label="Size guide"
         className={cn(
-          'fixed top-0 right-0 bottom-0 z-50',
+          'fixed top-0 right-0 bottom-0 z-[70]',
           'w-full max-w-[420px]',
           'bg-background border-l border-muted',
           'shadow-[-4px_0_24px_rgba(35,45,53,0.10)]',

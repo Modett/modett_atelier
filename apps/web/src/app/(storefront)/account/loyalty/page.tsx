@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, type ReactNode } from 'react'
-import { Award, Sparkles, Gift } from 'lucide-react'
+import { Award, Sparkles, Gift, Users, Copy, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useLoyalty, useLoyaltyLedger, type LoyaltyLedgerRow } from '@/hooks/useAccount'
+import { useLoyalty, useLoyaltyLedger, useReferral, type LoyaltyLedgerRow } from '@/hooks/useAccount'
 
 function ledgerDescription(row: LoyaltyLedgerRow): string {
   const meta = row.metadata_json ?? row.metadataJson ?? {}
@@ -34,6 +34,8 @@ export default function AccountLoyaltyPage() {
   const [page, setPage] = useState(1)
   const [ledgerRows, setLedgerRows] = useState<LoyaltyLedgerRow[]>([])
   const { data: ledgerPage, isLoading: lLoad, isFetching } = useLoyaltyLedger(page)
+  const { data: referral } = useReferral()
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!ledgerPage?.ledger) return
@@ -46,6 +48,13 @@ export default function AccountLoyaltyPage() {
 
   // Must be above any early return — Rules of Hooks
   const [explainOpen, setExplainOpen] = useState(false)
+
+  function copyReferralCode(text: string) {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   if (aLoad && !detail) {
     return <div className="h-48 bg-muted animate-pulse rounded-none" />
@@ -189,6 +198,90 @@ export default function AccountLoyaltyPage() {
             ]}
           />
         </div>
+      </section>
+
+      {/* Referral section */}
+      <section className="border border-muted p-6 bg-surface-raised/20 space-y-5">
+        <div className="flex items-start gap-3">
+          <Users className="w-5 h-5 text-highlight mt-0.5 shrink-0" />
+          <div>
+            <h2 className="font-body font-medium text-[14px] text-umber">
+              Invite a Friend. Earn Together.
+            </h2>
+            <p className="font-body font-light text-[13px] text-muted-foreground mt-1 leading-relaxed">
+              Share your code. When a friend joins Modett using it, you both earn Muse Points —
+              you receive{' '}
+              <span className="font-medium text-umber">200 pts</span>
+              {' '}and they receive{' '}
+              <span className="font-medium text-umber">150 pts</span> as a welcome gift.
+            </p>
+          </div>
+        </div>
+
+        {referral ? (
+          <>
+            {/* Code display + copy */}
+            <div className="flex items-stretch gap-0">
+              <div className="flex-1 border border-muted px-4 py-3 bg-background">
+                <p className="font-body font-light text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+                  Your Muse Code
+                </p>
+                <p className="font-body font-medium text-[18px] text-umber tracking-[0.12em]">
+                  {referral.referralCode}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => copyReferralCode(referral.referralCode)}
+                className="border border-l-0 border-muted px-5 py-3 flex flex-col items-center justify-center gap-1 bg-umber text-background hover:bg-umber/90 transition-colors duration-200 min-w-[72px]"
+                aria-label="Copy referral code"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+                <span className="font-body font-light text-[9px] uppercase tracking-[0.15em]">
+                  {copied ? 'Copied' : 'Copy'}
+                </span>
+              </button>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="border border-muted p-4 text-center bg-background">
+                <p className="font-display font-bold text-[28px] text-umber leading-none">
+                  {referral.totalReferrals}
+                </p>
+                <p className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground mt-2">
+                  Friends Invited
+                </p>
+              </div>
+              <div className="border border-muted p-4 text-center bg-background">
+                <p className="font-display font-bold text-[28px] text-umber leading-none">
+                  {referral.creditedReferrals * 200}
+                </p>
+                <p className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground mt-2">
+                  Pts Earned via Referrals
+                </p>
+              </div>
+            </div>
+
+            {/* Share link */}
+            <p className="font-body font-light text-[12px] text-muted-foreground">
+              Or share your invite link:{' '}
+              <button
+                type="button"
+                onClick={() => copyReferralCode(referral.referralUrl)}
+                className="text-umber underline hover:no-underline"
+              >
+                {referral.referralUrl.replace('https://', '')}
+              </button>
+            </p>
+          </>
+        ) : (
+          <div className="h-20 bg-muted animate-pulse" />
+        )}
       </section>
 
       <section>

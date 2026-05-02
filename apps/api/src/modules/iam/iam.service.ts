@@ -42,6 +42,11 @@ import {
   addToWishlist,
   removeFromWishlist,
   listActiveProductListRowsByIds,
+  getUserByReferralCode,
+  createReferralRecord,
+  getOrCreateReferralCode,
+  getReferralStats,
+  markReferralBonusCredited,
 } from '@modett/db'
 import type {
   User,
@@ -82,18 +87,24 @@ export async function checkEmailExists({
 
 // —— Signup / Login / Logout ——
 
+const SIGNUP_BONUS_POINTS = 100
+const REFERRAL_BONUS_REFERRER = 200
+const REFERRAL_BONUS_REFERRED = 150
+
 export async function signup({
   firstName,
   lastName,
   email,
   password,
   newsletterOptIn,
+  referralCode,
 }: {
   firstName: string
   lastName: string
   email: string
   password: string
   newsletterOptIn?: boolean
+  referralCode?: string
 }): Promise<{ user: SanitisedUser; sessionId: string }> {
   const normalisedEmail = email.toLowerCase().trim()
   const existing = await getUserByEmail({ email: normalisedEmail })
@@ -106,9 +117,47 @@ export async function signup({
     passwordHash,
     newsletterOptIn,
   })
-  createLoyaltyAccount({ userId: user.id }).catch((err) =>
-    console.error('[iam] loyalty account creation failed:', err),
-  )
+  createLoyaltyAccount({ userId: user.id })
+    .then(async () => {
+      const { earnPoints } = await import('../loyalty/loyalty.service')
+
+      // Award signup bonus
+      await earnPoints({
+        userId: user.id,
+        points: SIGNUP_BONUS_POINTS,
+        type: 'BONUS',
+        metadataJson: { reason: 'Welcome to Modett Muse Club ✦' },
+      }).catch((e) => console.error('[iam] signup bonus failed:', e))
+
+      // Handle referral if a code was provided
+      if (referralCode) {
+        const referrer = await getUserByReferralCode(referralCode).catch(() => null)
+        if (referrer && referrer.id !== user.id) {
+          await createReferralRecord({
+            referrerId: referrer.id,
+            referredId: user.id,
+            referralCode,
+          }).catch(() => null)
+
+          await earnPoints({
+            userId: user.id,
+            points: REFERRAL_BONUS_REFERRED,
+            type: 'BONUS',
+            metadataJson: { reason: `Joined via referral from ${referrer.firstName}` },
+          }).catch(() => null)
+
+          await earnPoints({
+            userId: referrer.id,
+            points: REFERRAL_BONUS_REFERRER,
+            type: 'BONUS',
+            metadataJson: { reason: 'Friend joined Modett Muse Club — referral bonus' },
+          }).catch(() => null)
+
+          await markReferralBonusCredited(user.id).catch(() => null)
+        }
+      }
+    })
+    .catch((err) => console.error('[iam] loyalty account creation failed:', err))
   createNotificationPreferences({ userId: user.id }).catch((err) =>
     console.error('[iam] notification prefs creation failed:', err),
   )
