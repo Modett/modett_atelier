@@ -57,7 +57,7 @@ export const AuthInput = forwardRef<HTMLInputElement, AuthInputProps>(
               'border-0 border-b pb-1',
               error
                 ? 'border-red-400'
-                : 'border-muted-foreground focus:border-umber',
+                : 'border-umber/40 focus:border-umber',
               'transition-colors duration-200',
               'placeholder:text-muted-foreground/60',
               isPassword && 'pr-8',
@@ -71,7 +71,7 @@ export const AuthInput = forwardRef<HTMLInputElement, AuthInputProps>(
               aria-label={showPassword ? 'Hide password' : 'Show password'}
               className={cn(
                 'absolute right-0 bottom-1.5',
-                'text-muted-foreground hover:text-umber',
+                'text-umber hover:text-graphite',
                 'transition-colors duration-200',
                 'focus:outline-none',
               )}

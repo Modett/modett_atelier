@@ -185,11 +185,11 @@ function CartEmptyState() {
 
   return (
     <div className="flex flex-col items-center text-center py-20">
-      <ShoppingBag className="w-16 h-16 text-muted-foreground/20 mb-6" />
-      <h2 className="font-display font-bold text-[24px] text-umber mb-3">
+      <ShoppingBag className="w-16 h-16 text-umber/20 mb-6" />
+      <h2 className="font-display font-bold text-[24px] text-graphite mb-3">
         Your Shopping Bag is Empty
       </h2>
-      <p className="font-body font-light text-[14px] text-muted-foreground mb-8">
+      <p className="font-body font-light text-[14px] text-umber mb-8">
         Looks like you haven&apos;t added anything yet.
       </p>
       <button

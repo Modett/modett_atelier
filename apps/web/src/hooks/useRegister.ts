@@ -14,6 +14,7 @@ interface RegisterInput {
   email:           string
   password:        string
   newsletterOptIn: boolean
+  referralCode?:   string
 }
 
 export function useRegister() {

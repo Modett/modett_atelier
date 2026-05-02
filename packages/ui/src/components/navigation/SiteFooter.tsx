@@ -163,7 +163,7 @@ function MobileFooterSection({
             <li key={link.label}>
               <a
                 href={link.href}
-                className="font-body text-sm font-normal text-muted-foreground hover:text-foreground transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 ring-offset-surface-raised rounded"
+                className="font-body text-sm font-normal text-umber hover:text-graphite transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 ring-offset-surface-raised rounded"
               >
                 {link.label}
               </a>
@@ -198,7 +198,7 @@ export function SiteFooter({
                   <li key={link.label}>
                     <a
                       href={link.href}
-                      className="font-body text-sm font-normal text-muted-foreground hover:text-foreground transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 ring-offset-surface-raised rounded"
+                      className="font-body text-sm font-normal text-umber hover:text-graphite transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 ring-offset-surface-raised rounded"
                     >
                       {link.label}
                     </a>
@@ -216,7 +216,7 @@ export function SiteFooter({
                 <a
                   key={social.platform}
                   href={social.href}
-                  className="text-foreground hover:text-muted-foreground transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 ring-offset-surface-raised rounded"
+                  className="text-umber hover:text-graphite transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 ring-offset-surface-raised rounded"
                   aria-label={`Follow Modett on ${social.platform}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -242,7 +242,7 @@ export function SiteFooter({
                 <a
                   key={social.platform}
                   href={social.href}
-                  className="text-foreground hover:text-muted-foreground transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 ring-offset-surface-raised rounded min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+                  className="text-umber hover:text-graphite transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:ring-offset-2 ring-offset-surface-raised rounded min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
                   aria-label={`Follow Modett on ${social.platform}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -275,25 +275,25 @@ export function SiteFooter({
         </div>
 
         <div className="border-t border-foreground/10 mt-12 pt-6 pb-6 md:pb-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="font-body font-light text-[11px] text-muted-foreground uppercase tracking-[0.15em] text-center md:text-left">
+          <p className="font-body font-light text-[11px] text-umber uppercase tracking-[0.15em] text-center md:text-left">
             {copyrightText ?? `© ${new Date().getFullYear()} Modett. All rights reserved.`}
           </p>
           <div className="flex items-center gap-6 flex-wrap justify-center">
             <Link
               href="/privacy"
-              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber hover:text-graphite transition-colors duration-200"
             >
               Privacy Policy
             </Link>
             <Link
               href="/terms"
-              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber hover:text-graphite transition-colors duration-200"
             >
               Terms of Sale
             </Link>
             <Link
               href="/contact"
-              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground hover:text-foreground transition-colors duration-200"
+              className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber hover:text-graphite transition-colors duration-200"
             >
               Contact
             </Link>

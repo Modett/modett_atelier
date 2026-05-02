@@ -206,11 +206,13 @@ export async function earnPoints({
   userId,
   points,
   orderId,
+  type = 'EARN',
   metadataJson,
 }: {
   userId: string
   points: number
   orderId?: string | null
+  type?: 'EARN' | 'BONUS'
   metadataJson?: Record<string, unknown>
 }): Promise<{ newBalance: number }> {
   if (points <= 0) throw new AppError('EARN_POINTS_MUST_BE_POSITIVE', 400)
@@ -220,7 +222,7 @@ export async function earnPoints({
         await insertLedgerEntryInTx({
           tx,
           userId,
-          type: 'EARN',
+          type,
           points,
           orderId: orderId ?? null,
           metadataJson,

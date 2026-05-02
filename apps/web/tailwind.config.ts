@@ -178,6 +178,16 @@ const config: Config = {
         'banner':      '260px',
         'card-image':  '320px',
       },
+
+      keyframes: {
+        marquee: {
+          '0%':   { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-33.333%)' },
+        },
+      },
+      animation: {
+        marquee: 'marquee 22s linear infinite',
+      },
     },
   },
 

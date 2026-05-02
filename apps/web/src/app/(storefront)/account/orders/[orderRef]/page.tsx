@@ -124,7 +124,7 @@ export default function AccountOrderDetailPage() {
   if (error || !data || !orderRow) {
     return (
       <div className="text-center py-16">
-        <p className="font-body text-[14px] text-muted-foreground mb-4">
+        <p className="font-body text-[14px] text-graphite mb-4">
           We couldn&apos;t load this order.
         </p>
         <Link href="/account/orders" className="text-umber underline text-[13px]">
@@ -235,16 +235,16 @@ export default function AccountOrderDetailPage() {
     <div>
       <Link
         href="/account/orders"
-        className="font-body font-light text-[12px] uppercase tracking-[0.15em] text-muted-foreground hover:text-umber mb-6 inline-flex items-center gap-1"
+        className="font-body font-light text-[12px] uppercase tracking-[0.15em] text-umber hover:text-graphite mb-6 inline-flex items-center gap-1"
       >
         <ChevronLeft className="w-3 h-3 shrink-0" aria-hidden />
         Back to orders
       </Link>
 
-      <h1 className="font-display font-bold text-[22px] text-umber">
+      <h1 className="font-display font-bold text-[22px] text-graphite">
         ORDER {orderRefStr}
       </h1>
-      <p className="font-body font-light text-[13px] text-muted-foreground mt-1">
+      <p className="font-body font-light text-[13px] text-graphite mt-1">
         {placedAt ? `Placed on ${formatPlacedLong(placedAt)}` : '—'}
       </p>
 
@@ -254,19 +254,19 @@ export default function AccountOrderDetailPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-muted">
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 pr-2 text-left">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 pr-2 text-left">
                     Product
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-left">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 px-2 text-left">
                     SKU
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-right">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 px-2 text-right">
                     Price
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 px-2 text-right">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 px-2 text-right">
                     Quantity
                   </th>
-                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-muted-foreground py-3 pl-2 text-right">
+                  <th className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-umber py-3 pl-2 text-right">
                     Total
                   </th>
                 </tr>
@@ -290,11 +290,11 @@ export default function AccountOrderDetailPage() {
           </div>
 
           <div className="max-w-xs ml-auto mt-8 space-y-2 text-right">
-            <div className="flex justify-end gap-8 font-body font-light text-[13px] text-muted-foreground">
+            <div className="flex justify-end gap-8 font-body font-light text-[13px] text-umber">
               <span>Subtotal</span>
-              <span className="tabular-nums text-umber">{subtotalFmt}</span>
+              <span className="tabular-nums text-graphite">{subtotalFmt}</span>
             </div>
-            <div className="flex justify-end gap-8 font-body font-bold text-[14px] text-umber">
+            <div className="flex justify-end gap-8 font-body font-bold text-[14px] text-graphite">
               <span>Total</span>
               <span className="tabular-nums">{totalFmt}</span>
             </div>
@@ -303,7 +303,7 @@ export default function AccountOrderDetailPage() {
 
         {shipping && (
           <section>
-            <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-3">
+            <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-3">
               Delivery address
             </h2>
             <AddressBlock json={shipping.address_json} countryCode={shipping.country_code} />
@@ -422,7 +422,7 @@ export default function AccountOrderDetailPage() {
                 </div>
 
                 <div>
-                  <p className="font-body font-light text-[13px] text-muted-foreground mb-3">
+                  <p className="font-body font-light text-[13px] text-umber mb-3">
                     Items must be unworn with tags attached. Returns accepted within 30 days
                     of delivery.
                   </p>
@@ -463,7 +463,7 @@ export default function AccountOrderDetailPage() {
                       setSelectedItems({})
                       setFormError(null)
                     }}
-                    className="font-body font-light text-[12px] text-muted-foreground hover:text-umber"
+                    className="font-body font-light text-[12px] text-umber hover:text-graphite"
                   >
                     Cancel
                   </button>
@@ -478,7 +478,7 @@ export default function AccountOrderDetailPage() {
         )}
 
         <section>
-          <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
+          <h2 className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-4">
             Timeline
           </h2>
           <ol className="space-y-3 border-l border-muted pl-3 ml-1">
@@ -492,11 +492,11 @@ export default function AccountOrderDetailPage() {
                 />
                 <div className="flex items-center gap-2">
                   <TimelineIcon type={ev.event_type} />
-                  <span className="font-body text-[13px] text-umber">
+                  <span className="font-body text-[13px] text-graphite">
                     {ORDER_EVENT_LABELS[ev.event_type] ?? ev.event_type}
                   </span>
                 </div>
-                <p className="font-body font-light text-[11px] text-muted-foreground mt-0.5">
+                <p className="font-body font-light text-[11px] text-graphite mt-0.5">
                   {new Date(ev.created_at).toLocaleString('en-GB')}
                 </p>
               </li>
@@ -527,12 +527,12 @@ function OrderItemTableRow({
   const nameInner = slug ? (
     <Link
       href={`/products/${encodeURIComponent(slug)}`}
-      className="font-body text-[13px] text-umber underline underline-offset-2 hover:text-ink"
+      className="font-body text-[13px] text-graphite underline underline-offset-2 hover:text-ink"
     >
       {title}
     </Link>
   ) : (
-    <span className="font-body text-[13px] text-umber">{title}</span>
+    <span className="font-body text-[13px] text-graphite">{title}</span>
   )
 
   return (
@@ -541,25 +541,25 @@ function OrderItemTableRow({
         <div className="space-y-1">
           {nameInner}
           {line2 && (
-            <p className="font-body font-light text-[12px] text-muted-foreground">{line2}</p>
+            <p className="font-body font-light text-[12px] text-umber">{line2}</p>
           )}
           {fulfilledOn && (
-            <p className="font-body font-light text-[12px] text-muted-foreground">
+            <p className="font-body font-light text-[12px] text-umber">
               Fulfilled on {fulfilledOn}
             </p>
           )}
         </div>
       </td>
-      <td className="py-4 px-2 font-body font-light text-[12px] text-muted-foreground whitespace-nowrap">
+      <td className="py-4 px-2 font-body font-light text-[12px] text-umber whitespace-nowrap">
         {sku || '—'}
       </td>
-      <td className="py-4 px-2 font-body font-light text-[13px] text-umber text-right tabular-nums">
+      <td className="py-4 px-2 font-body font-light text-[13px] text-graphite text-right tabular-nums">
         {unit}
       </td>
-      <td className="py-4 px-2 font-body font-light text-[13px] text-umber text-right">
+      <td className="py-4 px-2 font-body font-light text-[13px] text-graphite text-right">
         {item.qty}
       </td>
-      <td className="py-4 pl-2 font-body text-[13px] text-umber text-right tabular-nums">
+      <td className="py-4 pl-2 font-body text-[13px] text-graphite text-right tabular-nums">
         {totalFmt}
       </td>
     </tr>
@@ -584,26 +584,26 @@ function OrderItemMobile({
   const nameInner = slug ? (
     <Link
       href={`/products/${encodeURIComponent(slug)}`}
-      className="font-body text-[13px] text-umber underline underline-offset-2"
+      className="font-body text-[13px] text-graphite underline underline-offset-2"
     >
       {title}
     </Link>
   ) : (
-    <span className="font-body text-[13px] text-umber">{title}</span>
+    <span className="font-body text-[13px] text-graphite">{title}</span>
   )
 
   return (
     <div className="border-b border-muted pb-6 space-y-2">
       {nameInner}
       {line2 && (
-        <p className="font-body font-light text-[12px] text-muted-foreground">{line2}</p>
+        <p className="font-body font-light text-[12px] text-umber">{line2}</p>
       )}
       {fulfilledOn && (
-        <p className="font-body font-light text-[12px] text-muted-foreground">
+        <p className="font-body font-light text-[12px] text-umber">
           Fulfilled on {fulfilledOn}
         </p>
       )}
-      <p className="font-body font-light text-[13px] text-umber">
+      <p className="font-body font-light text-[13px] text-graphite">
         {unit} × {item.qty} = {totalFmt}
       </p>
     </div>
@@ -639,7 +639,7 @@ function AddressBlock({
   const city  = String(json.city ?? '')
   const pc    = String(json.postal_code ?? json.postcode ?? '')
   return (
-    <div className="font-body font-light text-[13px] text-muted-foreground space-y-1">
+    <div className="font-body font-light text-[13px] text-graphite space-y-1">
       {line1 && <p>{line1}</p>}
       {line2 && <p>{line2}</p>}
       <p>
@@ -665,5 +665,5 @@ function TimelineIcon({ type }: { type: string }) {
   if (type === 'ORDER_PLACED' || type === 'PAYMENT_CONFIRMED') {
     return <Package className="w-3.5 h-3.5 text-umber shrink-0" aria-hidden />
   }
-  return <Circle className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+  return <Circle className="w-3.5 h-3.5 text-umber shrink-0" aria-hidden />
 }

@@ -40,7 +40,7 @@ export function AccountSidebar() {
       {isLoading ? (
         <div className="w-32 h-4 bg-muted animate-pulse mb-5" aria-hidden />
       ) : (
-        <p className="font-body font-light text-[13px] text-muted-foreground mb-5">
+        <p className="font-body font-light text-[13px] text-umber mb-5">
           {accountLine}
         </p>
       )}
@@ -57,7 +57,7 @@ export function AccountSidebar() {
                   'transition-colors duration-200',
                   active
                     ? 'text-umber font-medium'
-                    : 'text-muted-foreground hover:text-umber',
+                    : 'text-umber hover:text-graphite',
                 )}
               >
                 {link.label}
@@ -82,7 +82,7 @@ export function AccountSidebar() {
         className={cn(
           'mt-6 block',
           'font-body font-light text-[12px] uppercase tracking-[0.15em]',
-          'text-muted-foreground hover:text-umber transition-colors',
+          'text-umber hover:text-graphite transition-colors',
         )}
       >
         Sign Out

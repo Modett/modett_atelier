@@ -102,13 +102,13 @@ export function ShippingStep() {
             'flex flex-col items-center justify-center gap-2 py-5 transition-colors duration-200',
             deliveryType === 'home'
               ? 'bg-background'
-              : 'bg-surface-raised text-muted-foreground',
+              : 'bg-surface-raised text-umber',
           )}
         >
-          <Truck className={cn('w-6 h-6', deliveryType === 'home' ? 'text-umber' : 'text-muted-foreground')} />
+          <Truck className={cn('w-6 h-6', deliveryType === 'home' ? 'text-umber' : 'text-umber')} />
           <span className={cn(
             'font-body font-light text-[11px] uppercase tracking-[0.2em]',
-            deliveryType === 'home' ? 'text-umber' : 'text-muted-foreground',
+            deliveryType === 'home' ? 'text-umber' : 'text-umber',
           )}>
             Receive at Home
           </span>
@@ -120,13 +120,13 @@ export function ShippingStep() {
             'flex flex-col items-center justify-center gap-2 py-5 transition-colors duration-200',
             deliveryType === 'boutique'
               ? 'bg-background'
-              : 'bg-surface-raised text-muted-foreground',
+              : 'bg-surface-raised text-umber',
           )}
         >
-          <Gift className={cn('w-6 h-6', deliveryType === 'boutique' ? 'text-umber' : 'text-muted-foreground')} />
+          <Gift className={cn('w-6 h-6', deliveryType === 'boutique' ? 'text-umber' : 'text-umber')} />
           <span className={cn(
             'font-body font-light text-[11px] uppercase tracking-[0.2em]',
-            deliveryType === 'boutique' ? 'text-umber' : 'text-muted-foreground',
+            deliveryType === 'boutique' ? 'text-umber' : 'text-umber',
           )}>
             Pick Up in Boutique
           </span>
@@ -166,7 +166,7 @@ export function ShippingStep() {
               ))}
             </div>
           ) : (
-            <p className="font-body font-light text-[13px] text-muted-foreground">
+            <p className="font-body font-light text-[13px] text-umber">
               We currently ship to Sri Lanka and Singapore. Your location ({countryCode}) may not
               be supported yet. Please{' '}
               <a href="/contact" className="underline underline-offset-2 hover:text-umber transition-colors">
@@ -201,7 +201,7 @@ export function ShippingStep() {
             ))}
           </select>
           {selectedBoutiqueId && (
-            <p className="font-body font-light text-[12px] text-muted-foreground mt-1">
+            <p className="font-body font-light text-[12px] text-umber mt-1">
               {BOUTIQUES.find((b) => b.id === selectedBoutiqueId)?.address}
             </p>
           )}
@@ -300,7 +300,7 @@ export function ShippingStep() {
                       'transition-colors duration-200',
                     )}
                   />
-                  <p className="font-body font-light text-[11px] text-muted-foreground text-right mt-1">
+                  <p className="font-body font-light text-[11px] text-umber text-right mt-1">
                     {giftMessage.length}/200
                   </p>
                 </div>
@@ -367,7 +367,7 @@ function ShippingMethodRadio({
             {method.name}
           </span>
           {method.estimatedDays && (
-            <span className="font-body font-light text-[12px] text-muted-foreground ml-1">
+            <span className="font-body font-light text-[12px] text-umber ml-1">
               ({method.estimatedDays})
             </span>
           )}
@@ -377,7 +377,7 @@ function ShippingMethodRadio({
         {method.cost.isFree ? (
           <span className="flex items-center gap-1.5">
             {method.cost.originalAmount && (
-              <span className="line-through text-muted-foreground">
+              <span className="line-through text-umber">
                 {formatMoney({ amount: method.cost.originalAmount, currency: method.cost.currency })}
               </span>
             )}
@@ -399,7 +399,7 @@ export function ShippingSummary() {
   const packagingLabel = giftPackaging ? 'Gift packaging' : 'Standard packaging'
 
   return (
-    <p className="font-body font-light text-[13px] text-muted-foreground">
+    <p className="font-body font-light text-[13px] text-umber">
       {typeLabel} · {packagingLabel}
     </p>
   )

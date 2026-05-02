@@ -4,6 +4,7 @@
  */
 
 import { db } from '@modett/db'
+import { sql } from 'drizzle-orm'
 import {
   withInventoryLock,
   getVariantStock as getVariantStockQuery,
@@ -66,7 +67,8 @@ import type {
 } from '@modett/types'
 import { AppError } from '../../lib/errors'
 
-function toIso(d: Date): string {
+function toIso(d: Date | string): string {
+  if (typeof d === 'string') return new Date(d).toISOString()
   return d.toISOString()
 }
 
@@ -90,7 +92,7 @@ function mapStockRowToAdmin(
     availableQty: number
     lowStockThreshold: number
     stockStatus: AdminVariantStock['stockStatus']
-    stockUpdatedAt: Date
+    stockUpdatedAt: Date | string
   },
 ): AdminVariantStock {
   return {
@@ -243,22 +245,46 @@ export async function listAdminInventory({
   const safeLimit = Math.min(Math.max(limit, 1), 100)
   const safePage = Math.max(page, 1)
   const offset = (safePage - 1) * safeLimit
-  const [rows, total] = await Promise.all([
-    listAdminInventoryVariants({
-      productId,
-      stockStatus,
-      search,
+  try {
+    const [rows, total] = await Promise.all([
+      listAdminInventoryVariants({
+        productId,
+        stockStatus,
+        search,
+        limit: safeLimit,
+        offset,
+      }),
+      countAdminInventoryVariants({ productId, stockStatus, search }),
+    ])
+    return {
+      variants: rows.map(mapListRowToInventoryVariantRow),
+      total,
+      page: safePage,
       limit: safeLimit,
-      offset,
-    }),
-    countAdminInventoryVariants({ productId, stockStatus, search }),
-  ])
-  return {
-    variants: rows.map(mapListRowToInventoryVariantRow),
-    total,
-    page: safePage,
-    limit: safeLimit,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (
+      msg.includes('does not exist') ||
+      msg.includes('relation') ||
+      msg.includes('column')
+    ) {
+      return { variants: [], total: 0, page: safePage, limit: safeLimit }
+    }
+    throw err
   }
+}
+
+export async function runInventoryMigrations(): Promise<{ initialized: number }> {
+  try {
+    await db.execute(sql`
+      ALTER TABLE inventory.product_variants
+        ADD COLUMN IF NOT EXISTS color_hex TEXT
+    `)
+  } catch {
+    // column may already exist or table has different schema — ignore
+  }
+  return await initializeMissingVariantStockRows()
 }
 
 export async function initializeAllMissingStock(): Promise<{

@@ -44,7 +44,7 @@ export function CheckoutSection({
     return (
       <div>
         <div className="bg-surface-raised px-6 py-4 flex justify-between items-center">
-          <span className="font-body font-light text-[14px] text-muted-foreground">
+          <span className="font-body font-light text-[14px] text-umber">
             <span className="text-[#4A7C59] mr-1.5" aria-hidden="true">✓</span>
             {stepNumber}. {title}
           </span>
@@ -73,7 +73,7 @@ export function CheckoutSection({
     return (
       <div>
         <div className="bg-surface-raised/50 px-6 py-4">
-          <span className="font-body font-light text-[14px] text-muted-foreground/40">
+          <span className="font-body font-light text-[14px] text-umber/40">
             {stepNumber}. {title}
           </span>
         </div>

@@ -146,9 +146,16 @@ export function useAdminInventoryList(filters: AdminInventoryListFilters = {}) {
         '/admin/inventory',
         { params },
       )
-      return res.data
+      // Ensure we always return a valid structure even if API returns partial data
+      return {
+        variants: res.data.variants ?? [],
+        total: res.data.total ?? 0,
+        page: res.data.page ?? page,
+        limit: res.data.limit ?? limit,
+      }
     },
     staleTime: 20 * 1000,
+    retry: 1,
   })
 }
 
@@ -241,6 +248,22 @@ export function useInitializeMissingStock() {
     mutationFn: async () => {
       const res = await api.post<{ data: { initialized: number } }>(
         '/admin/inventory/initialize-all',
+        {},
+      )
+      return res.data
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ADMIN_INVENTORY_KEYS.all })
+    },
+  })
+}
+
+export function useRunInventoryMigrations() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.post<{ data: { ok: boolean; initialized: number } }>(
+        '/admin/inventory/run-migrations',
         {},
       )
       return res.data

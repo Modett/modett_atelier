@@ -98,7 +98,7 @@ export default function AccountPersonalDetailsPage() {
       </h1>
 
       <section>
-        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-5">
+        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-5">
           Your Details
         </p>
         <div className="mb-5">
@@ -113,7 +113,7 @@ export default function AccountPersonalDetailsPage() {
                   'border px-4 py-2 cursor-pointer font-body font-light text-[12px] rounded-none transition-colors',
                   titlePreference === t
                     ? 'bg-umber text-background border-umber'
-                    : 'border-muted text-muted-foreground hover:border-umber',
+                    : 'border-muted text-umber hover:border-umber',
                 )}
               >
                 {TITLE_LABELS[t]}
@@ -152,11 +152,11 @@ export default function AccountPersonalDetailsPage() {
             onChange={(e) => setDob(e.target.value)}
             className={cn(
               'w-full h-12 border border-muted px-4 rounded-none',
-              'font-body font-light text-[14px] text-umber',
+              'font-body font-light text-[14px] text-graphite',
               'outline-none focus:border-umber',
             )}
           />
-          <p className="font-body font-light text-[11px] text-muted-foreground mt-2">
+          <p className="font-body font-light text-[11px] text-umber mt-2">
             By providing your date of birth you agree to our privacy policy.
           </p>
         </div>
@@ -209,11 +209,11 @@ export default function AccountPersonalDetailsPage() {
       <div className="border-t border-muted my-8" />
 
       <section>
-        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
+        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-2">
           Email address
         </p>
-        <p className="font-body font-light text-[14px] text-umber">{user.email}</p>
-        <p className="font-body font-light text-[13px] text-muted-foreground mt-2">
+        <p className="font-body font-light text-[14px] text-graphite">{user.email}</p>
+        <p className="font-body font-light text-[13px] text-umber mt-2">
           To change your email address, visit{' '}
           <Link href="/account/login" className="text-umber underline underline-offset-2">
             Login Details
@@ -228,7 +228,7 @@ export default function AccountPersonalDetailsPage() {
             setDeleteOpen(true)
             setDeleteConfirm('')
           }}
-          className="font-body font-light text-[12px] text-muted-foreground hover:text-red-500"
+          className="font-body font-light text-[12px] text-umber hover:text-red-500"
         >
           Delete my account
         </button>
@@ -270,7 +270,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         className={cn(
           'w-full h-12 border border-muted px-4 rounded-none',
-          'font-body font-light text-[14px] text-umber',
+          'font-body font-light text-[14px] text-graphite',
           'outline-none focus:border-umber',
         )}
       />

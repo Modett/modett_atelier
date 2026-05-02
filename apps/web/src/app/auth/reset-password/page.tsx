@@ -56,7 +56,7 @@ function ResetPasswordForm() {
         <h1 className="font-display font-bold text-[24px] text-umber mb-3">
           Invalid link
         </h1>
-        <p className="font-body font-light text-[14px] text-muted-foreground mb-6">
+        <p className="font-body font-light text-[14px] text-umber mb-6">
           This password reset link is missing a token. Open the link from your email, or request a new reset from the sign-in page.
         </p>
         <Link
@@ -75,7 +75,7 @@ function ResetPasswordForm() {
         <h1 className="font-display font-bold text-[24px] text-umber mb-3">
           Password updated
         </h1>
-        <p className="font-body font-light text-[14px] text-muted-foreground mb-6">
+        <p className="font-body font-light text-[14px] text-umber mb-6">
           You can sign in with your new password.
         </p>
         <Link
@@ -93,7 +93,7 @@ function ResetPasswordForm() {
       <h1 className="font-display font-bold text-[28px] text-umber mb-2 w-full">
         Set a new password
       </h1>
-      <p className="font-body font-light text-[13px] text-muted-foreground mb-8 w-full">
+      <p className="font-body font-light text-[13px] text-umber mb-8 w-full">
         Choose a strong password for your Modett account.
       </p>
 

@@ -80,11 +80,11 @@ export function PromoCodeInput() {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5">
-        <Tag className="w-3.5 h-3.5 text-muted-foreground
+        <Tag className="w-3.5 h-3.5 text-umber
                         flex-shrink-0" />
         <span className="font-body font-light text-[12px]
                          uppercase tracking-[0.15em]
-                         text-muted-foreground">
+                         text-umber">
           Promo code
         </span>
       </div>
@@ -113,8 +113,8 @@ export function PromoCodeInput() {
             onClick={handleRemove}
             disabled={isPending}
             aria-label="Remove promo code"
-            className="text-muted-foreground
-                       hover:text-umber transition-colors"
+            className="text-umber
+                       hover:text-graphite transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -135,7 +135,7 @@ export function PromoCodeInput() {
               'flex-1 h-11 px-4 rounded-none',
               'border font-body font-light text-[14px]',
               'text-umber uppercase tracking-[0.05em]',
-              'placeholder:text-muted-foreground/50',
+              'placeholder:text-umber/40',
               'placeholder:normal-case',
               'placeholder:tracking-normal',
               'outline-none transition-colors duration-200',

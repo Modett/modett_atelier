@@ -1152,7 +1152,7 @@ export function AdminSettingsView() {
   const isOwner = admin.role === 'OWNER'
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="max-w-5xl">
       <h1 className="mb-6 text-2xl font-semibold text-gray-900">Settings</h1>
       <div className="block md:hidden">
         <Label className="mb-2 block">Section</Label>
@@ -1170,18 +1170,30 @@ export function AdminSettingsView() {
       </div>
       <Tabs value={tab} onValueChange={setTabNav} className="mt-4 md:mt-0">
         <div className="flex flex-col gap-6 md:flex-row">
-          <TabsList className="hidden h-auto w-48 shrink-0 flex-col items-stretch rounded-md bg-gray-100 p-1 md:flex">
-            <TabsTrigger value="banner" className="justify-start">
-              Banner
+          <TabsList className="hidden h-auto w-52 shrink-0 flex-col items-stretch rounded-lg border border-gray-200 bg-white p-1 shadow-sm md:flex">
+            <TabsTrigger
+              value="banner"
+              className="justify-start rounded-md px-3 py-2 text-left text-sm data-[state=active]:bg-gray-900 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-50"
+            >
+              <span>Site Banner</span>
             </TabsTrigger>
-            <TabsTrigger value="team" className="justify-start">
-              Team
+            <TabsTrigger
+              value="team"
+              className="justify-start rounded-md px-3 py-2 text-left text-sm data-[state=active]:bg-gray-900 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-50"
+            >
+              <span>Team</span>
             </TabsTrigger>
-            <TabsTrigger value="shipping" className="justify-start">
-              Shipping
+            <TabsTrigger
+              value="shipping"
+              className="justify-start rounded-md px-3 py-2 text-left text-sm data-[state=active]:bg-gray-900 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-50"
+            >
+              <span>Shipping</span>
             </TabsTrigger>
-            <TabsTrigger value="account" className="justify-start">
-              Account
+            <TabsTrigger
+              value="account"
+              className="justify-start rounded-md px-3 py-2 text-left text-sm data-[state=active]:bg-gray-900 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-50"
+            >
+              <span>Account</span>
             </TabsTrigger>
           </TabsList>
           <div className="min-w-0 flex-1">

@@ -22,7 +22,7 @@ export function AccountMobileNav() {
               'border-b-2 transition-all duration-200',
               active
                 ? 'border-umber text-umber'
-                : 'border-transparent text-muted-foreground',
+                : 'border-transparent text-umber',
             )}
           >
             {link.label}

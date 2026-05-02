@@ -26,7 +26,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
@@ -44,6 +43,7 @@ import {
 } from '@/components/ui/dialog'
 import { HangTagPreview } from '@/components/admin/HangTagPreview'
 import { ColourPickerInput } from '@/components/admin/ColourPickerInput'
+import { PillNav } from '@/components/admin/PillNav'
 import type { AdminProductImage, AdminProductVariant } from '@modett/types'
 import {
   useAdminProductDetail,
@@ -333,6 +333,7 @@ export function ProductEditClient({ productId }: { productId: string }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const [uploading, setUploading] = useState<Record<string, boolean>>({})
+  const [activeTab, setActiveTab] = useState<'details' | 'images' | 'variants' | 'pricing'>('details')
 
   const detailForm = useForm<DetailForm>({
     resolver: zodResolver(detailSchema as never),
@@ -605,361 +606,409 @@ export function ProductEditClient({ productId }: { productId: string }) {
         </div>
       </div>
 
-      <Tabs defaultValue="details" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="images">Images</TabsTrigger>
-          <TabsTrigger value="variants">Variants</TabsTrigger>
-          <TabsTrigger value="pricing">Pricing</TabsTrigger>
-        </TabsList>
+      <div className="space-y-6">
+        {/* ── Pill navigation bar ──────────────────────────────────── */}
+        <PillNav
+          active={activeTab}
+          onChange={(v) => setActiveTab(v as typeof activeTab)}
+          items={[
+            { value: 'details', label: 'Details' },
+            { value: 'images', label: 'Images', badge: sortedImages.length || undefined },
+            { value: 'variants', label: 'Variants', badge: product.variants.filter((v) => !v.deletedAt).length || undefined },
+            { value: 'pricing', label: 'Pricing' },
+          ]}
+        />
 
-        <TabsContent value="details">
-          <Card>
-            <CardContent className="space-y-4 p-4">
-              <div>
-                <Label htmlFor="ed-displayName">Display name *</Label>
-                <Input
-                  id="ed-displayName"
-                  {...detailForm.register('displayName', {
-                    onChange: (e) => {
-                      if (!slugManual.current) {
-                        detailForm.setValue('slug', slugFromDisplayName(e.target.value), {
-                          shouldValidate: true,
-                        })
-                      }
-                    },
-                  })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="ed-shortName">Short name *</Label>
-                <Input id="ed-shortName" {...detailForm.register('shortName')} />
-              </div>
-              <div>
-                <Label htmlFor="ed-productCode">Product code *</Label>
-                <Input id="ed-productCode" {...detailForm.register('productCode')} />
-              </div>
-              <div>
-                <Label htmlFor="ed-slug">Slug *</Label>
-                <Input
-                  id="ed-slug"
-                  {...detailForm.register('slug')}
-                  onFocus={() => {
-                    slugManual.current = true
-                  }}
-                />
-              </div>
-              <div>
-                <Label>Category</Label>
-                <Select
-                  value={detailForm.watch('categoryId') || '__none__'}
-                  onValueChange={(v) =>
-                    detailForm.setValue('categoryId', !v || v === '__none__' ? '' : v)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="No category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">No category</SelectItem>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="ed-desc">Description</Label>
-                <Textarea id="ed-desc" rows={5} {...detailForm.register('description')} />
-              </div>
-              <div>
-                <Label htmlFor="ed-fabric">Fabric &amp; care</Label>
-                <Textarea id="ed-fabric" rows={3} {...detailForm.register('fabricInfo')} />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <span className="text-sm font-medium">Visible on storefront</span>
-                <Switch
-                  checked={detailForm.watch('active')}
-                  onCheckedChange={(v) => detailForm.setValue('active', v)}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <span className="text-sm font-medium">Sale item</span>
-                <Switch
-                  checked={detailForm.watch('isSale')}
-                  onCheckedChange={(v) => detailForm.setValue('isSale', v)}
-                />
-              </div>
-              <Button
-                type="button"
-                onClick={() => void saveDetails()}
-                disabled={updateMut.isPending}
-              >
-                {updateMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save changes
-              </Button>
-
-              <div className="mt-8 rounded-lg border border-red-200 bg-red-50/50 p-4">
-                <h3 className="font-medium text-red-900">Danger zone</h3>
-                <p className="mt-2 text-sm text-red-800">
-                  Delete this product. Removes it from the storefront; data is kept for
-                  order history.
-                </p>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="mt-3"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  Delete product
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="images" className="space-y-4">
-          <div
-            {...getRootProps()}
-            className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
-              isDragActive ? 'border-gray-400 bg-gray-50' : 'border-gray-300'
-            }`}
-          >
-            <input {...getInputProps()} />
-            <CloudUpload className="mx-auto h-10 w-10 text-gray-400" />
-            <p className="mt-2 text-sm font-medium text-gray-700">
-              Drop product images here, or click to browse
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              JPEG, PNG, WebP, TIFF — max 20MB each — high resolution recommended
-            </p>
-            {Object.keys(uploading).length > 0 ? (
-              <p className="mt-2 text-sm text-gray-600">Uploading…</p>
-            ) : null}
-          </div>
-          {Object.entries(uploadErrors).map(([k, msg]) => (
-            <p key={k} className="text-sm text-red-600">
-              {msg}
-            </p>
-          ))}
-
-          {sortedImages.length === 0 ? (
-            <div className="py-8 text-center text-gray-500">
-              <p>No images yet. Upload your first product photo above.</p>
-              <p className="mt-1 text-sm">
-                Add at least one image before publishing this product.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-              {sortedImages.map((img, idx) => (
-                <ProductImageCard
-                  key={img.id}
-                  image={img}
-                  productId={product.id}
-                  keyImageId={product.keyImageId}
-                  index={idx}
-                  total={sortedImages.length}
-                  sortedIds={sortedIds}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="variants" className="space-y-6">
-          {variantsByColor.map((group) => (
-            <Card key={`${group.color}-${group.colorHex ?? ''}`}>
-              <CardContent className="p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <span
-                    className="inline-block h-5 w-5 rounded-full border border-gray-200"
-                    style={{
-                      backgroundColor:
-                        group.colorHex && /^#[0-9A-Fa-f]{6}$/i.test(group.colorHex)
-                          ? group.colorHex
-                          : '#e5e7eb',
-                    }}
-                  />
-                  <span className="font-semibold uppercase">{group.color}</span>
-                  {group.colorHex ? (
-                    <span className="font-mono text-xs text-gray-500">{group.colorHex}</span>
-                  ) : null}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-gray-500">
-                        <th className="py-2 pr-4">Size</th>
-                        <th className="py-2 pr-4">SKU group</th>
-                        <th className="py-2 pr-4">Stock</th>
-                        <th className="py-2">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.rows.map((v) => {
-                        const st = v.stock
-                        const avail = st?.availableQty ?? 0
-                        const low = st?.lowStockThreshold ?? 3
-                        let stockCell: React.ReactNode = String(avail)
-                        if (avail === 0) {
-                          stockCell = <span className="text-red-600">0 ✕</span>
-                        } else if (avail > 0 && avail <= low) {
-                          stockCell = (
-                            <span className="text-orange-600">
-                              {avail} ⚠️
-                            </span>
-                          )
-                        }
-                        return (
-                          <VariantRow
-                            key={v.id}
-                            v={v}
-                            stockCell={stockCell}
-                            productId={product.id}
-                            deleteVar={deleteVar}
-                          />
-                        )
+        {/* ── Details ──────────────────────────────────────────────── */}
+        {activeTab === 'details' && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            {/* LEFT: main fields */}
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="space-y-4 p-4">
+                  <div>
+                    <Label htmlFor="ed-displayName">Display name *</Label>
+                    <Input
+                      id="ed-displayName"
+                      {...detailForm.register('displayName', {
+                        onChange: (e) => {
+                          if (!slugManual.current) {
+                            detailForm.setValue('slug', slugFromDisplayName(e.target.value), {
+                              shouldValidate: true,
+                            })
+                          }
+                        },
                       })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="ed-shortName">Short name *</Label>
+                    <Input id="ed-shortName" {...detailForm.register('shortName')} />
+                  </div>
+                  <div>
+                    <Label htmlFor="ed-productCode">Product code *</Label>
+                    <Input id="ed-productCode" {...detailForm.register('productCode')} />
+                  </div>
+                  <div>
+                    <Label htmlFor="ed-slug">Slug *</Label>
+                    <Input
+                      id="ed-slug"
+                      {...detailForm.register('slug')}
+                      onFocus={() => {
+                        slugManual.current = true
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label>Category</Label>
+                    <Select
+                      value={detailForm.watch('categoryId') || '__none__'}
+                      onValueChange={(v) =>
+                        detailForm.setValue('categoryId', !v || v === '__none__' ? '' : v)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="No category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No category</SelectItem>
+                        {categories.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="ed-desc">Description</Label>
+                    <Textarea id="ed-desc" rows={5} {...detailForm.register('description')} />
+                  </div>
+                  <div>
+                    <Label htmlFor="ed-fabric">Fabric &amp; care</Label>
+                    <Textarea id="ed-fabric" rows={3} {...detailForm.register('fabricInfo')} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          <Card>
-            <CardContent className="space-y-4 p-4">
-              <h3 className="font-medium text-gray-900">Add new variant</h3>
-              <div>
-                <Label>Colour name *</Label>
-                <Input
-                  value={colorName}
-                  onChange={(e) => setColorName(e.target.value)}
-                  placeholder="e.g. Ivory"
-                />
-              </div>
-              <ColourPickerInput value={hex} onChange={setHex} label="Colour (hex) *" />
-              <div>
-                <Label>SKU group *</Label>
-                <Input
-                  value={skuGroup}
-                  onChange={(e) => setSkuGroup(e.target.value)}
-                  placeholder="e.g. MOD-001-IVORY"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  All sizes of this colour share one SKU group.
+            {/* RIGHT: status, save, danger */}
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="space-y-3 p-4">
+                  <h3 className="text-sm font-medium text-gray-900">Status &amp; visibility</h3>
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <span className="text-sm font-medium">Visible on storefront</span>
+                    <Switch
+                      checked={detailForm.watch('active')}
+                      onCheckedChange={(v) => detailForm.setValue('active', v)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <span className="text-sm font-medium">Sale item</span>
+                    <Switch
+                      checked={detailForm.watch('isSale')}
+                      onCheckedChange={(v) => detailForm.setValue('isSale', v)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={() => void saveDetails()}
+                    disabled={updateMut.isPending}
+                  >
+                    {updateMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save changes
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-red-200 bg-red-50/30">
+                <CardContent className="space-y-3 p-4">
+                  <h3 className="font-medium text-red-900">Danger zone</h3>
+                  <p className="text-sm text-red-800">
+                    Delete this product. Removes it from the storefront; data is kept for
+                    order history.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="w-full"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    Delete product
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ── Images ───────────────────────────────────────────────── */}
+        {activeTab === 'images' && (
+          <div className="space-y-4">
+            <div
+              {...getRootProps()}
+              className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
+                isDragActive ? 'border-gray-400 bg-gray-50' : 'border-gray-300'
+              }`}
+            >
+              <input {...getInputProps()} />
+              <CloudUpload className="mx-auto h-10 w-10 text-gray-400" />
+              <p className="mt-2 text-sm font-medium text-gray-700">
+                Drop product images here, or click to browse
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                JPEG, PNG, WebP, TIFF — max 20MB each — high resolution recommended
+              </p>
+              {Object.keys(uploading).length > 0 ? (
+                <p className="mt-2 text-sm text-gray-600">Uploading…</p>
+              ) : null}
+            </div>
+            {Object.entries(uploadErrors).map(([k, msg]) => (
+              <p key={k} className="text-sm text-red-600">
+                {msg}
+              </p>
+            ))}
+
+            {sortedImages.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">
+                <p>No images yet. Upload your first product photo above.</p>
+                <p className="mt-1 text-sm">
+                  Add at least one image before publishing this product.
                 </p>
               </div>
-              <div>
-                <Label>Sizes *</Label>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[...STANDARD_UK, ...STANDARD_EU].map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => toggleSize(s)}
-                      className={`rounded border px-2 py-1 text-xs ${
-                        selectedSizes.has(s)
-                          ? 'border-gray-900 bg-gray-900 text-white'
-                          : 'border-gray-200 bg-white text-gray-700'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-2 flex gap-2">
+            ) : (
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                {sortedImages.map((img, idx) => (
+                  <ProductImageCard
+                    key={img.id}
+                    image={img}
+                    productId={product.id}
+                    keyImageId={product.keyImageId}
+                    index={idx}
+                    total={sortedImages.length}
+                    sortedIds={sortedIds}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Variants ─────────────────────────────────────────────── */}
+        {activeTab === 'variants' && (
+          <div className="space-y-6">
+            {variantsByColor.map((group) => (
+              <Card key={`${group.color}-${group.colorHex ?? ''}`}>
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span
+                      className="inline-block h-5 w-5 rounded-full border border-gray-200"
+                      style={{
+                        backgroundColor:
+                          group.colorHex && /^#[0-9A-Fa-f]{6}$/i.test(group.colorHex)
+                            ? group.colorHex
+                            : '#e5e7eb',
+                      }}
+                    />
+                    <span className="font-semibold uppercase">{group.color}</span>
+                    {group.colorHex ? (
+                      <span className="font-mono text-xs text-gray-500">{group.colorHex}</span>
+                    ) : null}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-gray-500">
+                          <th className="py-2 pr-4">Size</th>
+                          <th className="py-2 pr-4">SKU group</th>
+                          <th className="py-2 pr-4">Stock</th>
+                          <th className="py-2">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((v) => {
+                          const st = v.stock
+                          const avail = st?.availableQty ?? 0
+                          const low = st?.lowStockThreshold ?? 3
+                          let stockCell: React.ReactNode = String(avail)
+                          if (avail === 0) {
+                            stockCell = <span className="text-red-600">0 ✕</span>
+                          } else if (avail > 0 && avail <= low) {
+                            stockCell = (
+                              <span className="text-orange-600">
+                                {avail} ⚠️
+                              </span>
+                            )
+                          }
+                          return (
+                            <VariantRow
+                              key={v.id}
+                              v={v}
+                              stockCell={stockCell}
+                              productId={product.id}
+                              deleteVar={deleteVar}
+                            />
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                <h3 className="font-medium text-gray-900">Add new variant</h3>
+                <div>
+                  <Label>Colour name *</Label>
                   <Input
-                    placeholder="Add custom size"
-                    value={customSize}
-                    onChange={(e) => setCustomSize(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ',') {
-                        e.preventDefault()
+                    value={colorName}
+                    onChange={(e) => setColorName(e.target.value)}
+                    placeholder="e.g. Ivory"
+                  />
+                </div>
+                <ColourPickerInput value={hex} onChange={setHex} label="Colour (hex) *" />
+                <div>
+                  <Label>SKU group *</Label>
+                  <Input
+                    value={skuGroup}
+                    onChange={(e) => setSkuGroup(e.target.value)}
+                    placeholder="e.g. MOD-001-IVORY"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    All sizes of this colour share one SKU group.
+                  </p>
+                </div>
+                <div>
+                  <Label>Sizes *</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[...STANDARD_UK, ...STANDARD_EU].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => toggleSize(s)}
+                        className={`rounded border px-2 py-1 text-xs ${
+                          selectedSizes.has(s)
+                            ? 'border-gray-900 bg-gray-900 text-white'
+                            : 'border-gray-200 bg-white text-gray-700'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      placeholder="Add custom size"
+                      value={customSize}
+                      onChange={(e) => setCustomSize(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault()
+                          const t = customSize.trim()
+                          if (t) {
+                            toggleSize(t)
+                            setCustomSize('')
+                          }
+                        }
+                      }}
+                      className="max-w-xs"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
                         const t = customSize.trim()
                         if (t) {
                           toggleSize(t)
                           setCustomSize('')
                         }
-                      }
-                    }}
-                    className="max-w-xs"
+                      }}
+                    >
+                      Add size
+                    </Button>
+                  </div>
+                </div>
+                <Button type="button" onClick={() => void addVariants()} disabled={variantBusy}>
+                  {variantBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Add colour &amp; sizes
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* ── Pricing ──────────────────────────────────────────────── */}
+        {activeTab === 'pricing' && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                <h3 className="font-medium text-gray-900">Prices</h3>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <Label>LKR</Label>
+                    <Input type="number" step="0.01" {...priceForm.register('lkrAmount')} />
+                  </div>
+                  <div>
+                    <Label>SGD</Label>
+                    <Input type="number" step="0.01" {...priceForm.register('sgdAmount')} />
+                  </div>
+                  <div>
+                    <Label>USD</Label>
+                    <Input type="number" step="0.01" {...priceForm.register('usdAmount')} />
+                  </div>
+                </div>
+                {product.prices ? (
+                  <p className="text-xs text-gray-500">
+                    Last updated:{' '}
+                    {new Date(product.prices.updatedAt).toLocaleString(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </p>
+                ) : null}
+                <p className="text-xs text-amber-800">
+                  Price changes take effect immediately on the storefront. Exchange rates
+                  between LKR, SGD, and USD are not auto-converted — update all three when
+                  repricing.
+                </p>
+                <div className="flex justify-end border-t pt-4">
+                  <HangTagPreview
+                    displayName={product.displayName}
+                    productCode={product.productCode}
+                    lkrAmount={pw.lkrAmount ?? '0'}
+                    sgdAmount={pw.sgdAmount ?? '0'}
+                    usdAmount={pw.usdAmount ?? '0'}
                   />
+                </div>
+              </CardContent>
+            </Card>
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="mb-3 text-sm text-gray-600">
+                    Set prices for each market currency. Changes take effect immediately
+                    on the storefront.
+                  </p>
                   <Button
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const t = customSize.trim()
-                      if (t) {
-                        toggleSize(t)
-                        setCustomSize('')
-                      }
-                    }}
+                    className="w-full"
+                    onClick={() => void savePrices()}
+                    disabled={updateMut.isPending}
                   >
-                    Add size
+                    {updateMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save pricing
                   </Button>
-                </div>
-              </div>
-              <Button type="button" onClick={() => void addVariants()} disabled={variantBusy}>
-                {variantBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add colour &amp; sizes
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="pricing">
-          <Card>
-            <CardContent className="space-y-4 p-4">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <Label>LKR</Label>
-                  <Input type="number" step="0.01" {...priceForm.register('lkrAmount')} />
-                </div>
-                <div>
-                  <Label>SGD</Label>
-                  <Input type="number" step="0.01" {...priceForm.register('sgdAmount')} />
-                </div>
-                <div>
-                  <Label>USD</Label>
-                  <Input type="number" step="0.01" {...priceForm.register('usdAmount')} />
-                </div>
-              </div>
-              {product.prices ? (
-                <p className="text-xs text-gray-500">
-                  Last updated:{' '}
-                  {new Date(product.prices.updatedAt).toLocaleString(undefined, {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}
-                </p>
-              ) : null}
-              <Button type="button" onClick={() => void savePrices()} disabled={updateMut.isPending}>
-                {updateMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save prices
-              </Button>
-              <p className="text-xs text-amber-800">
-                Price changes take effect immediately on the storefront. Exchange rates
-                between LKR, SGD, and USD are not auto-converted — update all three when
-                repricing.
-              </p>
-              <div className="flex justify-end border-t pt-4">
-                <HangTagPreview
-                  displayName={product.displayName}
-                  productCode={product.productCode}
-                  lkrAmount={pw.lkrAmount ?? '0'}
-                  sgdAmount={pw.sgdAmount ?? '0'}
-                  usdAmount={pw.usdAmount ?? '0'}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+      </div>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
@@ -1011,38 +1060,46 @@ function VariantRow({
       <td className="py-2 pr-4 font-mono text-xs">{v.skuGroup}</td>
       <td className="py-2 pr-4">{stockCell}</td>
       <td className="py-2">
-        {confirm ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] text-gray-600">
-              Removed from storefront; orders unchanged.
-            </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/admin/inventory?variantId=${v.id}`}
+            className="inline-flex h-7 items-center rounded-md border border-gray-200 px-2 text-xs font-medium hover:bg-gray-50"
+          >
+            Manage Stock
+          </Link>
+          {confirm ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] text-gray-600">
+                Removed from storefront; orders unchanged.
+              </span>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 text-xs"
+                onClick={() =>
+                  void deleteVar.mutateAsync({ productId, variantId: v.id }).then(() => {
+                    toast.success('Variant removed.')
+                    setConfirm(false)
+                  })
+                }
+              >
+                Confirm Delete
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setConfirm(false)}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
             <Button
               size="sm"
-              variant="destructive"
-              className="h-7 text-xs"
-              onClick={() =>
-                void deleteVar.mutateAsync({ productId, variantId: v.id }).then(() => {
-                  toast.success('Variant removed.')
-                  setConfirm(false)
-                })
-              }
+              variant="ghost"
+              className="h-7 text-red-600 text-xs"
+              onClick={() => setConfirm(true)}
             >
-              Confirm
+              Delete
             </Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setConfirm(false)}>
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-600"
-            onClick={() => setConfirm(true)}
-          >
-            Delete
-          </Button>
-        )}
+          )}
+        </div>
       </td>
     </tr>
   )

@@ -231,8 +231,8 @@ function AdminShell({
         `}
       >
         <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4">
-          <Link className="font-semibold text-gray-900" href="/admin">
-            Modett Admin
+          <Link className="text-sm font-bold tracking-widest uppercase text-gray-900" href="/admin">
+            MODETT
           </Link>
           <div className="flex items-center gap-1">
             <NotificationBell />
@@ -258,8 +258,8 @@ function AdminShell({
                 className={`
                   flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors
                   ${isActive
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-gray-900 text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }
                 `}
                 href={item.href}
@@ -274,8 +274,8 @@ function AdminShell({
 
         <div className="mt-auto border-t border-gray-200 p-4">
           <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600">
-              {user?.firstName?.charAt(0) ?? 'A'}
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white">
+              {user?.firstName?.charAt(0)?.toUpperCase() ?? 'A'}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-gray-900">{adminName}</p>
@@ -308,8 +308,10 @@ function AdminShell({
           </div>
         </header>
 
-        <main className="p-4 lg:p-6">
-          <AdminErrorBoundary>{children}</AdminErrorBoundary>
+        <main className="p-4 lg:p-8">
+          <div className="mx-auto max-w-[1400px]">
+            <AdminErrorBoundary>{children}</AdminErrorBoundary>
+          </div>
         </main>
       </div>
 

@@ -103,18 +103,12 @@ export default function AdminCustomersPage() {
         />
       </div>
 
-      <div
-        className={`
-          flex flex-col gap-4
-          lg:flex-row lg:items-start
-          ${showMobileDetail ? 'max-lg:fixed max-lg:inset-0 max-lg:z-20 max-lg:bg-gray-50 max-lg:p-4 max-lg:overflow-y-auto' : ''}
-        `}
-      >
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div
           className={`
-            w-full shrink-0 space-y-3
-            lg:w-[35%]
-            ${showMobileDetail ? 'max-lg:hidden' : ''}
+            w-full shrink-0 space-y-2
+            lg:w-80 lg:sticky lg:top-6
+            ${selectedId !== null ? 'max-lg:hidden' : ''}
           `}
         >
           <h2 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
@@ -137,6 +131,11 @@ export default function AdminCustomersPage() {
                 No customers found matching &apos;{q.trim()}&apos;
               </p>
             )}
+          {!search.isFetching && q.trim().length < 2 && customers.length === 0 && (
+            <div className="rounded-lg border border-dashed border-gray-200 p-6 text-center">
+              <p className="text-sm text-gray-400">Search above to find a customer</p>
+            </div>
+          )}
           {!search.isFetching &&
             customers.map((c) => (
               <button
@@ -214,24 +213,25 @@ export default function AdminCustomersPage() {
           `}
         >
           {showMobileDetail && (
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="mb-4 lg:hidden"
+              className="mb-4 flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 lg:hidden"
               onClick={() => setSelectedId(null)}
             >
-              <ArrowLeft className="mr-1 h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" />
               Back to results
-            </Button>
+            </button>
           )}
 
           {!selectedId && (
-            <Card className="border-dashed">
-              <CardContent className="flex min-h-[280px] items-center justify-center p-8 text-center text-sm text-gray-500">
-                Search for a customer above to view their profile
-              </CardContent>
-            </Card>
+            <div className="hidden rounded-xl border border-dashed border-gray-200 bg-white py-24 text-center lg:flex lg:items-center lg:justify-center">
+              <div>
+                <Users className="mx-auto h-10 w-10 text-gray-300" />
+                <p className="mt-3 text-sm font-medium text-gray-500">
+                  Select a customer to view their profile
+                </p>
+              </div>
+            </div>
           )}
 
           {selectedId && detail.isLoading && (

@@ -225,12 +225,12 @@ export function PaymentStep() {
           <p className="font-body font-light text-[13px] text-umber">
             Secure payment via PAYable
           </p>
-          <p className="font-body font-light text-[12px] text-muted-foreground mt-1">
+          <p className="font-body font-light text-[12px] text-umber mt-1">
             You will be securely redirected to the PAYable payment gateway to
             complete your card payment. Your card details are never stored on our
             servers.
           </p>
-          <p className="font-body font-light text-[12px] text-muted-foreground mt-1">
+          <p className="font-body font-light text-[12px] text-umber mt-1">
             Accepted: Visa, Mastercard (credit and debit cards)
           </p>
         </div>

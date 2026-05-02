@@ -29,7 +29,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAdminSession } from '@/hooks/useAdminSession'
 import {
   useReportSellers,
@@ -46,6 +45,7 @@ import {
 } from '@/hooks'
 import { cn } from '@/lib/utils'
 import { productImageAdminThumbCandidates } from '@/lib/productImageUrl'
+import { PillNav } from '@/components/admin/PillNav'
 
 const PERIODS: { value: ReportPeriod; label: string }[] = [
   { value: '7d', label: '7d' },
@@ -320,7 +320,7 @@ export default function AdminReportsPage() {
   }>
 
   return (
-    <div className="p-4 md:p-8 max-w-[1400px] mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="font-semibold text-2xl text-gray-900">Reports</h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -359,20 +359,24 @@ export default function AdminReportsPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="flex flex-wrap h-auto gap-1 bg-gray-100 p-1">
-          <TabsTrigger value="sellers">Sellers</TabsTrigger>
-          <TabsTrigger value="views">Most Viewed</TabsTrigger>
-          <TabsTrigger value="cart">Cart & Funnel</TabsTrigger>
-          <TabsTrigger value="returns">Returns</TabsTrigger>
-          <TabsTrigger value="traffic">Traffic</TabsTrigger>
-          <TabsTrigger value="sizes">Colours & Sizes</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-        </TabsList>
+      <PillNav
+        className="mb-2"
+        active={activeTab}
+        onChange={setActiveTab}
+        items={[
+          { value: 'sellers',   label: 'Sellers' },
+          { value: 'views',     label: 'Most Viewed' },
+          { value: 'cart',      label: 'Cart & Funnel' },
+          { value: 'returns',   label: 'Returns' },
+          { value: 'traffic',   label: 'Traffic' },
+          { value: 'sizes',     label: 'Colours & Sizes' },
+          { value: 'customers', label: 'Customers' },
+        ]}
+      />
 
-        <div
+      <div
           id="report-content"
-          className="mt-6 min-w-0 bg-white p-4 rounded-lg border border-gray-100 md:min-w-[960px] print:!w-[1200px] print:!max-w-none"
+          className="mt-6 w-full overflow-x-auto bg-white p-4 rounded-lg border border-gray-100 print:!w-[1200px] print:!max-w-none"
         >
           {activeTab === 'sellers' && (
           <div className="space-y-6">
@@ -1107,7 +1111,6 @@ export default function AdminReportsPage() {
           </div>
           )}
         </div>
-      </Tabs>
     </div>
   )
 }

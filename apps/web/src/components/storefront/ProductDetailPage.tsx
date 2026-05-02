@@ -106,7 +106,7 @@ export function ProductDetailPage({ slug }: ProductDetailPageProps) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="text-center">
-          <p className="font-body font-light text-[14px] text-muted-foreground mb-4">
+          <p className="font-body font-light text-[14px] text-graphite mb-4">
             Something went wrong loading this product.
           </p>
           <a

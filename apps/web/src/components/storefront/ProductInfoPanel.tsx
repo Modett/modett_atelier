@@ -47,9 +47,6 @@ export function ProductInfoPanel({
 
   const uniqueColours = [...new Set(product.variants.map((v) => v.color))]
 
-  const showLowStock =
-    selectedVariant !== null && selectedVariant.stockStatus === 'LOW_STOCK'
-
   async function handleAddToCart() {
     if (!selectedVariant) return
     try {
@@ -113,13 +110,33 @@ export function ProductInfoPanel({
         className="mt-5"
       />
 
-      {/* ── Low stock warning ────────────────────────── */}
-      {showLowStock && selectedVariant && (
-        <p className="font-body text-[12px] text-graphite mt-2 flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-terracotta-clay flex-shrink-0" aria-hidden />
-          Only {selectedVariant.availableQty} left in this size
-        </p>
-      )}
+      {/* ── Stock urgency badge ─────────────────────────── */}
+      {selectedVariant &&
+        selectedVariant.stockStatus !== 'OUT_OF_STOCK' &&
+        (selectedVariant.stockStatus === 'LOW_STOCK' ||
+          selectedVariant.availableQty <= 10) && (
+          <div className="mt-4 flex items-center gap-2 px-3 py-2.5 border border-umber/20 bg-surface">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-umber flex-shrink-0"
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <p className="font-body font-light text-[12px] text-graphite">
+              Only {selectedVariant.availableQty} left in stock.{' '}
+              <span className="font-medium">Order soon.</span>
+            </p>
+          </div>
+        )}
 
       {/* ── Add to cart ───────────────────────────────── */}
       <div className="mt-6">

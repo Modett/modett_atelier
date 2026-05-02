@@ -20,7 +20,7 @@ export function ProductBreadcrumb({ product }: ProductBreadcrumbProps) {
               Home
             </Link>
           </li>
-          <li className="flex-shrink-0 font-body text-[11px] text-umber/50">
+          <li className="flex-shrink-0 font-body text-[11px] text-umber/40 mx-1">
             /
           </li>
           <li className="flex-shrink-0">
@@ -31,11 +31,11 @@ export function ProductBreadcrumb({ product }: ProductBreadcrumbProps) {
               Collection
             </Link>
           </li>
-          <li className="flex-shrink-0 font-body text-[11px] text-umber/50">
+          <li className="flex-shrink-0 font-body text-[11px] text-umber/40 mx-1">
             /
           </li>
           <li className="min-w-0">
-            <span className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-graphite block truncate">
+            <span className="font-body font-light text-[11px] uppercase tracking-[0.15em] text-graphite font-medium block truncate">
               <span className="hidden md:inline">{product.displayName}</span>
               <span className="md:hidden">{product.shortName}</span>
             </span>

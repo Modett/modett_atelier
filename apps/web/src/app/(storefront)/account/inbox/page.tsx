@@ -81,14 +81,14 @@ export default function AccountInboxPage() {
       {messages.length === 0 ? (
         <div className="border border-muted px-6 py-16 text-center">
           <Mail
-            className="mx-auto mb-4 h-10 w-10 text-muted-foreground/40"
+            className="mx-auto mb-4 h-10 w-10 text-umber/40"
             strokeWidth={1}
             aria-hidden
           />
           <p className="mb-2 font-body text-[14px] font-medium text-umber">
             No messages yet
           </p>
-          <p className="font-body text-[13px] font-light text-muted-foreground">
+          <p className="font-body text-[13px] font-light text-umber">
             Your order updates, care guides, and exclusive offers will appear
             here.
           </p>
@@ -130,7 +130,7 @@ export default function AccountInboxPage() {
                         >
                           {m.title}
                         </p>
-                        <span className="shrink-0 font-body text-[11px] font-light text-muted-foreground">
+                        <span className="shrink-0 font-body text-[11px] font-light text-umber">
                           {new Date(m.created_at).toLocaleDateString('en-GB', {
                             month: 'short',
                             year: 'numeric',
@@ -138,7 +138,7 @@ export default function AccountInboxPage() {
                           })}
                         </span>
                       </div>
-                      <p className="mt-1 truncate font-body text-[12px] font-light text-muted-foreground">
+                      <p className="mt-1 truncate font-body text-[12px] font-light text-umber">
                         {m.body}
                       </p>
                     </div>

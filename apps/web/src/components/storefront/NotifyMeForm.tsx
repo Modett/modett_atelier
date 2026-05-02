@@ -65,7 +65,7 @@ export function NotifyMeForm({
 
   return (
     <div className="space-y-4">
-      <p className="font-body font-light text-[13px] text-muted-foreground leading-relaxed">
+      <p className="font-body font-light text-[13px] text-umber leading-relaxed">
         This colour is currently out of stock.
       </p>
 

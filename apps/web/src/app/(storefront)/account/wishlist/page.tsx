@@ -78,14 +78,14 @@ export default function AccountWishlistPage() {
       {list.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center px-4">
           <Heart
-            className="w-16 h-16 text-muted-foreground/30"
+            className="w-16 h-16 text-umber/30"
             strokeWidth={1}
             aria-hidden
           />
-          <p className="font-display font-bold text-[22px] text-umber mt-6">
+          <p className="font-display font-bold text-[22px] text-graphite mt-6">
             Your wishlist is empty
           </p>
-          <p className="font-body font-light text-[14px] text-muted-foreground mt-2 max-w-sm">
+          <p className="font-body font-light text-[14px] text-umber mt-2 max-w-sm">
             Save pieces you love and come back to them anytime.
           </p>
           <Link

@@ -83,10 +83,10 @@ export default function AccountLoginDetailsPage() {
       </h1>
 
       <section>
-        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-1">
           Change Email:
         </p>
-        <p className="font-body font-light text-[13px] text-muted-foreground mb-4">
+        <p className="font-body font-light text-[13px] text-umber mb-4">
           Email changes are not yet available online.
         </p>
 
@@ -107,7 +107,7 @@ export default function AccountLoginDetailsPage() {
           Update e-mail
         </button>
 
-        <p className="font-body font-light text-[12px] text-muted-foreground mt-4">
+        <p className="font-body font-light text-[12px] text-umber mt-4">
           To change your email address, please contact our customer support team.{' '}
           <Link href="/contact" className="text-umber underline underline-offset-2">
             Contact us
@@ -118,10 +118,10 @@ export default function AccountLoginDetailsPage() {
       <div className="border-t border-muted my-8" />
 
       <section>
-        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+        <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber mb-1">
           Change password:
         </p>
-        <p className="font-body font-light text-[13px] text-muted-foreground mb-4">
+        <p className="font-body font-light text-[13px] text-umber mb-4">
           Enter your current password and a new one below.
         </p>
 
@@ -145,7 +145,7 @@ export default function AccountLoginDetailsPage() {
               onToggleVisible={() => setShowNew((s) => !s)}
               autoComplete="new-password"
             />
-            <ul className="font-body font-light text-[11px] text-muted-foreground space-y-0.5 mt-2">
+            <ul className="font-body font-light text-[11px] text-umber space-y-0.5 mt-2">
               <li>The password should contain:</li>
               <li>• Minimum 8 characters</li>
               <li>• At least 1 capital letter</li>
@@ -193,7 +193,7 @@ export default function AccountLoginDetailsPage() {
           setDeleteOpen(true)
           setDeleteConfirm('')
         }}
-        className="font-body font-light text-[12px] text-muted-foreground hover:text-red-500 transition-colors duration-200"
+        className="font-body font-light text-[12px] text-umber hover:text-red-500 transition-colors duration-200"
       >
         Delete account
       </button>
@@ -232,7 +232,7 @@ function LockedField({
         readOnly
         disabled
         className={cn(
-          'bg-surface-raised border border-muted/50 text-muted-foreground',
+          'bg-surface-raised border border-muted/50 text-umber',
           'h-12 px-4 w-full font-body font-light text-[14px]',
           'cursor-not-allowed rounded-none',
         )}
@@ -279,7 +279,7 @@ function PasswordField({
         <button
           type="button"
           onClick={onToggleVisible}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-umber"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-umber hover:text-graphite"
           aria-label={visible ? 'Hide password' : 'Show password'}
         >
           {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

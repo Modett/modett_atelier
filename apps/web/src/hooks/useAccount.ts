@@ -437,6 +437,28 @@ export function useChangePassword() {
   })
 }
 
+// ── Referral ────────────────────────────────────────────────────────────────
+
+export interface ReferralData {
+  referralCode: string
+  referralUrl: string
+  totalReferrals: number
+  creditedReferrals: number
+}
+
+export function useReferral() {
+  const { isLoggedIn } = useSession()
+  return useQuery({
+    queryKey: ['referral'],
+    queryFn: async () => {
+      const res = await api.get<{ data: ReferralData }>('/account/referral')
+      return res.data
+    },
+    enabled: isLoggedIn,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 // ── Returns ─────────────────────────────────────────────────────────────────
 
 export const RETURN_POLICY_VERSION = 'modett-return-policy-v1'

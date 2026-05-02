@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, Printer, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { UnitStatus } from '@modett/types'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ import {
   useRunReconciliation,
   useSetLowStockThreshold,
 } from '@/hooks/useAdminInventory'
+import { BarcodePrintDialog } from './BarcodePrintDialog'
 
 export type InventoryManagerTab =
   | 'overview'
@@ -152,6 +153,8 @@ export function VariantInventorySheet({
   const [damageConfirmOpen, setDamageConfirmOpen] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [adjustNote, setAdjustNote] = useState('')
+  const [printDialogOpen, setPrintDialogOpen] = useState(false)
+  const [printUnitIds, setPrintUnitIds] = useState<string[]>([])
 
   const setThreshold = useSetLowStockThreshold()
   const restockMut = useRestockVariant()
@@ -180,6 +183,8 @@ export function VariantInventorySheet({
       setAdjustOpen(false)
       setAdjustNote('')
       setRestockQty(1)
+      setPrintDialogOpen(false)
+      setPrintUnitIds([])
     }
   }, [open, variantId])
 
@@ -500,9 +505,22 @@ export function VariantInventorySheet({
                         restockMut.mutate(
                           { variantId, qty: restockQty },
                           {
-                            onSuccess: () => {
+                            onSuccess: (result) => {
+                              const count = result.newUnits.length
                               toast.success(
-                                `Stock added. ${restockQty} units created.`,
+                                `${count} unit${count === 1 ? '' : 's'} added.`,
+                                {
+                                  action: {
+                                    label: 'Print Barcodes',
+                                    onClick: () => {
+                                      setPrintUnitIds(
+                                        result.newUnits.map((u) => u.id),
+                                      )
+                                      setPrintDialogOpen(true)
+                                    },
+                                  },
+                                  duration: 8000,
+                                },
                               )
                               setActiveTab('units')
                               setUnitFilter('ALL')
@@ -529,19 +547,36 @@ export function VariantInventorySheet({
               </TabsContent>
 
               <TabsContent value="units" className="mt-0 space-y-4">
-                <div className="flex flex-wrap gap-1">
-                  {UNIT_FILTER_TABS.map((t) => (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-1">
+                    {UNIT_FILTER_TABS.map((t) => (
+                      <Button
+                        key={t.value}
+                        type="button"
+                        size="sm"
+                        variant={unitFilter === t.value ? 'default' : 'outline'}
+                        className="h-8 text-xs"
+                        onClick={() => setUnitFilter(t.value)}
+                      >
+                        {t.label}
+                      </Button>
+                    ))}
+                  </div>
+                  {inStockSelectable.length > 0 && (
                     <Button
-                      key={t.value}
                       type="button"
                       size="sm"
-                      variant={unitFilter === t.value ? 'default' : 'outline'}
+                      variant="outline"
                       className="h-8 text-xs"
-                      onClick={() => setUnitFilter(t.value)}
+                      onClick={() => {
+                        setPrintUnitIds(inStockSelectable.map((u) => u.id))
+                        setPrintDialogOpen(true)
+                      }}
                     >
-                      {t.label}
+                      <Printer className="mr-1.5 h-3.5 w-3.5" />
+                      Print All IN_STOCK ({inStockSelectable.length})
                     </Button>
-                  ))}
+                  )}
                 </div>
                 {summaryParts ? (
                   <p className="text-xs text-gray-600">{summaryParts}</p>
@@ -605,9 +640,22 @@ export function VariantInventorySheet({
                 {selectedIds.size > 0 && (
                   <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/50 p-3">
                     <p className="text-sm font-medium">
-                      {selectedIds.size} units selected
+                      {selectedIds.size} IN_STOCK unit{selectedIds.size > 1 ? 's' : ''}{' '}
+                      selected
                     </p>
                     <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setPrintUnitIds([...selectedIds])
+                          setPrintDialogOpen(true)
+                        }}
+                      >
+                        <Printer className="mr-1.5 h-3.5 w-3.5" />
+                        Print Barcodes
+                      </Button>
                       <Button
                         type="button"
                         size="sm"
@@ -629,21 +677,6 @@ export function VariantInventorySheet({
                         }}
                       >
                         Adjust Out
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const ids = [...selectedIds].join(',')
-                          const q = new URLSearchParams({
-                            variantId,
-                            unitIds: ids,
-                          })
-                          window.open(`/admin/barcodes/print?${q.toString()}`, '_blank')
-                        }}
-                      >
-                        Reprint Barcodes
                       </Button>
                     </div>
                     {damageConfirmOpen && (
@@ -868,6 +901,19 @@ export function VariantInventorySheet({
           )}
         </div>
       </SheetContent>
+
+      {variantId && detail && (
+        <BarcodePrintDialog
+          open={printDialogOpen}
+          onOpenChange={setPrintDialogOpen}
+          variantId={variantId}
+          unitIds={printUnitIds}
+          productName={detail.productName}
+          color={detail.color}
+          size={detail.size}
+          skuGroup={detail.skuGroup}
+        />
+      )}
     </Sheet>
   )
 }

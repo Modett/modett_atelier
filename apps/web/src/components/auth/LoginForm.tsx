@@ -121,7 +121,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
           <h2 className="font-display font-bold text-[28px] text-umber leading-tight mb-2">
             Check your email
           </h2>
-          <p className="font-body font-light text-[13px] text-muted-foreground leading-relaxed">
+          <p className="font-body font-light text-[13px] text-umber leading-relaxed">
             If an account exists for{' '}
             <span className="text-umber font-medium">{resetEmail.trim()}</span>
             , you&apos;ll receive a reset link shortly.
@@ -141,7 +141,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
           <h2 className="font-display font-bold text-[28px] text-umber leading-tight mb-2">
             Reset your password
           </h2>
-          <p className="font-body font-light text-[13px] text-muted-foreground leading-relaxed">
+          <p className="font-body font-light text-[13px] text-umber leading-relaxed">
             Enter your email and we&apos;ll send you a reset link.
           </p>
         </div>
@@ -192,12 +192,12 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
         <h2 className="font-display font-bold text-[28px] text-umber leading-tight mb-2">
           My Modett
         </h2>
-        <p className="font-body font-light text-[13px] text-muted-foreground leading-relaxed">
+        <p className="font-body font-light text-[13px] text-umber leading-relaxed">
           Please enter your email address to login or create a new profile
         </p>
       </div>
 
-      <p className="font-body font-light text-[11px] text-muted-foreground text-right">
+      <p className="font-body font-light text-[11px] text-umber text-right">
         &middot; Required fields
       </p>
 
@@ -257,7 +257,7 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
             'transition-colors duration-200',
             rememberMe
               ? 'bg-umber border-umber'
-              : 'bg-transparent border-muted-foreground',
+              : 'bg-transparent border-umber/40',
           )}
         >
           {rememberMe && (

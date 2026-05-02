@@ -153,6 +153,19 @@ const IMAGES = {
   ],
 }
 
+const COLOUR_HEX: Record<string, string> = {
+  IVORY:    '#F5F0E8',
+  SAGE:     '#8FAF8A',
+  UMBER:    '#8B6347',
+  ECRU:     '#E8DCC8',
+  SAND:     '#C8B89A',
+  BLUSH:    '#E8C4B0',
+  SLATE:    '#6B7A8D',
+  BLACK:    '#1A1A1A',
+  CAMEL:    '#C4956A',
+  CHARCOAL: '#4A4A4A',
+}
+
 // ── Step 1: Reset ─────────────────────────────────────────────────────────────
 
 async function resetDatabase(client: pg.PoolClient) {
@@ -380,7 +393,7 @@ interface ProductDef {
   sgd: string
   usd: string
   images: string[]
-  colours: { name: string; stockOverrides?: Record<string, number> }[]
+  colours: { name: string; hex?: string; stockOverrides?: Record<string, number> }[]
   sizes: string[]
 }
 
@@ -396,9 +409,9 @@ const PRODUCTS: ProductDef[] = [
     images: IMAGES.skirt1,
     colours: [
       // IVORY: UK 6 OOS, UK 8 low stock (2 units), rest normal
-      { name: 'IVORY', stockOverrides: { 'UK 6': 0, 'UK 8': 2 } },
-      { name: 'SAGE' },
-      { name: 'UMBER' },
+      { name: 'IVORY', hex: COLOUR_HEX.IVORY, stockOverrides: { 'UK 6': 0, 'UK 8': 2 } },
+      { name: 'SAGE',  hex: COLOUR_HEX.SAGE },
+      { name: 'UMBER', hex: COLOUR_HEX.UMBER },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -413,8 +426,8 @@ const PRODUCTS: ProductDef[] = [
     images: IMAGES.dress1,
     colours: [
       // ECRU: UK 10 low stock (2 units)
-      { name: 'ECRU', stockOverrides: { 'UK 10': 2 } },
-      { name: 'SAND' },
+      { name: 'ECRU', hex: COLOUR_HEX.ECRU, stockOverrides: { 'UK 10': 2 } },
+      { name: 'SAND', hex: COLOUR_HEX.SAND },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -429,9 +442,9 @@ const PRODUCTS: ProductDef[] = [
     images: IMAGES.dress2,
     colours: [
       // IVORY: UK 6 OOS
-      { name: 'IVORY', stockOverrides: { 'UK 6': 0 } },
-      { name: 'BLUSH' },
-      { name: 'SLATE' },
+      { name: 'IVORY', hex: COLOUR_HEX.IVORY, stockOverrides: { 'UK 6': 0 } },
+      { name: 'BLUSH', hex: COLOUR_HEX.BLUSH },
+      { name: 'SLATE', hex: COLOUR_HEX.SLATE },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14'],
   },
@@ -445,9 +458,9 @@ const PRODUCTS: ProductDef[] = [
     lkr: '390.00', sgd: '1.70', usd: '1.25',
     images: IMAGES.dress3,
     colours: [
-      { name: 'UMBER' },
-      { name: 'BLACK' },
-      { name: 'SAGE' },
+      { name: 'UMBER', hex: COLOUR_HEX.UMBER },
+      { name: 'BLACK', hex: COLOUR_HEX.BLACK },
+      { name: 'SAGE',  hex: COLOUR_HEX.SAGE },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -461,10 +474,10 @@ const PRODUCTS: ProductDef[] = [
     lkr: '310.00', sgd: '1.35', usd: '1.00',
     images: IMAGES.top1,
     colours: [
-      { name: 'IVORY' },
-      { name: 'SLATE' },
+      { name: 'IVORY', hex: COLOUR_HEX.IVORY },
+      { name: 'SLATE', hex: COLOUR_HEX.SLATE },
       // BLACK: UK 8 OOS
-      { name: 'BLACK', stockOverrides: { 'UK 8': 0 } },
+      { name: 'BLACK', hex: COLOUR_HEX.BLACK, stockOverrides: { 'UK 8': 0 } },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -478,10 +491,10 @@ const PRODUCTS: ProductDef[] = [
     lkr: '465.00', sgd: '2.00', usd: '1.50',
     images: IMAGES.top2,
     colours: [
-      { name: 'IVORY' },
-      { name: 'UMBER' },
+      { name: 'IVORY', hex: COLOUR_HEX.IVORY },
+      { name: 'UMBER', hex: COLOUR_HEX.UMBER },
       // SAGE: UK 10 low stock (2 units)
-      { name: 'SAGE', stockOverrides: { 'UK 10': 2 } },
+      { name: 'SAGE',  hex: COLOUR_HEX.SAGE, stockOverrides: { 'UK 10': 2 } },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -495,9 +508,9 @@ const PRODUCTS: ProductDef[] = [
     lkr: '390.00', sgd: '1.70', usd: '1.25',
     images: IMAGES.pant1,
     colours: [
-      { name: 'ECRU' },
-      { name: 'BLACK' },
-      { name: 'SAGE' },
+      { name: 'ECRU',  hex: COLOUR_HEX.ECRU },
+      { name: 'BLACK', hex: COLOUR_HEX.BLACK },
+      { name: 'SAGE',  hex: COLOUR_HEX.SAGE },
     ],
     // Includes UK 20 (was EU 48) as an extended size
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16', 'UK 20'],
@@ -512,9 +525,9 @@ const PRODUCTS: ProductDef[] = [
     lkr: '465.00', sgd: '2.00', usd: '1.50',
     images: IMAGES.pant2,
     colours: [
-      { name: 'CHARCOAL' },
-      { name: 'CAMEL' },
-      { name: 'ECRU' },
+      { name: 'CHARCOAL', hex: COLOUR_HEX.CHARCOAL },
+      { name: 'CAMEL',    hex: COLOUR_HEX.CAMEL },
+      { name: 'ECRU',     hex: COLOUR_HEX.ECRU },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -528,9 +541,9 @@ const PRODUCTS: ProductDef[] = [
     lkr: '620.00', sgd: '2.70', usd: '2.00',
     images: IMAGES.blazer1,
     colours: [
-      { name: 'CAMEL' },
-      { name: 'CHARCOAL' },
-      { name: 'IVORY' },
+      { name: 'CAMEL',    hex: COLOUR_HEX.CAMEL },
+      { name: 'CHARCOAL', hex: COLOUR_HEX.CHARCOAL },
+      { name: 'IVORY',    hex: COLOUR_HEX.IVORY },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -545,9 +558,9 @@ const PRODUCTS: ProductDef[] = [
     images: IMAGES.blazer2,
     colours: [
       // CAMEL: UK 12 low stock (2 units)
-      { name: 'CAMEL', stockOverrides: { 'UK 12': 2 } },
-      { name: 'CHARCOAL' },
-      { name: 'BLACK' },
+      { name: 'CAMEL',    hex: COLOUR_HEX.CAMEL, stockOverrides: { 'UK 12': 2 } },
+      { name: 'CHARCOAL', hex: COLOUR_HEX.CHARCOAL },
+      { name: 'BLACK',    hex: COLOUR_HEX.BLACK },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -561,9 +574,9 @@ const PRODUCTS: ProductDef[] = [
     lkr: '310.00', sgd: '1.35', usd: '1.00',
     images: IMAGES.short1,
     colours: [
-      { name: 'ECRU' },
-      { name: 'BLACK' },
-      { name: 'SAGE' },
+      { name: 'ECRU',  hex: COLOUR_HEX.ECRU },
+      { name: 'BLACK', hex: COLOUR_HEX.BLACK },
+      { name: 'SAGE',  hex: COLOUR_HEX.SAGE },
     ],
     sizes: ['UK 6', 'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16'],
   },
@@ -625,9 +638,9 @@ async function seedProducts(client: pg.PoolClient) {
 
         await client.query(`
           INSERT INTO inventory.product_variants
-            (id, product_id, color, size, sku_group, created_at, updated_at)
-          VALUES ($1,$2,$3,$4,$5,NOW(),NOW())
-        `, [variantId, p.id, colour.name, size, skuGroup])
+            (id, product_id, color, color_hex, size, sku_group, created_at, updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
+        `, [variantId, p.id, colour.name, colour.hex ?? null, size, skuGroup])
 
         await client.query(`
           INSERT INTO inventory.variant_stock
@@ -641,12 +654,14 @@ async function seedProducts(client: pg.PoolClient) {
         // e.g. MOD-001-IVO-UK6-0001
         const sizeCode = size.replace(' ', '')  // 'UK6', 'UK8', etc.
         for (let seq = 1; seq <= stockQty; seq++) {
-          const barcode = `${skuGroup}-${sizeCode}-${String(seq).padStart(4, '0')}`
+          const seqStr = String(seq).padStart(4, '0')
+          const unitSku = `${skuGroup}-${sizeCode}-${seqStr}`
+          const barcodeValue = `${skuGroup}-${sizeCode}-${seqStr}`
           await client.query(`
             INSERT INTO inventory.inventory_units
               (id, variant_id, unit_sku, barcode_value, status, created_at, updated_at)
-            VALUES ($1,$2,$3,$3,'IN_STOCK',NOW(),NOW())
-          `, [uuid(), variantId, barcode])
+            VALUES ($1,$2,$3,$4,'IN_STOCK',NOW(),NOW())
+          `, [uuid(), variantId, unitSku, barcodeValue])
           totalUnits++
         }
       }

@@ -72,7 +72,7 @@ export function QuantityStepper({
         )}
       >
         {isPending ? (
-          <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+          <Loader2 className="w-3 h-3 animate-spin text-umber" />
         ) : (
           qty
         )}

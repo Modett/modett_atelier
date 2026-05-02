@@ -125,7 +125,7 @@ export function AuthPanel({ open, onClose }: AuthPanelProps) {
           aria-label="Close"
           className={cn(
             'absolute top-5 right-5 z-10',
-            'text-muted-foreground hover:text-umber',
+            'text-umber hover:text-graphite',
             'transition-colors duration-200',
             'focus:outline-none',
           )}

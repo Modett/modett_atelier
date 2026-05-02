@@ -65,7 +65,7 @@ export function FitChartDrawer({
         aria-hidden="true"
         onClick={onClose}
         className={cn(
-          'fixed inset-0 z-40 bg-graphite/30',
+          'fixed inset-0 z-[65] bg-graphite/30',
           'transition-opacity duration-200',
           open
             ? 'opacity-100 pointer-events-auto'
@@ -79,7 +79,7 @@ export function FitChartDrawer({
         aria-modal="true"
         aria-label="Size guide"
         className={cn(
-          'fixed top-0 right-0 bottom-0 z-50',
+          'fixed top-0 right-0 bottom-0 z-[70]',
           'w-full max-w-[420px]',
           'bg-background border-l border-muted',
           'shadow-[-4px_0_24px_rgba(35,45,53,0.10)]',
@@ -97,7 +97,7 @@ export function FitChartDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close size guide"
-            className="text-muted-foreground hover:text-umber transition-colors duration-200"
+            className="text-umber hover:text-graphite transition-colors duration-200"
           >
             <X className="w-5 h-5" />
           </button>
@@ -105,7 +105,7 @@ export function FitChartDrawer({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-          <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+          <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber">
             UK Sizing
           </p>
 
@@ -171,7 +171,7 @@ export function FitChartDrawer({
 
           {/* How to measure */}
           <div className="space-y-3 pt-2">
-            <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber">
               How to Measure
             </p>
             {MEASUREMENTS.map(({ label, text }) => (
@@ -187,7 +187,7 @@ export function FitChartDrawer({
           </div>
 
           {/* Model info */}
-          <p className="font-body font-light text-[11px] text-muted-foreground italic pt-2 border-t border-muted">
+          <p className="font-body font-light text-[11px] text-umber italic pt-2 border-t border-muted">
             Our model is 5&apos;10&quot; (178cm) and wears UK size 10.
           </p>
         </div>

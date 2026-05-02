@@ -78,7 +78,7 @@ export function CheckoutOrderSummary({
 
   return (
     <div className={cn('bg-background', className)}>
-      <h2 className="font-display font-bold text-[22px] text-umber pb-4 border-b border-muted mb-0">
+      <h2 className="font-display font-bold text-[22px] text-graphite pb-4 border-b border-muted mb-0">
         Order Summary ({itemCount} {itemCount === 1 ? 'item' : 'items'})
       </h2>
 
@@ -89,7 +89,7 @@ export function CheckoutOrderSummary({
         )}
       >
         {items.length === 0 ? (
-          <p className="font-body font-light text-[13px] text-muted-foreground py-4 text-center">
+          <p className="font-body font-light text-[13px] text-umber py-4 text-center">
             No items in your bag
           </p>
         ) : (
@@ -105,7 +105,7 @@ export function CheckoutOrderSummary({
         <span className="font-body font-light text-[14px] text-umber">
           Subtotal
         </span>
-        <span className="font-body font-light text-[14px] text-umber">
+        <span className="font-body font-light text-[14px] text-graphite">
           {summary ? formatMoney(summary.subtotal) : '—'}
         </span>
       </div>
@@ -145,14 +145,14 @@ export function CheckoutOrderSummary({
 
       <div className="flex justify-between items-baseline pt-4">
         <div className="flex items-baseline gap-1">
-          <span className="font-display font-bold text-[24px] text-umber">
+          <span className="font-display font-bold text-[24px] text-graphite">
             Total
           </span>
-          <span className="font-body font-light text-[12px] text-muted-foreground">
+          <span className="font-body font-light text-[12px] text-umber">
             Taxes inc.
           </span>
         </div>
-        <span className="font-body font-light text-[20px] text-umber">
+        <span className="font-body font-light text-[20px] text-graphite">
           {store.orderTotal
             ? formatMoney({
                 amount:   store.orderTotal,
@@ -194,15 +194,15 @@ function OrderSummaryItem({ item }: { item: CartItem }) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-body font-light text-[13px] text-umber leading-snug truncate">
+        <p className="font-body font-light text-[13px] text-graphite leading-snug truncate">
           {item.displayName}
         </p>
-        <p className="font-body font-light text-[12px] text-muted-foreground mt-0.5">
+        <p className="font-body font-light text-[12px] text-umber mt-0.5">
           Color: {item.color}
           <span className="mx-2 text-muted/60">|</span>
           Size: {item.size}
         </p>
-        <p className="font-body font-light text-[13px] text-umber mt-1">
+        <p className="font-body font-light text-[13px] text-graphite mt-1">
           {formatMoney(item.totalPrice)}
         </p>
       </div>
@@ -233,7 +233,7 @@ function ShippingRow({
             Shipping
           </span>
         </div>
-        <p className="font-body font-light text-[12px] text-muted-foreground mt-1">
+        <p className="font-body font-light text-[12px] text-umber mt-1">
           Calculated at checkout based on your location
         </p>
       </div>
@@ -260,21 +260,21 @@ function ShippingRow({
           </span>
           <div className="flex items-baseline gap-1.5">
             {shippingCost.originalAmount && (
-              <span className="font-body font-light text-[13px] text-muted-foreground line-through">
+              <span className="font-body font-light text-[13px] text-umber line-through">
                 {formatMoney({
                   amount: shippingCost.originalAmount,
                   currency: shippingCost.currency,
                 })}
               </span>
             )}
-            <span className="font-body font-medium text-[13px] text-umber">
+            <span className="font-body font-medium text-[13px] text-graphite">
               FREE
             </span>
           </div>
         </div>
         <div className="flex items-center gap-1.5 mt-1.5">
-          <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="font-body font-light text-[12px] text-muted-foreground">
+          <Tag className="w-3.5 h-3.5 text-umber" />
+          <span className="font-body font-light text-[12px] text-umber">
             {shippingCost.label}
           </span>
         </div>
@@ -289,7 +289,7 @@ function ShippingRow({
           <span className="font-body font-light text-[13px] text-umber">
             Shipping
           </span>
-          <span className="font-body font-light text-[13px] text-umber">
+          <span className="font-body font-light text-[13px] text-graphite">
             {formatMoney({
               amount: shippingCost.amount,
               currency: shippingCost.currency,
@@ -297,12 +297,12 @@ function ShippingRow({
           </span>
         </div>
         {activeMethod?.estimatedDays && (
-          <p className="font-body font-light text-[12px] text-muted-foreground mt-1">
+          <p className="font-body font-light text-[12px] text-umber mt-1">
             {activeMethod.estimatedDays} working days after receipt of order confirmation
           </p>
         )}
         {shippingData?.amountUntilFree && (
-          <p className="font-body font-light text-[12px] text-muted-foreground mt-1.5">
+          <p className="font-body font-light text-[12px] text-umber mt-1.5">
             Add{' '}
             <span className="text-highlight font-medium">
               {formatMoney({
@@ -322,7 +322,7 @@ function ShippingRow({
       <span className="font-body font-light text-[13px] text-umber">
         Shipping
       </span>
-      <span className="font-body font-light text-[12px] text-muted-foreground">
+      <span className="font-body font-light text-[12px] text-umber">
         Not available
       </span>
     </div>

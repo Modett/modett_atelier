@@ -33,8 +33,8 @@ export function CollectionFilters({
               'font-body font-light text-[12px]',
               'transition-colors duration-200',
               !activeCategory
-                ? 'text-umber font-medium'
-                : 'text-muted-foreground hover:text-umber',
+                ? 'text-graphite font-medium'
+                : 'text-umber hover:text-graphite',
             )}
           >
             All
@@ -49,8 +49,8 @@ export function CollectionFilters({
                 'font-body font-light text-[12px]',
                 'transition-colors duration-200',
                 activeCategory === cat.slug
-                  ? 'text-umber font-medium'
-                  : 'text-muted-foreground hover:text-umber',
+                  ? 'text-graphite font-medium'
+                  : 'text-umber hover:text-graphite',
               )}
             >
               {cat.name}
@@ -60,13 +60,13 @@ export function CollectionFilters({
       </FilterAccordion>
 
       <FilterAccordion title="Colour" defaultOpen={false}>
-        <p className="font-body text-[11px] text-muted-foreground pt-2">
+        <p className="font-body text-[11px] text-umber pt-2">
           Filter by colour coming soon
         </p>
       </FilterAccordion>
 
       <FilterAccordion title="Collection" defaultOpen={false}>
-        <p className="font-body text-[11px] text-muted-foreground pt-2">
+        <p className="font-body text-[11px] text-umber pt-2">
           No sub-collections yet
         </p>
       </FilterAccordion>
@@ -82,7 +82,7 @@ export function CollectionFilters({
                     'flex-shrink-0 transition-colors duration-200',
                     activeSizes.includes(size)
                       ? 'bg-umber border-umber'
-                      : 'bg-transparent border-muted-foreground',
+                      : 'bg-transparent border-umber/40',
                   )}
                 >
                   {activeSizes.includes(size) && (
@@ -108,8 +108,8 @@ export function CollectionFilters({
                   className={cn(
                     'font-body font-light text-[12px]',
                     activeSizes.includes(size)
-                      ? 'text-umber'
-                      : 'text-muted-foreground',
+                      ? 'text-graphite'
+                      : 'text-umber',
                   )}
                 >
                   {size}
@@ -117,7 +117,7 @@ export function CollectionFilters({
               </label>
             ))
           ) : (
-            <p className="font-body text-[11px] text-muted-foreground">
+            <p className="font-body text-[11px] text-umber">
               No sizes available
             </p>
           )}

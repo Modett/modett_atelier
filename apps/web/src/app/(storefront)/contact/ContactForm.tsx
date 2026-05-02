@@ -65,7 +65,7 @@ export function ContactForm() {
               <p className="font-display font-bold text-[22px] text-umber mb-3">
                 Thank you for reaching out.
               </p>
-              <p className="font-body font-light text-[14px] text-muted-foreground leading-relaxed">
+              <p className="font-body font-light text-[14px] text-umber leading-relaxed">
                 We’ll get back to you at {email.trim()} within 1–2 business days.
               </p>
             </div>
@@ -161,7 +161,7 @@ export function ContactForm() {
                 <p className="font-body font-medium text-[14px] text-umber mb-1">Phone</p>
                 <a
                   href={CONTACT.phone.href}
-                  className="font-body font-light text-[14px] text-muted-foreground hover:text-umber transition-colors duration-200"
+                  className="font-body font-light text-[14px] text-umber hover:text-graphite transition-colors duration-200"
                 >
                   {CONTACT.phone.display}
                 </a>
@@ -176,7 +176,7 @@ export function ContactForm() {
                 <p className="font-body font-medium text-[14px] text-umber mb-1">Email</p>
                 <a
                   href={CONTACT.email.href}
-                  className="font-body font-light text-[14px] text-muted-foreground hover:text-umber transition-colors duration-200"
+                  className="font-body font-light text-[14px] text-umber hover:text-graphite transition-colors duration-200"
                 >
                   {CONTACT.email.display}
                 </a>
@@ -193,7 +193,7 @@ export function ContactForm() {
                   href={CONTACT.address.mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-body font-light text-[14px] text-muted-foreground hover:text-umber transition-colors duration-200"
+                  className="font-body font-light text-[14px] text-umber hover:text-graphite transition-colors duration-200"
                 >
                   {CONTACT.address.display}
                 </a>

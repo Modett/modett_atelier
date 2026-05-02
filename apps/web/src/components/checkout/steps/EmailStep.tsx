@@ -226,7 +226,7 @@ export function EmailStep() {
               type="button"
               onClick={() => setShowPassword((p) => !p)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-umber transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-umber hover:text-graphite transition-colors"
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -306,7 +306,7 @@ export function EmailSummary() {
   const email = useCheckoutStore((s) => s.email)
   if (!email) return null
   return (
-    <p className="font-body font-light text-[13px] text-muted-foreground">
+    <p className="font-body font-light text-[13px] text-umber">
       The e-mail address entered is: {email}
     </p>
   )

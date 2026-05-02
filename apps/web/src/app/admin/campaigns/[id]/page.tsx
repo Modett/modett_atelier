@@ -28,9 +28,10 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { PillNav } from '@/components/admin/PillNav'
 
 function parseContent(raw: Record<string, unknown>): CampaignContent {
   return {
@@ -348,12 +349,17 @@ export default function AdminCampaignBuilderPage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <div className="min-w-0">
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="mb-4 flex w-full flex-wrap h-auto gap-1">
-              <TabsTrigger value="content">Content</TabsTrigger>
-              <TabsTrigger value="audience">Audience</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-              <TabsTrigger value="deliver">Deliver</TabsTrigger>
-            </TabsList>
+            <PillNav
+              className="mb-6"
+              active={tab}
+              onChange={setTab}
+              items={[
+                { value: 'content',  label: 'Content' },
+                { value: 'audience', label: 'Audience' },
+                { value: 'settings', label: 'Settings' },
+                { value: 'deliver',  label: 'Deliver' },
+              ]}
+            />
 
             <TabsContent value="content" className="space-y-4">
               <div>

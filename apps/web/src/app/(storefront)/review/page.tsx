@@ -6,7 +6,7 @@ function ReviewPageFallback() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3 pt-16 md:pt-24">
       <Loader2 className="h-8 w-8 animate-spin text-umber" aria-hidden />
-      <p className="font-body font-light text-sm text-muted-foreground">
+      <p className="font-body font-light text-sm text-umber">
         Loading…
       </p>
     </div>

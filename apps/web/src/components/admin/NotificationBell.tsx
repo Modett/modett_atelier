@@ -239,7 +239,7 @@ export function NotificationBell() {
             className="fixed inset-0 z-40 cursor-default bg-transparent"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute top-10 right-0 z-50 w-80 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          <div className="absolute top-10 right-0 z-50 w-72 max-h-[80vh] overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
             <NotificationPanel
               feed={feed}
               summary={panelSummary}

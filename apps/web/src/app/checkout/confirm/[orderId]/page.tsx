@@ -145,7 +145,7 @@ export default function OrderConfirmationPage() {
         <h1 className="font-display font-bold text-[24px] text-umber mb-3">
           Confirming your order...
         </h1>
-        <p className="font-body font-light text-[14px] text-muted-foreground">
+        <p className="font-body font-light text-[14px] text-umber">
           Please do not close this page.
         </p>
       </div>
@@ -167,7 +167,7 @@ export default function OrderConfirmationPage() {
           </p>
         )}
         {email && (
-          <p className="font-body font-light text-[14px] text-muted-foreground mb-8">
+          <p className="font-body font-light text-[14px] text-umber mb-8">
             A confirmation email has been sent to {email}
           </p>
         )}
@@ -190,7 +190,7 @@ export default function OrderConfirmationPage() {
               Save your details for next time
             </p>
             <p
-              className="font-body font-light text-[13px] text-muted-foreground mb-6 max-w-sm mx-auto"
+              className="font-body font-light text-[13px] text-umber mb-6 max-w-sm mx-auto"
             >
               Create an account to track this order, save your addresses,
               and earn loyalty points on future purchases.
@@ -218,7 +218,7 @@ export default function OrderConfirmationPage() {
               }}
               className={cn(
                 'block mx-auto mt-4 font-body font-light text-[12px]',
-                'text-muted-foreground hover:text-umber',
+                'text-umber hover:text-graphite',
                 'transition-colors duration-200',
               )}
             >
@@ -239,7 +239,7 @@ export default function OrderConfirmationPage() {
         <h1 className="font-display font-bold text-[24px] text-umber mb-3">
           Payment could not be processed
         </h1>
-        <p className="font-body font-light text-[14px] text-muted-foreground mb-8">
+        <p className="font-body font-light text-[14px] text-umber mb-8">
           Please try again or use a different payment method.
         </p>
         <button
@@ -266,7 +266,7 @@ export default function OrderConfirmationPage() {
       <h1 className="font-display font-bold text-[24px] text-umber mb-3">
         Confirmation taking longer than expected
       </h1>
-      <p className="font-body font-light text-[14px] text-muted-foreground mb-8">
+      <p className="font-body font-light text-[14px] text-umber mb-8">
         Your payment may still be processing. Check your email for a confirmation.
       </p>
       <button

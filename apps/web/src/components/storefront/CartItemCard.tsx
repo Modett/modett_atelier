@@ -94,37 +94,36 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
         {/* Item details */}
         <div className="flex-1 min-w-0">
 
-          <h3 className="font-body font-medium text-[15px] text-umber leading-snug mb-1">
+          <h3 className="font-body font-medium text-[15px] text-graphite leading-snug mb-1">
             {item.displayName}
           </h3>
 
-          <p className="font-body font-light text-[12px] text-muted-foreground mb-0.5">
+          <p className="font-body font-light text-[12px] text-umber mb-0.5">
             Style No: {item.variantId.slice(0, 10).toUpperCase()}
             &nbsp;&nbsp;|&nbsp;&nbsp;
             SKU: {item.variantId.toUpperCase()}
           </p>
 
-          <p className="font-body font-light text-[13px] text-muted-foreground mb-3">
+          <p className="font-body font-light text-[13px] text-umber mb-3">
             {item.color}, {item.size}
           </p>
 
-          <p className={cn(
-            'font-body font-light text-[13px] mb-0.5',
-            isOOS
-              ? 'text-red-400'
-              : isLowStock
-                ? 'text-highlight'
-                : 'text-umber',
-          )}>
-            {isOOS
-              ? 'Out of Stock'
-              : isLowStock
-                ? `Low Stock — Only ${item.availableQty} left`
-                : 'In Stock'
-            }
-          </p>
+          {isOOS ? (
+            <p className="font-body font-light text-[13px] mb-0.5 text-red-400">
+              Out of Stock
+            </p>
+          ) : isLowStock ? (
+            <p className="font-body font-light text-[13px] mb-0.5 text-graphite flex items-center gap-1.5">
+              <span className="inline-block w-1 h-1 rounded-full bg-terracotta-clay flex-shrink-0" aria-hidden />
+              Low Stock — Only {item.availableQty} left
+            </p>
+          ) : (
+            <p className="font-body font-light text-[13px] mb-0.5 text-graphite">
+              In Stock
+            </p>
+          )}
 
-          <p className="font-body font-light text-[14px] text-umber mb-4">
+          <p className="font-body font-light text-[14px] text-graphite mb-4">
             {formatMoney(item.unitPrice)}
           </p>
 
@@ -138,7 +137,7 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
             <button
               type="button"
               onClick={handleSaveForLater}
-              className="flex items-center gap-1.5 font-body font-light text-[13px] transition-colors duration-200 text-muted-foreground hover:text-umber"
+              className="flex items-center gap-1.5 font-body font-light text-[13px] transition-colors duration-200 text-umber hover:text-graphite"
               aria-label={isWishlisted
                 ? `Remove ${item.displayName} from wishlist`
                 : `Save ${item.displayName} for later`}
@@ -148,7 +147,7 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
                   'w-4 h-4 transition-colors duration-200',
                   isWishlisted
                     ? 'fill-umber stroke-umber'
-                    : 'fill-none stroke-current',
+                    : 'fill-none stroke-umber',
                 )}
               />
               <span>{isWishlisted ? 'Saved' : 'Save for Later'}</span>
@@ -168,12 +167,12 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
           />
 
           {atMax && isLowStock && (
-            <p className="font-body font-light text-[11px] text-highlight text-center max-w-[120px] leading-snug">
+            <p className="font-body font-light text-[11px] text-umber text-center max-w-[120px] leading-snug">
               Max {maxQty} available
             </p>
           )}
           {atMax && !isLowStock && item.qty >= 10 && (
-            <p className="font-body font-light text-[11px] text-muted-foreground text-center max-w-[120px] leading-snug">
+            <p className="font-body font-light text-[11px] text-umber text-center max-w-[120px] leading-snug">
               Max qty: 10
             </p>
           )}
@@ -181,7 +180,7 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
 
         {/* Item total price */}
         <div className="flex-shrink-0 text-right pt-1 min-w-[100px]">
-          <p className="font-body font-medium text-[15px] text-umber">
+          <p className="font-body font-medium text-[15px] text-graphite">
             {formatMoney(item.totalPrice)}
           </p>
         </div>
@@ -192,7 +191,7 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
             onClick={handleRemove}
             disabled={removeFromCart.isPending}
             aria-label={`Remove ${item.displayName} from bag`}
-            className="text-muted-foreground hover:text-umber transition-colors duration-200 disabled:opacity-40"
+            className="text-umber hover:text-graphite transition-colors duration-200 disabled:opacity-40"
           >
             <Trash2 className="w-5 h-5" />
           </button>
@@ -226,35 +225,39 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
           <div className="flex-1 min-w-0">
 
             <div className="flex justify-between items-start">
-              <h3 className="font-body font-medium text-[14px] text-umber leading-snug flex-1 pr-2">
+              <h3 className="font-body font-medium text-[14px] text-graphite leading-snug flex-1 pr-2">
                 {item.displayName}
               </h3>
               <button
                 onClick={handleRemove}
                 disabled={removeFromCart.isPending}
                 aria-label="Remove item"
-                className="text-muted-foreground hover:text-umber transition-colors duration-200 flex-shrink-0 disabled:opacity-40"
+                className="text-umber hover:text-graphite transition-colors duration-200 flex-shrink-0 disabled:opacity-40"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="font-body font-light text-[12px] text-muted-foreground mt-1">
+            <p className="font-body font-light text-[12px] text-umber mt-1">
               {item.color}, {item.size}
             </p>
 
-            <p className={cn(
-              'font-body font-light text-[12px] mt-0.5',
-              isOOS ? 'text-red-400'
-              : isLowStock ? 'text-highlight'
-              : 'text-muted-foreground',
-            )}>
-              {isOOS ? 'Out of Stock'
-               : isLowStock ? `Only ${item.availableQty} left`
-               : 'In Stock'}
-            </p>
+            {isOOS ? (
+              <p className="font-body font-light text-[12px] mt-0.5 text-red-400">
+                Out of Stock
+              </p>
+            ) : isLowStock ? (
+              <p className="font-body font-light text-[12px] mt-0.5 text-graphite flex items-center gap-1.5">
+                <span className="inline-block w-1 h-1 rounded-full bg-terracotta-clay flex-shrink-0" aria-hidden />
+                Only {item.availableQty} left
+              </p>
+            ) : (
+              <p className="font-body font-light text-[12px] mt-0.5 text-graphite">
+                In Stock
+              </p>
+            )}
 
-            <p className="font-body font-light text-[13px] text-umber mt-1">
+            <p className="font-body font-light text-[13px] text-graphite mt-1">
               {formatMoney(item.unitPrice)}
             </p>
 
@@ -267,13 +270,13 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
                 isPending={updateQty.isPending || removeFromCart.isPending}
                 size="sm"
               />
-              <p className="font-body font-medium text-[14px] text-umber">
+              <p className="font-body font-medium text-[14px] text-graphite">
                 {formatMoney(item.totalPrice)}
               </p>
             </div>
 
             {atMax && (
-              <p className="font-body font-light text-[11px] text-muted-foreground mt-1">
+              <p className="font-body font-light text-[11px] text-umber mt-1">
                 {isLowStock
                   ? `Max ${maxQty} available due to low stock`
                   : 'Maximum quantity reached (10)'}
@@ -298,10 +301,10 @@ export function CartItemCard({ item, onEdit }: CartItemCardProps) {
                     'w-3.5 h-3.5 transition-colors duration-200',
                     isWishlisted
                       ? 'fill-umber stroke-umber'
-                      : 'fill-none stroke-muted-foreground',
+                      : 'fill-none stroke-umber',
                   )}
                 />
-                <span className="font-body font-light text-[12px] text-muted-foreground">
+                <span className="font-body font-light text-[12px] text-umber">
                   {isWishlisted ? 'Saved' : 'Save for Later'}
                 </span>
               </button>
