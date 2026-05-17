@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Loader2, X } from 'lucide-react'
+import { Camera, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { FilledButton } from '@modett/ui'
 import { cn } from '@/lib/utils'
@@ -23,7 +23,7 @@ const RATING_LABELS: Record<number, string> = {
   5: 'Excellent',
 }
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'] as const
 
 export function ReviewSubmissionClient() {
   const searchParams = useSearchParams()
@@ -288,51 +288,36 @@ export function ReviewSubmissionClient() {
           </p>
         </div>
 
-        <div className="border border-muted p-4">
-          <p className="font-body font-light text-[13px] text-umber mb-1">
-            Add photos (optional)
-          </p>
-          <p className="font-body font-light text-[12px] text-umber mb-4">
-            Share how you styled it
-          </p>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            disabled={!user || mediaUrls.length >= 5 || uploading}
-            onChange={(e) => void handleFiles(e.target.files)}
-            className="sr-only"
-            id="review-photos"
-          />
-          <label htmlFor="review-photos">
-            <span
-              className={cn(
-                'inline-flex h-10 px-6 items-center justify-center cursor-pointer',
-                'border border-umber font-body font-light text-[11px] uppercase tracking-[0.2em] text-umber',
-                'rounded-none hover:bg-umber/5 transition-colors',
-                (!user || mediaUrls.length >= 5 || uploading) &&
-                  'opacity-40 pointer-events-none',
-              )}
-            >
-              + Upload photos
+        <div className="space-y-3">
+          <p className="font-body font-normal text-[13px] text-umber">
+            Photos{' '}
+            <span className="font-light text-muted-foreground text-[12px]">
+              (optional · up to 5 · max 20MB each)
             </span>
-          </label>
-          <p className="font-body font-light text-[11px] text-umber mt-3">
-            Up to 5 photos · JPEG, PNG, WebP
           </p>
-          {Object.keys(uploadProgress).length > 0 && (
-            <p className="text-xs text-umber mt-2">Uploading…</p>
-          )}
+
+          {/* Photo preview grid */}
           {mediaUrls.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4">
+            <div className="flex flex-wrap gap-2">
               {mediaUrls.map((url) => (
-                <div key={url} className="relative w-16 h-16">
+                <div
+                  key={url}
+                  className="relative w-20 h-20 bg-muted overflow-hidden group"
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={url}
+                    alt="Your uploaded photo"
+                    className="w-full h-full object-cover"
+                  />
                   <button
                     type="button"
-                    onClick={() => setMediaUrls((u) => u.filter((x) => x !== url))}
-                    className="absolute -top-1 -right-1 bg-deep text-background p-0.5 rounded-none"
+                    onClick={() =>
+                      setMediaUrls((u) => u.filter((x) => x !== url))
+                    }
+                    className="absolute top-0.5 right-0.5 w-5 h-5 bg-graphite/70 text-background
+                               flex items-center justify-center opacity-0 group-hover:opacity-100
+                               transition-opacity duration-150"
                     aria-label="Remove photo"
                   >
                     <X className="w-3 h-3" />
@@ -341,6 +326,48 @@ export function ReviewSubmissionClient() {
               ))}
             </div>
           )}
+
+          {/* Upload button */}
+          {mediaUrls.length < 5 && (
+            <>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic"
+                multiple
+                disabled={!user || mediaUrls.length >= 5 || uploading}
+                onChange={(e) => void handleFiles(e.target.files)}
+                className="sr-only"
+                id="review-photos"
+              />
+              <label
+                htmlFor="review-photos"
+                className={cn(
+                  'inline-flex items-center gap-2 h-10 px-5 border border-muted',
+                  'font-body font-light text-[12px] uppercase tracking-[0.2em] text-umber',
+                  'cursor-pointer hover:border-umber transition-colors duration-200',
+                  (!user || uploading) &&
+                    'opacity-50 cursor-not-allowed pointer-events-none',
+                )}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Uploading…
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-3.5 h-3.5" />
+                    {mediaUrls.length === 0 ? 'Add Photos' : 'Add More'}
+                  </>
+                )}
+              </label>
+            </>
+          )}
+
+          <p className="font-body font-light text-[12px] text-muted-foreground leading-relaxed">
+            Share how you wear it. Photos help other customers see the piece in
+            real life.
+          </p>
         </div>
 
         {!user && (

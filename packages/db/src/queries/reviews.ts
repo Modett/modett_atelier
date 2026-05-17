@@ -723,3 +723,50 @@ export async function listFlaggedReviews({
 }> {
   return listAdminReviews({ page, limit, flagged: true })
 }
+
+export interface FeaturedReview {
+  id: string
+  rating: number
+  body: string
+  reviewerFirstName: string
+  productName: string
+  productSlug: string | null
+}
+
+export async function getFeaturedReviews({
+  minBodyLength = 80,
+  minRating = 4,
+  limit = 3,
+}: {
+  minBodyLength?: number
+  minRating?: number
+  limit?: number
+} = {}): Promise<FeaturedReview[]> {
+  const result = await db.execute(sql`
+    SELECT
+      r.id,
+      r.rating,
+      r.body,
+      COALESCE(NULLIF(trim(u.first_name), ''), 'Customer') AS "reviewerFirstName",
+      p.display_name AS "productName",
+      p.slug         AS "productSlug"
+    FROM reviews.reviews r
+    JOIN iam.users u        ON u.id = r.user_id
+    JOIN catalog.products p ON p.id = r.product_id
+    WHERE r.status = 'VISIBLE'
+      AND r.rating >= ${minRating}
+      AND LENGTH(r.body) >= ${minBodyLength}
+      AND p.deleted_at IS NULL
+    ORDER BY r.rating DESC, r.created_at DESC
+    LIMIT ${limit}
+  `)
+
+  return (result.rows as Record<string, unknown>[]).map((r) => ({
+    id: r.id as string,
+    rating: Number(r.rating),
+    body: r.body as string,
+    reviewerFirstName: (r.reviewerFirstName as string) || 'Customer',
+    productName: (r.productName as string) || 'Product',
+    productSlug: (r.productSlug as string | null) ?? null,
+  }))
+}

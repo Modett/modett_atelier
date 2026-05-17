@@ -170,6 +170,18 @@ const tokenStatusQuerySchema = z.object({
 })
 
 router.get(
+  '/reviews/featured',
+  async (_req: Request, res: Response) => {
+    try {
+      const reviews = await reviewsService.getFeaturedReviews()
+      res.status(200).json({ data: { reviews } })
+    } catch {
+      res.status(200).json({ data: { reviews: [] } })
+    }
+  },
+)
+
+router.get(
   '/reviews/token-status',
   optionalAuth,
   validateQuery(tokenStatusQuerySchema),

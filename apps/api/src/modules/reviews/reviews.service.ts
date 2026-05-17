@@ -22,6 +22,7 @@ import {
   resolveFlag,
   listAdminReviews,
   listFlaggedReviews,
+  getFeaturedReviews as getFeaturedReviewsQuery,
 } from '@modett/db'
 import type { EnrichedAdminReview, EnrichedReview } from '@modett/db'
 import { AppError } from '../../lib/errors'
@@ -533,6 +534,10 @@ export async function adminListReviews({
     limit: meta.limit,
     total: meta.total,
   }
+}
+
+export async function getFeaturedReviews() {
+  return getFeaturedReviewsQuery()
 }
 
 export async function adminListFlaggedReviews({
