@@ -72,14 +72,21 @@ export function NewsletterPopup() {
     setIsOpen(false)
   }, [])
 
-  // Kick off the image fetch immediately on mount so the browser caches it
-  // before the popup timer fires. Without this the image request starts only
-  // when the popup becomes visible (after a 3 s delay), causing a noticeable
-  // load flash on first open.
+  // Preload the Next.js-optimised image URL (not the raw R2 URL).
+  // new window.Image() fetches the raw URL which is a different cache
+  // entry from what <Image> requests via /_next/image. We must preload
+  // the exact URL Next.js will request so the browser cache is warm
+  // when the popup opens.
   useEffect(() => {
     if (!shouldShowPopup()) return
-    const img = new window.Image()
-    img.src = EDITORIAL_IMAGE
+    const link = document.createElement('link')
+    link.rel = 'preload'
+    link.as = 'image'
+    link.href = `/_next/image?url=${encodeURIComponent(EDITORIAL_IMAGE)}&w=384&q=75`
+    document.head.appendChild(link)
+    return () => {
+      document.head.removeChild(link)
+    }
   }, [])
 
   useEffect(() => {
@@ -157,6 +164,7 @@ export function NewsletterPopup() {
               src={EDITORIAL_IMAGE}
               alt="Newsletter editorial"
               fill
+              priority
               sizes="387px"
               className="object-cover object-top"
             />
