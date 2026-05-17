@@ -17,7 +17,23 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../../'),
 
   images: {
-    formats: ['image/avif', 'image/webp'],
+    // WebP-first: AVIF encoding on Vercel image optimisation adds latency on
+    // cold requests. WebP is fast to encode, widely supported, and produces
+    // files 25–35% smaller than JPEG at equivalent quality.
+    formats: ['image/webp'],
+
+    // Cache optimised images for 30 days. Next.js defaults to 60 s, which
+    // causes the optimisation server to re-process the same image repeatedly.
+    // 2_592_000 = 30 × 24 × 60 × 60 seconds.
+    minimumCacheTTL: 2592000,
+
+    // Viewport breakpoints used for srcset generation. Limiting to common
+    // sizes reduces the number of variants Vercel generates and caches.
+    deviceSizes: [640, 768, 1024, 1280, 1440, 1920],
+
+    // Fixed-width image sizes (thumbnails, avatars, product cards).
+    imageSizes: [64, 128, 256, 384],
+
     remotePatterns: [
       {
         // Cloudflare R2 — product photography storage

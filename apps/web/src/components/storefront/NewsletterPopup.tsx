@@ -72,6 +72,16 @@ export function NewsletterPopup() {
     setIsOpen(false)
   }, [])
 
+  // Kick off the image fetch immediately on mount so the browser caches it
+  // before the popup timer fires. Without this the image request starts only
+  // when the popup becomes visible (after a 3 s delay), causing a noticeable
+  // load flash on first open.
+  useEffect(() => {
+    if (!shouldShowPopup()) return
+    const img = new window.Image()
+    img.src = EDITORIAL_IMAGE
+  }, [])
+
   useEffect(() => {
     if (!shouldShowPopup()) return
 
