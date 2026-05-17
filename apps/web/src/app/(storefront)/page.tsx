@@ -1,6 +1,7 @@
 import { HomepageHero } from '@/components/storefront/HomepageHero'
 import { HomepageNewsletter } from '@/components/storefront/HomepageNewsletter'
 import { HomepageBestsellers } from '@/components/storefront/HomepageBestsellers'
+import { HomepageReviews } from '@/components/storefront/HomepageReviews'
 import { EditorialCarousel } from '@modett/ui'
 import { HOMEPAGE_CAROUSEL_SLIDES } from '@/lib/placeholder-data'
 
@@ -10,6 +11,8 @@ export default function HomePage() {
       <HomepageHero imageUrl="/images/hero-image.jpg" />
 
       <HomepageBestsellers />
+
+      <HomepageReviews />
 
       <EditorialCarousel
         slides={HOMEPAGE_CAROUSEL_SLIDES}
