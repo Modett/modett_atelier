@@ -42,7 +42,6 @@ export function ReviewSubmissionClient() {
   const [body, setBody] = useState('')
   const [mediaUrls, setMediaUrls] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
   const [success, setSuccess] = useState(false)
 
   const productIdForInvalidate = tokenStatus?.product?.id
@@ -58,9 +57,7 @@ export function ReviewSubmissionClient() {
           toast.error('Please use JPEG, PNG, or WebP images only.')
           continue
         }
-        const key = `${file.name}-${i}-${Date.now()}`
         setUploading(true)
-        setUploadProgress((p) => ({ ...p, [key]: 0 }))
         try {
           const json = await api.get<{
             data: { uploadUrl: string; publicUrl: string }
@@ -82,11 +79,6 @@ export function ReviewSubmissionClient() {
           toast.error('Upload failed. Please try again.')
         } finally {
           setUploading(false)
-          setUploadProgress((p) => {
-            const rest = { ...p }
-            delete rest[key]
-            return rest
-          })
         }
       }
     },

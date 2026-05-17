@@ -20,20 +20,24 @@ export function HomepageHero({ imageUrl }: HomepageHeroProps) {
     ? { duration: 0 }
     : { duration: 0.8, delay: 0.8, ease: 'easeOut' as const }
 
+  // Image is always visible immediately — no opacity animation.
+  // The subtle scale-in still runs for a "settle" effect but the image
+  // is never hidden, so bytes arriving before hydration are shown right away.
   const imageMotion = prefersReducedMotion
-    ? { initial: { opacity: 1, scale: 1 }, animate: { opacity: 1, scale: 1 } }
+    ? { initial: { scale: 1 }, animate: { scale: 1 } }
     : {
-        initial: { opacity: 0, scale: 1.06 },
-        animate: { opacity: 1, scale: 1 },
-        transition: { duration: 1.25, ease: [0.22, 1, 0.36, 1] as const },
+        initial: { scale: 1.04 },
+        animate: { scale: 1 },
+        transition: { duration: 1.6, ease: [0.22, 1, 0.36, 1] as const },
       }
 
+  // Starts at opacity:0.3 so the logo is never fully invisible after paint.
   const logoMotion = prefersReducedMotion
     ? { initial: { opacity: 1, y: 0 }, animate: { opacity: 1, y: 0 } }
     : {
-        initial: { opacity: 0, y: 12 },
+        initial: { opacity: 0.3, y: 8 },
         animate: { opacity: 1, y: 0 },
-        transition: { duration: 0.7, delay: 0.15, ease: 'easeOut' as const },
+        transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' as const },
       }
 
   return (
@@ -58,17 +62,18 @@ export function HomepageHero({ imageUrl }: HomepageHeroProps) {
           alt="Modett — Quiet luxury. Timeless craft."
           fill
           priority
-          quality={90}
+          fetchPriority="high"
+          quality={75}
           className={cn(
             'object-cover',
             'object-[center_28%] sm:object-[center_32%] md:object-center',
-            'transition-[object-position] duration-700 ease-out',
           )}
           sizes="100vw"
         />
       </motion.div>
 
-      <div
+      {/* Gradient fades in over the already-visible image for a cinematic feel */}
+      <motion.div
         aria-hidden="true"
         className={cn(
           'absolute inset-0 z-10',
@@ -77,6 +82,9 @@ export function HomepageHero({ imageUrl }: HomepageHeroProps) {
           'via-transparent',
           'to-black/30',
         )}
+        initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.9, ease: 'easeOut' }}
       />
 
       <div className="relative z-20 flex flex-col min-h-[inherit]">
