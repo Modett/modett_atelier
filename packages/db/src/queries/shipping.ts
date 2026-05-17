@@ -395,13 +395,26 @@ export async function updateShippingSettings({
     updates.freeShippingLabel = freeShippingLabel
   }
 
-  const rows = await db
+  const updateRows = await db
     .update(shippingSettings)
     .set(updates)
     .returning()
 
-  if (!rows[0]) {
-    throw new OrderOperationError('SHIPPING_SETTINGS_NOT_FOUND', 500)
-  }
-  return rows[0]
+  if (updateRows[0]) return updateRows[0]
+
+  // No row existed yet — first-time setup: insert the singleton settings row.
+  const [inserted] = await db
+    .insert(shippingSettings)
+    .values({
+      freeThresholdLkr: updates.freeThresholdLkr ?? null,
+      freeThresholdSgd: updates.freeThresholdSgd ?? null,
+      freeThresholdUsd: updates.freeThresholdUsd ?? null,
+      freeShippingLabel: updates.freeShippingLabel ?? 'Free Shipping',
+      updatedAt: updates.updatedAt ?? new Date(),
+      updatedByAdminId: adminId,
+    })
+    .returning()
+
+  if (!inserted) throw new OrderOperationError('SHIPPING_SETTINGS_CREATE_FAILED', 500)
+  return inserted
 }
