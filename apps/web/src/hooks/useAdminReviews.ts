@@ -117,4 +117,38 @@ export function useResolveFlag() {
   })
 }
 
+export function useFeatureReview() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      reviewId,
+      featured,
+    }: {
+      reviewId: string
+      featured: boolean
+    }) => {
+      await api.post(
+        `/admin/reviews/${reviewId}/${featured ? 'feature' : 'unfeature'}`,
+        undefined,
+        { credentials: 'include' },
+      )
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ADMIN_REVIEWS_KEYS.all })
+      void queryClient.invalidateQueries({ queryKey: ['featured-reviews'] })
+    },
+  })
+}
+
+export function useSendReviewRequest() {
+  return useMutation({
+    mutationFn: async ({ orderId }: { orderId: string }) => {
+      const res = await api.post<{
+        data: { ok: boolean; emailsSent: number; message: string }
+      }>('/admin/reviews/send-request', { orderId }, { credentials: 'include' })
+      return res.data
+    },
+  })
+}
+
 export type { AdminReview }

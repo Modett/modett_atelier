@@ -18,6 +18,7 @@ import {
   getReviewById,
   getEnrichedReviewById,
   setReviewStatus,
+  setReviewFeatured,
   createManualFlag,
   resolveFlag,
   listAdminReviews,
@@ -72,6 +73,7 @@ function toReviewApi(row: EnrichedReview) {
     rating: row.rating,
     body: row.body,
     status: row.status,
+    featured: row.featured ?? false,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
     mediaUrls: row.mediaUrls,
@@ -401,11 +403,20 @@ export async function generateTokensAfterDelivery({
         (typeof snap?.displayName === 'string' && snap.displayName) ||
         (typeof snap?.display_name === 'string' && snap.display_name) ||
         'Your item'
+      const productImageUrl =
+        (typeof snap?.imageUrl === 'string' && snap.imageUrl) ||
+        (typeof snap?.image_url === 'string' && snap.image_url) ||
+        null
+      const productColor = snapshotString(snap ?? {}, 'color', 'Colour')
+      const productSize = snapshotString(snap ?? {}, 'size', 'Size')
       await notifyReviewRequest({
         userId: order.user_id,
         orderItemId: t.orderItemId,
         productName,
         plainToken: t.plainToken,
+        productImageUrl: productImageUrl || null,
+        productColor,
+        productSize,
       }).catch(() => {})
     }
   }
@@ -506,6 +517,25 @@ export async function adminResolveFlag({
     }
     throw err
   }
+}
+
+export async function adminSetReviewFeatured({
+  reviewId,
+  featured,
+}: {
+  reviewId: string
+  featured: boolean
+}): Promise<void> {
+  const review = await getReviewById({ id: reviewId })
+  if (!review) throw new AppError('REVIEW_NOT_FOUND', 404)
+  if (featured && review.status !== 'VISIBLE') {
+    throw new AppError(
+      'REVIEW_NOT_VISIBLE',
+      400,
+      'Only visible reviews can be featured on the homepage.',
+    )
+  }
+  await setReviewFeatured({ id: reviewId, featured })
 }
 
 export async function adminListReviews({

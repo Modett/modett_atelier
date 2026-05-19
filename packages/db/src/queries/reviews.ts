@@ -299,6 +299,7 @@ export interface EnrichedReview {
   rating: number
   body: string | null
   status: 'VISIBLE' | 'HIDDEN'
+  featured: boolean
   createdAt: Date
   updatedAt: Date
   mediaUrls: string[]
@@ -333,6 +334,7 @@ const reviewListSelectSql = sql`
   r.rating,
   r.body,
   r.status,
+  r.featured,
   r.created_at AS "createdAt",
   r.updated_at AS "updatedAt",
   COALESCE(array_agg(rm.url ORDER BY rm.sort_order) FILTER (WHERE rm.id IS NOT NULL), ARRAY[]::text[]) AS "mediaUrls",
@@ -362,6 +364,7 @@ function mapEnrichedRow(r: Record<string, unknown>): EnrichedReview {
     rating: Number(r.rating),
     body: (r.body as string | null) ?? null,
     status: r.status === 'HIDDEN' ? 'HIDDEN' : 'VISIBLE',
+    featured: Boolean(r.featured),
     createdAt: r.createdAt as Date,
     updatedAt: r.updatedAt as Date,
     mediaUrls: Array.isArray(urls) ? urls : [],
@@ -571,6 +574,21 @@ export async function setReviewStatus({
   }
 }
 
+export async function setReviewFeatured({
+  id,
+  featured,
+}: {
+  id: string
+  featured: boolean
+}): Promise<void> {
+  await db.execute(sql`
+    UPDATE reviews.reviews
+    SET    featured   = ${featured},
+           updated_at = now()
+    WHERE  id = ${id}
+  `)
+}
+
 export async function createManualFlag({
   reviewId,
   reason,
@@ -667,15 +685,15 @@ export async function listAdminReviews({
     SELECT ${adminReviewSelectSql}
     FROM reviews.reviews r
     LEFT JOIN reviews.review_media rm ON rm.review_id = r.id
-    JOIN iam.users u ON u.id = r.user_id
-    JOIN catalog.products p ON p.id = r.product_id
+    LEFT JOIN iam.users u ON u.id = r.user_id
+    LEFT JOIN catalog.products p ON p.id = r.product_id
     LEFT JOIN catalog.product_images key_img ON key_img.id = p.key_image_id
-    JOIN orders.order_items oi ON oi.id = r.order_item_id
+    LEFT JOIN orders.order_items oi ON oi.id = r.order_item_id
     LEFT JOIN reviews.review_flags rf ON rf.review_id = r.id
     WHERE ${statusCond}
       AND ${flaggedCond}
       AND ${productCond}
-    GROUP BY r.id, u.first_name, p.display_name, p.slug, key_img.url,
+    GROUP BY r.id, r.featured, u.first_name, p.display_name, p.slug, key_img.url,
              oi.product_snapshot_json,
              rf.id, rf.review_id, rf.reason, rf.auto_flagged,
              rf.created_at, rf.resolved_at, rf.resolved_by_admin_id
@@ -734,12 +752,8 @@ export interface FeaturedReview {
 }
 
 export async function getFeaturedReviews({
-  minBodyLength = 80,
-  minRating = 4,
-  limit = 3,
+  limit = 6,
 }: {
-  minBodyLength?: number
-  minRating?: number
   limit?: number
 } = {}): Promise<FeaturedReview[]> {
   const result = await db.execute(sql`
@@ -751,20 +765,19 @@ export async function getFeaturedReviews({
       p.display_name AS "productName",
       p.slug         AS "productSlug"
     FROM reviews.reviews r
-    JOIN iam.users u        ON u.id = r.user_id
-    JOIN catalog.products p ON p.id = r.product_id
-    WHERE r.status = 'VISIBLE'
-      AND r.rating >= ${minRating}
-      AND LENGTH(r.body) >= ${minBodyLength}
-      AND p.deleted_at IS NULL
-    ORDER BY r.rating DESC, r.created_at DESC
+    LEFT JOIN iam.users u        ON u.id = r.user_id
+    LEFT JOIN catalog.products p ON p.id = r.product_id
+    WHERE r.featured = TRUE
+      AND r.status = 'VISIBLE'
+      AND (p.deleted_at IS NULL OR p.deleted_at IS NOT NULL)
+    ORDER BY r.created_at DESC
     LIMIT ${limit}
   `)
 
   return (result.rows as Record<string, unknown>[]).map((r) => ({
     id: r.id as string,
     rating: Number(r.rating),
-    body: r.body as string,
+    body: (r.body as string) || '',
     reviewerFirstName: (r.reviewerFirstName as string) || 'Customer',
     productName: (r.productName as string) || 'Product',
     productSlug: (r.productSlug as string | null) ?? null,
