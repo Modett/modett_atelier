@@ -2,19 +2,29 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Mail, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AdminReview, ReviewStatus } from '@modett/types'
 import { useAdminSession } from '@/hooks/useAdminSession'
 import {
   useAdminReviewsList,
+  useFeatureReview,
   useFlagReview,
   useHideReview,
   useResolveFlag,
+  useSendReviewRequest,
   useShowReview,
 } from '@/hooks/useAdminReviews'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -94,6 +104,12 @@ export default function AdminReviewsPage() {
   const showReview = useShowReview()
   const flagReview = useFlagReview()
   const resolveFlag = useResolveFlag()
+  const featureReview = useFeatureReview()
+  const sendReviewRequest = useSendReviewRequest()
+
+  const [sendEmailOpen, setSendEmailOpen] = useState(false)
+  const [sendOrderId, setSendOrderId] = useState('')
+  const [sendResult, setSendResult] = useState<string | null>(null)
 
   if (authLoading) {
     return <AdminReviewsPageSkeleton />
@@ -151,6 +167,19 @@ export default function AdminReviewsPage() {
             />
             Flagged only
           </label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSendOrderId('')
+              setSendResult(null)
+              setSendEmailOpen(true)
+            }}
+          >
+            <Mail className="h-4 w-4 mr-1.5" />
+            Send Review Email
+          </Button>
         </div>
       </div>
 
@@ -171,8 +200,9 @@ export default function AdminReviewsPage() {
                 <TableHead>Variant</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Flag</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                        <TableHead>Flag</TableHead>
+                        <TableHead>Featured</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -234,6 +264,40 @@ export default function AdminReviewsPage() {
                           </Badge>
                         ) : (
                           '—'
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {review.status === 'VISIBLE' ? (
+                          <button
+                            type="button"
+                            title={review.featured ? 'Remove from homepage' : 'Feature on homepage'}
+                            disabled={featureReview.isPending}
+                            onClick={() => {
+                              featureReview.mutate(
+                                { reviewId: review.id, featured: !review.featured },
+                                {
+                                  onSuccess: () =>
+                                    toast.success(
+                                      review.featured
+                                        ? 'Removed from homepage.'
+                                        : 'Added to homepage.',
+                                    ),
+                                  onError: () => toast.error('Could not update featured status.'),
+                                },
+                              )
+                            }}
+                            className="p-1 hover:opacity-70 transition-opacity disabled:opacity-30"
+                          >
+                            <Star
+                              className={
+                                review.featured
+                                  ? 'h-4 w-4 fill-yellow-400 text-yellow-400'
+                                  : 'h-4 w-4 text-muted-foreground'
+                              }
+                            />
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground/40 text-xs pl-1">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -334,7 +398,7 @@ export default function AdminReviewsPage() {
                     </TableRow>
                     {expanded && (
                       <TableRow>
-                        <TableCell colSpan={8} className="bg-muted/30">
+                        <TableCell colSpan={9} className="bg-muted/30">
                           <div className="py-4 px-2 space-y-4 max-w-3xl">
                             <div>
                               <p className="text-xs font-medium text-muted-foreground mb-1">
@@ -468,6 +532,85 @@ export default function AdminReviewsPage() {
           </Button>
         </div>
       )}
+
+      <Dialog open={sendEmailOpen} onOpenChange={setSendEmailOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Review Request Email</DialogTitle>
+            <DialogDescription>
+              Enter a delivered order ID to send review request emails to the
+              customer for each item. Use this to test the email or re-send a
+              missed request.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label
+                htmlFor="send-order-id"
+                className="text-sm font-medium text-foreground"
+              >
+                Order ID
+              </label>
+              <Input
+                id="send-order-id"
+                placeholder="Paste the order UUID here"
+                value={sendOrderId}
+                onChange={(e) => {
+                  setSendOrderId(e.target.value.trim())
+                  setSendResult(null)
+                }}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Find the order ID in Admin → Orders. The order must be in
+                DELIVERED status.
+              </p>
+            </div>
+
+            {sendResult && (
+              <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2.5">
+                <p className="text-sm text-green-800">{sendResult}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSendEmailOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={sendOrderId.length < 30 || sendReviewRequest.isPending}
+              onClick={async () => {
+                try {
+                  const result = await sendReviewRequest.mutateAsync({
+                    orderId: sendOrderId,
+                  })
+                  setSendResult(result.message)
+                  toast.success(result.message)
+                } catch (err) {
+                  const e = err as { message?: string }
+                  toast.error(e.message ?? 'Failed to send email.')
+                }
+              }}
+            >
+              {sendReviewRequest.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending…
+                </>
+              ) : (
+                'Send Email'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

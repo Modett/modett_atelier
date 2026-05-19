@@ -68,6 +68,7 @@ export const reviewsTable = reviewsSchema.table(
     rating: smallint('rating').notNull(),
     body: text('body'),
     status: reviewStatusEnum('status').notNull().default('VISIBLE'),
+    featured: boolean('featured').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

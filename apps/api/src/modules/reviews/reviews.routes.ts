@@ -365,4 +365,67 @@ router.post(
   },
 )
 
+// ── Feature / unfeature ────────────────────────────────────────────
+
+router.post(
+  '/admin/reviews/:reviewId/feature',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    await reviewsService.adminSetReviewFeatured({
+      reviewId: req.params.reviewId as string,
+      featured: true,
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
+router.post(
+  '/admin/reviews/:reviewId/unfeature',
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    await reviewsService.adminSetReviewFeatured({
+      reviewId: req.params.reviewId as string,
+      featured: false,
+    })
+    res.status(200).json({ data: { ok: true } })
+  },
+)
+
+// ── Manual review email trigger (admin) ───────────────────────────
+
+const sendReviewRequestBodySchema = z.object({
+  orderId: z.string().uuid(),
+})
+
+router.post(
+  '/admin/reviews/send-request',
+  requireAdmin,
+  validate(sendReviewRequestBodySchema),
+  async (req: Request, res: Response) => {
+    const body = (req as Request & {
+      body: z.infer<typeof sendReviewRequestBodySchema>
+    }).body
+    try {
+      const tokens = await reviewsService.generateTokensAfterDelivery({
+        orderId: body.orderId,
+      })
+      res.status(200).json({
+        data: {
+          ok: true,
+          emailsSent: tokens.length,
+          message:
+            tokens.length === 0
+              ? 'No new tokens generated — all items may already have tokens.'
+              : `${tokens.length} review email${tokens.length === 1 ? '' : 's'} sent.`,
+        },
+      })
+    } catch (err) {
+      const e = err as { code?: string; statusCode?: number; message?: string }
+      res.status(e.statusCode ?? 500).json({
+        error: { code: e.code ?? 'SERVER_ERROR', message: e.message ?? 'Failed.' },
+      })
+    }
+  },
+)
+
 export default router

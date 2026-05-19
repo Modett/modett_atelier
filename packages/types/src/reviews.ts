@@ -46,6 +46,7 @@ export interface Review {
   rating: number
   body: string | null
   status: ReviewStatus
+  featured: boolean
   createdAt: string
   updatedAt: string
   mediaUrls: string[]

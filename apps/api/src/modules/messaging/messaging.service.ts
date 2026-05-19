@@ -286,17 +286,145 @@ export async function notifyReviewRequest({
   orderItemId,
   productName,
   plainToken,
+  productImageUrl,
+  productColor,
+  productSize,
 }: {
   userId: string
   orderItemId: string
   productName: string
   plainToken: string
+  productImageUrl?: string | null
+  productColor?: string | null
+  productSize?: string | null
 }): Promise<void> {
+  const APP_URL = process.env.APP_URL ?? 'https://www.modett.com'
+  const reviewUrl = `${APP_URL}/review?token=${plainToken}&item=${orderItemId}`
+  const variantLine = [productColor, productSize].filter(Boolean).join(' · ')
+  const safeName = productName.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>How has your ${safeName} been treating you?</title>
+</head>
+<body style="margin:0;padding:0;background:#F8F5F2;">
+  <table width="100%" cellpadding="0" cellspacing="0"
+         style="background:#F8F5F2;padding:40px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0"
+             style="max-width:560px;width:100%;background:#ffffff;">
+
+        <!-- Header -->
+        <tr>
+          <td style="padding:36px 40px 24px;border-bottom:1px solid #E8E4DF;">
+            <p style="margin:0;font-family:Georgia,serif;font-size:10px;
+                      letter-spacing:0.35em;text-transform:uppercase;color:#C1AB85;">
+              Modett Atelier
+            </p>
+          </td>
+        </tr>
+
+        ${productImageUrl ? `
+        <!-- Product image -->
+        <tr>
+          <td style="padding:0;line-height:0;">
+            <img src="${productImageUrl}" alt="${safeName}"
+                 width="560" style="display:block;width:100%;
+                 max-height:300px;object-fit:cover;" />
+          </td>
+        </tr>` : ''}
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:40px 40px 0;">
+            <p style="margin:0 0 20px;font-family:Georgia,serif;font-size:24px;
+                      font-weight:700;color:#232D35;line-height:1.3;">
+              How has the ${safeName} been<br />treating you?
+            </p>
+
+            ${variantLine ? `
+            <p style="margin:0 0 20px;font-family:Helvetica,Arial,sans-serif;
+                      font-size:11px;letter-spacing:0.15em;color:#8A8A8A;">
+              ${variantLine}
+            </p>` : ''}
+
+            <p style="margin:0 0 16px;font-family:Helvetica,Arial,sans-serif;
+                      font-size:14px;font-weight:300;color:#4A4A4A;line-height:1.8;">
+              You've had it for a little while now — we'd genuinely love
+              to know how it wears, how it feels, and whether it's found
+              its place in your wardrobe.
+            </p>
+
+            <p style="margin:0 0 32px;font-family:Helvetica,Arial,sans-serif;
+                      font-size:14px;font-weight:300;color:#4A4A4A;line-height:1.8;">
+              If you've worn it somewhere worth remembering, we'd love
+              to see — you can add photos too.
+            </p>
+
+            <!-- CTA -->
+            <table cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+              <tr>
+                <td style="background:#232D35;">
+                  <a href="${reviewUrl}"
+                     style="display:inline-block;padding:15px 40px;
+                            font-family:Helvetica,Arial,sans-serif;
+                            font-size:11px;font-weight:300;
+                            letter-spacing:0.28em;text-transform:uppercase;
+                            color:#F8F5F2;text-decoration:none;">
+                    Share Your Thoughts
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 40px;font-family:Helvetica,Arial,sans-serif;
+                      font-size:12px;font-weight:300;color:#9A9A9A;line-height:1.7;">
+              This link is personal to you and valid for 30 days.<br />
+              Your review helps other women choose with intention.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 40px 36px;border-top:1px solid #E8E4DF;">
+            <p style="margin:0;font-family:Helvetica,Arial,sans-serif;
+                      font-size:10px;letter-spacing:0.18em;text-transform:uppercase;
+                      color:#AAAAAA;">
+              Modett Atelier &nbsp;·&nbsp;
+              <a href="mailto:hello@modett.com"
+                 style="color:#AAAAAA;text-decoration:none;">hello@modett.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+`
+
+  const inboxCtaUrl = `/review?token=${plainToken}&item=${orderItemId}`
+
   await queueNotification({
     userId,
     channel: 'EMAIL',
     templateKey: TemplateKey.REVIEW_REQUEST,
-    payloadJson: { orderItemId, productName, plainToken },
+    payloadJson: {
+      orderItemId,
+      productName,
+      plainToken,
+      productImageUrl: productImageUrl ?? null,
+      productColor: productColor ?? null,
+      productSize: productSize ?? null,
+      htmlBody: html,
+      reviewUrl,
+    },
     dedupeKey: `review:${orderItemId}:REVIEW_REQUEST:EMAIL`,
     isTransactional: false,
     inboxMessage: {
@@ -304,7 +432,7 @@ export async function notifyReviewRequest({
       title: `How was your ${productName}?`,
       body: 'Share your experience to help other shoppers.',
       ctaLabel: 'Write a Review',
-      ctaUrl: `/review?token=${plainToken}&orderItemId=${orderItemId}`,
+      ctaUrl: inboxCtaUrl,
     },
   })
 }
