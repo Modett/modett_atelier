@@ -13,9 +13,6 @@ interface HomepageHeroProps {
 export function HomepageHero({ imageUrl }: HomepageHeroProps) {
   const prefersReducedMotion = useReducedMotion()
 
-  const headlineTransition = prefersReducedMotion
-    ? { duration: 0 }
-    : { duration: 1, delay: 0.3, ease: 'easeOut' as const }
   const ctaTransition = prefersReducedMotion
     ? { duration: 0 }
     : { duration: 0.8, delay: 0.8, ease: 'easeOut' as const }
