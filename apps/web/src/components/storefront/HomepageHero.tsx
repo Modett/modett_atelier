@@ -110,7 +110,8 @@ export function HomepageHero({ imageUrl }: HomepageHeroProps) {
           )}
         >
           <div className="max-w-page mx-auto w-full">
-            <motion.h1
+            {/* Quiet luxury. Timeless craft. — temporarily hidden */}
+            {/* <motion.h1
               initial={{
                 opacity: prefersReducedMotion ? 1 : 0,
                 y: prefersReducedMotion ? 0 : 30,
@@ -131,7 +132,7 @@ export function HomepageHero({ imageUrl }: HomepageHeroProps) {
               Quiet luxury.
               <br />
               Timeless craft.
-            </motion.h1>
+            </motion.h1> */}
 
             <motion.div
               initial={{
