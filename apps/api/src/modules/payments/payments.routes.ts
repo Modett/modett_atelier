@@ -1,10 +1,14 @@
 /**
- * Payments route handlers — session (JSDK params), webhook, status.
+ * Payments route handlers.
  *
- * POST /payments/session  → returns paymentParams for PAYable CDN SDK
- * POST /payments/webhook  → PAYable server callback; must always return { Status: 200 }
- *                           EXCEPT when checkValue is invalid (HTTP 400)
- * GET  /payments/status/:orderId → poll payment/order state after redirect
+ *   POST   /payments/session                    → SDK params (one-time | tokenize)
+ *   POST   /payments/webhook                    → PAYable server callback ({ Status: 200 })
+ *   GET    /payments/status/:orderId            → poll order/payment state after redirect
+ *
+ *   GET    /payments/saved-cards                → list current user's saved cards
+ *   POST   /payments/saved-cards/:id/default    → mark as default
+ *   DELETE /payments/saved-cards/:id            → soft-delete + best-effort PAYable delete
+ *   POST   /payments/saved-cards/:id/pay        → server-to-server charge of saved card
  *
  * All success responses: { data: T }
  * Webhook response: { Status: 200 } (PAYable requirement)
@@ -13,12 +17,14 @@
 import type { Request, Response, IRouter } from 'express'
 import { Router } from 'express'
 import { z } from 'zod'
-import { optionalAuth } from '../../middleware/auth'
+import { optionalAuth, requireAuth } from '../../middleware/auth'
 import type { AuthRequest } from '../../middleware/auth'
 import { validate, validateQuery } from '../../middleware/validate'
 import * as paymentsService from './payments.service'
 
 const router = Router()
+
+// ——— /payments/session ———
 
 const sessionBodySchema = z.object({
   orderId: z.string().uuid(),
@@ -36,16 +42,20 @@ const sessionBodySchema = z.object({
     country: z.string().min(2).max(3),
     postcode: z.string().default(''),
   }),
+  /**
+   * Save the card for future use. Only honored when the request carries a
+   * valid customer session — the API forces ONE_TIME for guests regardless.
+   */
+  saveCard: z.boolean().optional().default(false),
 })
 
-// POST /payments/session
-// Returns snake_case payment params for PAYable CDN SDK (window.payable.startPayment)
 router.post(
   '/payments/session',
   optionalAuth,
   validate(sessionBodySchema),
   async (req, res: Response) => {
     const body = (req as Request & { body: z.infer<typeof sessionBodySchema> }).body
+    const authReq = req as AuthRequest
     const result = await paymentsService.createPaymentSession({
       orderId: body.orderId,
       reservationId: body.reservationId,
@@ -56,13 +66,17 @@ router.post(
       customerEmail: body.customerEmail,
       customerMobilePhone: body.customerMobilePhone,
       billingAddress: body.billingAddress,
+      userId: authReq.user?.id ?? null,
+      saveCard: body.saveCard,
     })
     res.status(200).json({ data: result })
   },
 )
 
-// POST /payments/webhook — no auth; PAYable server-to-server callback
-// Rule 8.2: ALWAYS respond { Status: 200 }, EXCEPT on invalid checkValue (HTTP 400)
+// ——— /payments/webhook ———
+
+// PAYable server-to-server callback. ALWAYS respond { Status: 200 }, except on
+// invalid checkValue (HTTP 400 per rule 8.2).
 router.post('/payments/webhook', async (req: Request, res: Response) => {
   try {
     await paymentsService.handleWebhook({ payload: req.body })
@@ -73,16 +87,17 @@ router.post('/payments/webhook', async (req: Request, res: Response) => {
       return res.status(400).send()
     }
     console.error('[webhook] Unhandled error:', err)
-    // Still return 200 to PAYable for non-checkValue errors (rule 8.2)
+    // Still return 200 — PAYable retries non-200 unless it's checkValue.
   }
   res.status(200).json({ Status: 200 })
 })
+
+// ——— /payments/status/:orderId ———
 
 const statusQuerySchema = z.object({
   guestEmail: z.string().email().optional(),
 })
 
-// GET /payments/status/:orderId
 router.get(
   '/payments/status/:orderId',
   optionalAuth,
@@ -96,6 +111,67 @@ router.get(
       orderId,
       userId: authReq.user?.id ?? null,
       guestEmail: query.guestEmail ?? null,
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+// ——— /payments/saved-cards ———
+
+router.get(
+  '/payments/saved-cards',
+  requireAuth,
+  async (req, res: Response) => {
+    const authReq = req as AuthRequest
+    const result = await paymentsService.listSavedCards({ userId: authReq.user.id })
+    res.status(200).json({ data: result })
+  },
+)
+
+router.delete(
+  '/payments/saved-cards/:id',
+  requireAuth,
+  async (req, res: Response) => {
+    const authReq = req as AuthRequest
+    const id = req.params.id as string
+    const result = await paymentsService.deleteSavedCard({
+      savedCardId: id,
+      userId: authReq.user.id,
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+router.post(
+  '/payments/saved-cards/:id/default',
+  requireAuth,
+  async (req, res: Response) => {
+    const authReq = req as AuthRequest
+    const id = req.params.id as string
+    const result = await paymentsService.setDefaultSavedCard({
+      savedCardId: id,
+      userId: authReq.user.id,
+    })
+    res.status(200).json({ data: result })
+  },
+)
+
+const payWithSavedCardSchema = z.object({
+  orderId: z.string().uuid(),
+})
+
+router.post(
+  '/payments/saved-cards/:id/pay',
+  requireAuth,
+  validate(payWithSavedCardSchema),
+  async (req, res: Response) => {
+    const authReq = req as AuthRequest
+    const savedCardId = req.params.id as string
+    const body = (req as Request & { body: z.infer<typeof payWithSavedCardSchema> }).body
+    const result = await paymentsService.payWithSavedCard({
+      orderId: body.orderId,
+      savedCardId,
+      userId: authReq.user.id,
     })
     res.status(200).json({ data: result })
   },

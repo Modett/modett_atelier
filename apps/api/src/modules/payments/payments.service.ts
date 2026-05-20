@@ -1,24 +1,56 @@
 /**
- * Payments service — createPaymentSession, handleWebhook, getPaymentStatus.
+ * Payments service — createPaymentSession, payWithSavedCard, handleWebhook,
+ * listSavedCards, deleteSavedCard, getPaymentStatus.
  *
- * Payment flow (PAYable CDN SDK v3):
- *   POST /payments/session → server generates checkValue, returns snake_case params to frontend
- *   Frontend CDN SDK (window.payable.startPayment) → opens PAYable popup
- *   PAYable webhook → POST /payments/webhook → confirms order atomically
+ * Payment flows:
  *
- * Security rules (non-negotiable):
- *   - checkValue generated server-side; merchantToken never leaves the server
- *   - Webhook: checkValue ALWAYS verified as the FIRST operation
- *   - Idempotency: Layer-1 Redis read → Layer-2 DB unique constraint → Layer-3 Redis write
- *   - Amount: always derived from order.total (server-authoritative), never from frontend
+ *   1. ONE_TIME (default — guest or `saveCard=false`)
+ *      POST /payments/session  → server generates one-time checkValue, returns
+ *                                params { payment_type: '1' } for SDK popup.
+ *      PAYable popup → notify_url webhook → confirm order atomically.
+ *
+ *   2. TOKENIZE (logged-in user + `saveCard=true`)
+ *      POST /payments/session  → server generates tokenize checkValue with
+ *                                stable customerRefNo (derived from userId),
+ *                                returns params { payment_type: '3',
+ *                                isSaveCard: '1', doFirstPayment: '1' }.
+ *      PAYable popup → notify_url webhook (carries `token` object) →
+ *      confirm order + insert saved_cards row atomically.
+ *
+ *   3. SAVED_CARD_PAY (repeat customer paying with a previously-saved card)
+ *      POST /payments/saved-cards/:id/pay → server-to-server POST to
+ *      PAYable /ipg/v2/tokenize/pay using Bearer accessToken. PAYable returns
+ *      result inline AND fires the webhook; DB unique constraint on
+ *      provider_charge_id deduplicates.
+ *
+ *   4. RECURRING (subscription — admin/future)
+ *      createRecurringPaymentSession() builds a paymentType=2 param set with
+ *      startDate/endDate/interval. Not wired to the checkout UI by default.
+ *
+ * Security invariants (do not relax):
+ *   - merchantToken/businessToken never leave the server.
+ *   - Amount always derived from order.total (server-authoritative).
+ *   - Tokenization is only enabled for authenticated users; guests can never
+ *     trigger paymentType=3.
+ *   - customerRefNo derived from userId; never accepted from request body.
+ *   - Webhook: checkValue MUST be the FIRST check before reading any field.
+ *   - 3-layer idempotency (Redis read → DB unique constraint → Redis write).
+ *   - Saved-card ownership verified before any operation on it.
  */
 
 import Decimal from 'decimal.js'
 import { AppError } from '../../lib/errors'
 import {
   payableConfig,
-  generateCheckValue,
+  getOneTimeCheckValue,
+  getTokenizeCheckValue,
   verifyCallbackCheckValue,
+  getWebhookUrl,
+  getCustomerRefNo,
+  payWithSavedCardRequest,
+  deleteSavedCardRequest,
+  toAlpha3,
+  PAYMENT_TYPE,
 } from '../../config/payable'
 import type { PayableWebhookPayload } from '../../config/payable'
 import { redis } from '@modett/db'
@@ -32,7 +64,12 @@ import {
   getOrderItems,
   appendOrderEvent,
   stampPaymentSubmitted,
+  listSavedCardsByUser,
+  getSavedCardOwnedByUser,
+  softDeleteSavedCard,
+  setDefaultSavedCard as setDefaultSavedCardQuery,
 } from '@modett/db'
+import type { SavedCard } from '@modett/db'
 import { earnPointsForOrder } from '../loyalty'
 
 type CurrencyCode = 'LKR' | 'SGD' | 'USD'
@@ -41,7 +78,11 @@ function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string })?.code === '23505'
 }
 
-// PAYable ONLY accepts LKR — convert other currencies
+/**
+ * PAYable ONLY accepts LKR — convert other currencies. These are floor rates
+ * used to ensure the LKR amount the gateway sees is correct; the order's
+ * source-of-truth amount remains in the order's native currency.
+ */
 const TO_LKR: Record<string, number> = {
   LKR: 1,
   SGD: 230,
@@ -66,6 +107,13 @@ export interface CreatePaymentSessionParams {
     country: string
     postcode: string
   }
+  /**
+   * Authenticated user id (from optionalAuth middleware). Required to enable
+   * tokenization. Guests cannot tokenize — the server forces ONE_TIME.
+   */
+  userId?: string | null
+  /** Save the card for future use (only honored when `userId` is present). */
+  saveCard?: boolean
 }
 
 /** Snake_case params passed directly to window.payable.startPayment() on the frontend. */
@@ -93,6 +141,10 @@ export interface PayableSDKParams {
   billing_address_postcode: string
   custom_1: string
   custom_2: string
+  /** Tokenize-only — present when payment_type === '3' */
+  is_save_card?: string
+  do_first_payment?: string
+  customer_ref_no?: string
 }
 
 export interface CreatePaymentSessionResult {
@@ -100,6 +152,7 @@ export interface CreatePaymentSessionResult {
   orderId: string
   orderRef: string
   sandboxMode: boolean
+  paymentType: 'ONE_TIME' | 'TOKENIZE'
   paymentParams: PayableSDKParams
 }
 
@@ -115,60 +168,86 @@ export async function createPaymentSession(
     customerEmail,
     customerMobilePhone,
     billingAddress,
+    userId,
+    saveCard,
   } = params
 
   const order = await getOrderById({ id: orderId })
   if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
   if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
 
-  // Server-authoritative amount from DB (includes subtotal + shipping + tax)
+  // Server-authoritative amount from DB.
   const originalAmount = new Decimal(String(order.total))
-
-  // PAYable only accepts LKR — convert from order currency
   const lkrAmount = order.currency === 'LKR'
     ? originalAmount.toFixed(2)
     : originalAmount.mul(TO_LKR[order.currency] ?? 1).toDecimalPlaces(2).toFixed(2)
 
-  // PAYable invoiceId ≤ 20 chars — orderRef is "MOD-YYYYNNNNN" = 13 chars
   const invoiceRef = order.order_ref
 
-  const checkValue = generateCheckValue({
-    invoiceId: invoiceRef,
-    amount: lkrAmount,
-    currencyCode: 'LKR',
-  })
+  // Tokenization is server-decided: only logged-in users + explicit saveCard=true
+  // can ever trigger paymentType=3. Guests are forced to ONE_TIME.
+  const willTokenize = Boolean(userId && saveCard)
+  const paymentTypeWire = willTokenize ? PAYMENT_TYPE.TOKENIZE : PAYMENT_TYPE.ONE_TIME
+  const paymentTypeColumn = willTokenize ? 'TOKENIZE' : 'ONE_TIME'
 
-  const webhookUrl =
-    process.env.PAYABLE_WEBHOOK_URL ??
-    `${payableConfig.apiUrl}/api/payments/webhook`
+  // customerRefNo is derived from userId — never client-supplied.
+  const customerRefNo = userId ? getCustomerRefNo(userId) : ''
 
-  const paymentParams: PayableSDKParams = {
-    merchant_key: payableConfig.merchantKey,
-    check_value: checkValue,
-    invoice_id: invoiceRef,
-    amount: lkrAmount,
-    currency_code: 'LKR',
-    payment_type: 'ONE_TIME_PAYMENT',
-    order_description: 'Modett Order',
-    notify_url: webhookUrl,
-    return_url: `${payableConfig.frontendUrl}/checkout/confirm/${orderId}`,
-    cancel_url: `${payableConfig.frontendUrl}/checkout`,
-    logo_url: payableConfig.logoUrl,
-    customer_first_name: customerFirstName,
-    customer_last_name: customerLastName,
-    customer_email: customerEmail,
-    customer_mobile_phone: customerMobilePhone,
-    customer_phone: customerMobilePhone,
-    billing_address_street: billingAddress.street,
-    billing_address_city: billingAddress.city,
-    billing_address_province: billingAddress.province || billingAddress.city,
-    billing_address_country: 'LKA',
-    billing_address_postcode: billingAddress.postcode || '0000',
-    custom_1: orderId,
-    custom_2: reservationId,
+  const checkValue = willTokenize
+    ? getTokenizeCheckValue({
+        invoiceId: invoiceRef,
+        amount: lkrAmount,
+        currencyCode: 'LKR',
+        customerRefNo,
+      })
+    : getOneTimeCheckValue({
+        invoiceId: invoiceRef,
+        amount: lkrAmount,
+        currencyCode: 'LKR',
+      })
+
+  const returnUrl = payableConfig.returnUrlBase
+    ? payableConfig.returnUrlBase.replace('{orderId}', orderId)
+    : `${payableConfig.frontendUrl}/checkout/confirm/${orderId}`
+
+  const cancelUrl = payableConfig.cancelUrl || `${payableConfig.frontendUrl}/checkout`
+
+  const baseParams: PayableSDKParams = {
+    merchant_key:              payableConfig.merchantKey,
+    check_value:               checkValue,
+    invoice_id:                invoiceRef,
+    amount:                    lkrAmount,
+    currency_code:             'LKR',
+    payment_type:              paymentTypeWire,
+    order_description:         `Modett Order ${invoiceRef}`,
+    notify_url:                getWebhookUrl(),
+    return_url:                returnUrl,
+    cancel_url:                cancelUrl,
+    logo_url:                  payableConfig.logoUrl,
+    customer_first_name:       customerFirstName,
+    customer_last_name:        customerLastName,
+    customer_email:            customerEmail,
+    customer_mobile_phone:     customerMobilePhone,
+    customer_phone:            customerMobilePhone,
+    billing_address_street:    billingAddress.street,
+    billing_address_city:      billingAddress.city,
+    billing_address_province:  billingAddress.province || billingAddress.city,
+    billing_address_country:   toAlpha3(billingAddress.country || 'LK'),
+    billing_address_postcode:  billingAddress.postcode || '0000',
+    custom_1:                  orderId,
+    custom_2:                  reservationId,
   }
 
-  // If a PENDING intent already exists, return cached params (same checkValue)
+  const paymentParams: PayableSDKParams = willTokenize
+    ? {
+        ...baseParams,
+        is_save_card:     '1',
+        do_first_payment: '1',
+        customer_ref_no:  customerRefNo,
+      }
+    : baseParams
+
+  // Idempotent — if a PENDING intent already exists, return the cached params.
   const existing = await getPaymentIntentByOrderId({ orderId })
   if (existing && existing.status === 'PENDING') {
     return {
@@ -176,27 +255,29 @@ export async function createPaymentSession(
       orderId,
       orderRef: order.order_ref,
       sandboxMode: payableConfig.sandboxMode,
+      paymentType: paymentTypeColumn,
       paymentParams,
     }
   }
 
-  // Stamp payment_submitted_at — starts the 10-min grace window for the expiry worker
+  // Stamp payment_submitted_at — starts the 10-min grace window.
   await stampPaymentSubmitted({ reservationId })
 
-  // Cache reservation context for the webhook handler
+  // Cache reservation context for the webhook handler. Tokenize callbacks need
+  // userId to insert the saved_cards row.
   await redis.set(
     `checkout:context:${orderId}`,
-    JSON.stringify({ reservationId, cartId }),
+    JSON.stringify({ reservationId, cartId, userId: userId ?? null, customerRefNo }),
     'EX',
     3600,
   )
 
-  // Create payment intent record (providerIntentId = orderRef before we get PAYable's ID)
   const paymentIntent = await createPaymentIntent({
     orderId,
     providerIntentId: invoiceRef,
     amount: lkrAmount,
     currency: 'LKR' as CurrencyCode,
+    paymentType: paymentTypeColumn,
   })
 
   return {
@@ -204,8 +285,263 @@ export async function createPaymentSession(
     orderId,
     orderRef: order.order_ref,
     sandboxMode: payableConfig.sandboxMode,
+    paymentType: paymentTypeColumn,
     paymentParams,
   }
+}
+
+// ——— payWithSavedCard ———
+
+export interface PayWithSavedCardResult {
+  status: 'confirmed' | 'failed' | 'pending'
+  orderId: string
+  orderRef: string
+  payableTransactionId?: string
+  statusMessage?: string
+}
+
+/**
+ * Charge an existing saved card token. Server-to-server. The PAYable webhook
+ * will also fire — DB unique constraint on provider_charge_id deduplicates.
+ *
+ * The caller (route handler) must have authenticated the user; we re-verify
+ * card ownership against userId here.
+ */
+export async function payWithSavedCard({
+  orderId,
+  savedCardId,
+  userId,
+}: {
+  orderId: string
+  savedCardId: string
+  userId: string
+}): Promise<PayWithSavedCardResult> {
+  const order = await getOrderById({ id: orderId })
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
+  if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
+  if (order.user_id !== userId) throw new AppError('ORDER_ACCESS_DENIED', 403)
+
+  const savedCard = await getSavedCardOwnedByUser({ id: savedCardId, userId })
+  if (!savedCard) throw new AppError('SAVED_CARD_NOT_FOUND', 404)
+  if (!savedCard.payable_customer_id) {
+    throw new AppError('SAVED_CARD_MISSING_CUSTOMER_ID', 409)
+  }
+
+  const originalAmount = new Decimal(String(order.total))
+  const lkrAmount = order.currency === 'LKR'
+    ? originalAmount.toFixed(2)
+    : originalAmount.mul(TO_LKR[order.currency] ?? 1).toDecimalPlaces(2).toFixed(2)
+
+  const intent = await getPaymentIntentByOrderId({ orderId })
+  if (!intent || intent.status !== 'PENDING') {
+    await createPaymentIntent({
+      orderId,
+      providerIntentId: order.order_ref,
+      amount: lkrAmount,
+      currency: 'LKR' as CurrencyCode,
+      paymentType: 'SAVED_CARD_PAY',
+      savedCardId,
+    })
+  }
+
+  const contextKey = `checkout:context:${orderId}`
+  const contextRaw = await redis.get(contextKey)
+  if (!contextRaw) {
+    throw new AppError('CHECKOUT_CONTEXT_MISSING', 409)
+  }
+
+  const resp = await payWithSavedCardRequest({
+    invoiceId:    order.order_ref,
+    amount:       lkrAmount,
+    currencyCode: 'LKR',
+    customerId:   savedCard.payable_customer_id,
+    tokenId:      savedCard.token_id,
+    custom1:      orderId,
+  })
+
+  const statusCode = Number(resp.statusCode ?? 0)
+  const isSuccess = statusCode === 1
+
+  if (!isSuccess) {
+    const txId = resp.payableTransactionId ?? `failed-${orderId}-${Date.now()}`
+    try {
+      await createPaymentTransaction({
+        orderId,
+        providerChargeId: txId,
+        status: 'FAILED',
+        amount: lkrAmount,
+        currency: 'LKR' as CurrencyCode,
+        paymentType: 'SAVED_CARD_PAY',
+        rawPayloadJson: resp as unknown as Record<string, unknown>,
+      })
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err
+    }
+    await updatePaymentIntentStatus({ orderId, newStatus: 'FAILED' }).catch(() => {})
+    await appendOrderEvent({
+      orderId,
+      eventType: 'PAYMENT_FAILED',
+      payloadJson: {
+        provider: 'payable',
+        method: 'saved_card_pay',
+        statusMessage: resp.statusMessage ?? 'Saved-card charge failed',
+      },
+    }).catch(() => {})
+
+    return {
+      status: 'failed',
+      orderId,
+      orderRef: order.order_ref,
+      payableTransactionId: resp.payableTransactionId,
+      statusMessage: resp.statusMessage,
+    }
+  }
+
+  const txId = resp.payableTransactionId
+  if (!txId) throw new AppError('PAYABLE_NO_TRANSACTION_ID', 502)
+
+  const { reservationId, cartId } = JSON.parse(contextRaw) as {
+    reservationId: string
+    cartId: string
+  }
+
+  const orderItems = await getOrderItems({ orderId })
+
+  // Same atomic 6-step confirmation as the webhook path. The webhook may also
+  // arrive — the DB unique constraint on provider_charge_id deduplicates.
+  try {
+    await confirmOrderTransaction({
+      orderId,
+      reservationId,
+      cartId,
+      providerChargeId: txId,
+      amount: lkrAmount,
+      currency: 'LKR' as CurrencyCode,
+      paymentType: 'SAVED_CARD_PAY',
+      rawPayloadJson: resp as unknown as Record<string, unknown>,
+      items: orderItems
+        .filter((i) => i.variant_id != null)
+        .map((i) => ({ variantId: i.variant_id!, qty: i.qty })),
+    })
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return {
+        status: 'confirmed',
+        orderId,
+        orderRef: order.order_ref,
+        payableTransactionId: txId,
+      }
+    }
+    throw err
+  }
+
+  // Cache event ID and the intent flip for the (likely) subsequent webhook.
+  await redis.set(`payment:event:${txId}`, '1', 'EX', 86400).catch(() => {})
+  await updatePaymentIntentStatus({ orderId, newStatus: 'SUCCEEDED' }).catch(() => {})
+  await redis.del(contextKey).catch(() => {})
+
+  if (order.user_id) {
+    const { notifyOrderReceipt } = await import('../messaging')
+    notifyOrderReceipt({
+      userId: order.user_id,
+      orderId,
+      orderRef: order.order_ref,
+      totalAmount: String(order.total),
+      currency: order.currency,
+    }).catch(() => {})
+
+    earnPointsForOrder({
+      userId: order.user_id,
+      orderId,
+    }).catch((err) => console.error('[payments] earn points failed:', err))
+  }
+
+  return {
+    status: 'confirmed',
+    orderId,
+    orderRef: order.order_ref,
+    payableTransactionId: txId,
+  }
+}
+
+// ——— Saved-card management ———
+
+export interface SavedCardSummary {
+  id: string
+  maskedCardNo: string
+  cardScheme: string | null
+  cardHolderName: string | null
+  cardExp: string | null
+  nickname: string | null
+  isDefault: boolean
+  createdAt: string
+}
+
+function toSummary(card: SavedCard): SavedCardSummary {
+  return {
+    id:             card.id,
+    maskedCardNo:   card.masked_card_no,
+    cardScheme:     card.card_scheme,
+    cardHolderName: card.card_holder_name,
+    cardExp:        card.card_exp,
+    nickname:       card.nickname,
+    isDefault:      card.is_default,
+    createdAt:      card.created_at.toISOString(),
+  }
+}
+
+export async function listSavedCards({
+  userId,
+}: {
+  userId: string
+}): Promise<{ cards: SavedCardSummary[] }> {
+  const rows = await listSavedCardsByUser({ userId })
+  return { cards: rows.map(toSummary) }
+}
+
+/** Soft-delete locally, then best-effort delete on PAYable. Local is authoritative. */
+export async function deleteSavedCard({
+  savedCardId,
+  userId,
+}: {
+  savedCardId: string
+  userId: string
+}): Promise<{ ok: true }> {
+  const card = await getSavedCardOwnedByUser({ id: savedCardId, userId })
+  if (!card) throw new AppError('SAVED_CARD_NOT_FOUND', 404)
+
+  const removed = await softDeleteSavedCard({ id: savedCardId, userId })
+  if (!removed) throw new AppError('SAVED_CARD_NOT_FOUND', 404)
+
+  // Best-effort: tell PAYable to remove the token too. Failures here are logged
+  // but don't fail the request — the local card is already inaccessible.
+  if (card.payable_customer_id) {
+    deleteSavedCardRequest({
+      customerId: card.payable_customer_id,
+      tokenId:    card.token_id,
+    })
+      .then((r) => {
+        if (!r.ok) {
+          console.warn('[payments] PAYable deleteCard non-OK:', r.status, r.body)
+        }
+      })
+      .catch((err) => console.error('[payments] PAYable deleteCard failed:', err))
+  }
+
+  return { ok: true }
+}
+
+export async function setDefaultSavedCard({
+  savedCardId,
+  userId,
+}: {
+  savedCardId: string
+  userId: string
+}): Promise<{ ok: true }> {
+  const card = await getSavedCardOwnedByUser({ id: savedCardId, userId })
+  if (!card) throw new AppError('SAVED_CARD_NOT_FOUND', 404)
+  await setDefaultSavedCardQuery({ id: savedCardId, userId })
+  return { ok: true }
 }
 
 // ——— handleWebhook ———
@@ -216,14 +552,14 @@ export type HandleWebhookResult =
   | { status: 'unknown_status' }
   | { status: 'order_not_found' }
   | { status: 'context_missing' }
-  | { status: 'confirmed' }
+  | { status: 'confirmed'; savedCardId: string | null }
 
 export async function handleWebhook({
   payload,
 }: {
   payload: PayableWebhookPayload
 }): Promise<HandleWebhookResult> {
-  // Rule 8.1: checkValue MUST be the VERY FIRST check — no exceptions
+  // Rule 8.1: checkValue MUST be the VERY FIRST check — no exceptions.
   if (!payload.checkValue) {
     throw new AppError('WEBHOOK_INVALID_CHECKVALUE', 400)
   }
@@ -233,7 +569,7 @@ export async function handleWebhook({
   }
 
   const txId = payload.payableTransactionId
-  // custom1 carries the full UUID orderId (invoiceNo is the orderRef ≤ 20 chars)
+  // custom1 carries the full UUID orderId (invoiceNo is the orderRef ≤ 20 chars).
   const orderId = payload.custom1 ?? payload.invoiceNo
 
   if (!txId || !orderId) {
@@ -241,7 +577,7 @@ export async function handleWebhook({
     return { status: 'unknown_status' }
   }
 
-  // Layer 1 idempotency — fast Redis read
+  // Layer 1 idempotency — fast Redis read.
   const redisKey = `payment:event:${txId}`
   const hit = await redis.get(redisKey)
   if (hit) return { status: 'already_processed' }
@@ -249,6 +585,8 @@ export async function handleWebhook({
   const statusCode = Number(payload.statusCode)
   const isFailure = statusCode === 2
   const isSuccess = statusCode === 1
+  const isTokenize = Boolean(payload.customerRefNo || payload.token)
+  const paymentTypeColumn = isTokenize ? 'TOKENIZE' : 'ONE_TIME'
 
   if (isFailure) {
     try {
@@ -258,6 +596,7 @@ export async function handleWebhook({
         status: 'FAILED',
         amount: payload.payableAmount ?? '0',
         currency: (payload.payableCurrency as CurrencyCode) ?? 'LKR',
+        paymentType: paymentTypeColumn,
         rawPayloadJson: payload as unknown as Record<string, unknown>,
       })
     } catch (err) {
@@ -265,7 +604,6 @@ export async function handleWebhook({
       throw err
     }
 
-    // Layer 3 idempotency — cache after successful DB write
     await redis.set(redisKey, '1', 'EX', 86400).catch(() => {})
 
     await updatePaymentIntentStatus({
@@ -279,6 +617,7 @@ export async function handleWebhook({
       payloadJson: {
         payableTransactionId: txId,
         statusMessage: payload.statusMessage,
+        paymentType: paymentTypeColumn,
       },
     }).catch((err) => console.error('[webhook] appendOrderEvent failed:', err))
 
@@ -286,7 +625,6 @@ export async function handleWebhook({
   }
 
   if (!isSuccess) {
-    // Unknown status codes: log and return 200 to PAYable (per rule 8.4)
     console.warn('[webhook] Unknown statusCode:', payload.statusCode, payload.statusMessage)
     return { status: 'unknown_status' }
   }
@@ -305,31 +643,65 @@ export async function handleWebhook({
     console.error(`[webhook] Context missing for order: ${orderId}`)
     return { status: 'context_missing' }
   }
-  const { reservationId, cartId } = JSON.parse(contextRaw) as {
+  const ctx = JSON.parse(contextRaw) as {
     reservationId: string
     cartId: string
+    userId?: string | null
+    customerRefNo?: string
   }
 
-  // Layer 2 idempotency — DB unique constraint on provider_charge_id
+  // Build the optional saveCard insert payload for tokenize callbacks.
+  let saveCard:
+    | {
+        userId: string
+        customerRefNo: string
+        payableCustomerId: string | null
+        tokenId: string
+        maskedCardNo: string
+        cardScheme: string | null
+        cardHolderName: string | null
+        cardExp: string | null
+      }
+    | null = null
+
+  if (isTokenize && ctx.userId && payload.token?.tokenId) {
+    const cardScheme = payload.paymentScheme ?? null
+    saveCard = {
+      userId:            ctx.userId,
+      customerRefNo:     payload.customerRefNo ?? ctx.customerRefNo ?? '',
+      payableCustomerId: payload.customerId ?? null,
+      tokenId:           payload.token.tokenId,
+      maskedCardNo:      payload.token.maskedCardNo ?? payload.cardNumber ?? '',
+      cardScheme,
+      cardHolderName:    payload.cardHolderName ?? null,
+      cardExp:           payload.token.exp ?? null,
+    }
+  }
+
+  // Layer 2 idempotency — DB unique constraint on provider_charge_id.
+  let savedCardId: string | null = null
   try {
-    await confirmOrderTransaction({
+    const result = await confirmOrderTransaction({
       orderId,
-      reservationId,
-      cartId,
+      reservationId: ctx.reservationId,
+      cartId: ctx.cartId,
       providerChargeId: txId,
       amount: payload.payableAmount ?? String(order.total),
       currency: (payload.payableCurrency as CurrencyCode) ?? order.currency,
+      paymentType: paymentTypeColumn,
       rawPayloadJson: payload as unknown as Record<string, unknown>,
       items: orderItems
         .filter((i) => i.variant_id != null)
         .map((i) => ({ variantId: i.variant_id!, qty: i.qty })),
+      saveCard,
     })
+    savedCardId = result.savedCardId
   } catch (err) {
     if (isUniqueViolation(err)) return { status: 'already_processed' }
     throw err
   }
 
-  // Layer 3 idempotency — cache after successful DB transaction
+  // Layer 3 idempotency — cache event ID after the DB transaction.
   await redis.set(redisKey, '1', 'EX', 86400).catch(() => {})
 
   await updatePaymentIntentStatus({
@@ -337,14 +709,13 @@ export async function handleWebhook({
     newStatus: 'SUCCEEDED',
   }).catch((err) => console.error('[webhook] intent update failed:', err))
 
-  // Clean up session caches
   await redis.del(`checkout:context:${orderId}`).catch(() => {})
   await redis.del(`payable:session:${orderId}`).catch(() => {})
 
-  // Post-confirmation side effects (best-effort — never fail the webhook)
+  // Post-confirmation side effects — best-effort, never fail the webhook.
   if (order.user_id) {
     const { notifyOrderReceipt } = await import('../messaging')
-    await notifyOrderReceipt({
+    notifyOrderReceipt({
       userId: order.user_id,
       orderId,
       orderRef: order.order_ref,
@@ -358,7 +729,7 @@ export async function handleWebhook({
     }).catch((err) => console.error('[payments] earn points failed:', err))
   }
 
-  return { status: 'confirmed' }
+  return { status: 'confirmed', savedCardId }
 }
 
 // ——— getPaymentStatus ———
@@ -387,6 +758,7 @@ export interface GetPaymentStatusResult {
     status: string
     amount: string
     currency: string
+    paymentType: string
   } | null
   /** Present when payment has completed — used for storefront analytics only. */
   purchaseAnalytics: PurchaseAnalyticsPayload | null
@@ -474,6 +846,7 @@ export async function getPaymentStatus({
           status: intent.status,
           amount: String(intent.amount),
           currency: intent.currency,
+          paymentType: intent.payment_type,
         }
       : null,
     purchaseAnalytics,

@@ -139,6 +139,16 @@ export {
   ADMIN_NOTIFICATION_KEYS,
 } from './useAdminNotifications'
 
+// Saved (tokenized) cards
+export {
+  useSavedCards,
+  useDeleteSavedCard,
+  useSetDefaultSavedCard,
+  usePayWithSavedCard,
+  SAVED_CARDS_QUERY_KEY,
+} from './useSavedCards'
+export type { SavedCardSummary } from './useSavedCards'
+
 // Account
 export {
   useOrders,
