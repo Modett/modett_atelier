@@ -140,13 +140,17 @@ export function getWebhookUrl(): string {
  * Derived from internal userId so it is:
  *   - stable across sessions (so PAYable can group tokens to the same customer)
  *   - never client-controlled
- *   - <= 20 chars (PAYable doesn't document a limit but we keep it tight)
+ *   - alphanumeric only — PAYable's gateway rejects any non-alphanumeric
+ *     character (including '-' / '_' / ':') with
+ *     `{ status: 404, error: "Invalid format for Customer Ref No" }`.
+ *   - <= 20 chars (PAYable doesn't document a hard limit; their own sample
+ *     uses 13 chars — we stay tight to be safe)
  *
- *   "CUST-" + first 16 hex chars of sha256(userId) → 21 chars; we trim to 20.
+ *   "CUST" + first 16 hex chars of sha256(userId) → 20 chars, [A-Z0-9] only.
  */
 export function getCustomerRefNo(userId: string): string {
   const hex = crypto.createHash('sha256').update(userId).digest('hex')
-  return `CUST-${hex.slice(0, 15).toUpperCase()}`
+  return `CUST${hex.slice(0, 16).toUpperCase()}`
 }
 
 // ——— checkValue: outbound ———

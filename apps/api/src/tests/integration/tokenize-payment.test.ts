@@ -141,9 +141,10 @@ async function seedDraftOrderForUser({
   `)
 
   // customerRefNo is derived in service code; the webhook sets it on the
-  // payload directly. We mirror the derivation here.
+  // payload directly. We mirror the derivation here — alphanumeric only,
+  // matching getCustomerRefNo() in apps/api/src/config/payable.ts.
   const hex = crypto.createHash('sha256').update(userId).digest('hex')
-  const customerRefNo = `CUST-${hex.slice(0, 15).toUpperCase()}`
+  const customerRefNo = `CUST${hex.slice(0, 16).toUpperCase()}`
 
   await redis.set(
     `checkout:context:${orderId}`,
