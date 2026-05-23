@@ -6,15 +6,15 @@
  *
  *   1. ONE_TIME (default — guest or `saveCard=false`)
  *      POST /payments/session  → server generates one-time checkValue, returns
- *                                params { payment_type: '1' } for SDK popup.
- *      PAYable popup → notify_url webhook → confirm order atomically.
+ *                                params { paymentType: '1' } for the SDK.
+ *      payable-ipg-js redirects → notifyUrl webhook → confirm order atomically.
  *
  *   2. TOKENIZE (logged-in user + `saveCard=true`)
  *      POST /payments/session  → server generates tokenize checkValue with
  *                                stable customerRefNo (derived from userId),
- *                                returns params { payment_type: '3',
+ *                                returns params { paymentType: '3',
  *                                isSaveCard: '1', doFirstPayment: '1' }.
- *      PAYable popup → notify_url webhook (carries `token` object) →
+ *      payable-ipg-js redirects → notifyUrl webhook (carries `token` object) →
  *      confirm order + insert saved_cards row atomically.
  *
  *   3. SAVED_CARD_PAY (repeat customer paying with a previously-saved card)
@@ -118,35 +118,46 @@ export interface CreatePaymentSessionParams {
   saveCard?: boolean
 }
 
-/** Snake_case params passed directly to window.payable.startPayment() on the frontend. */
+/**
+ * camelCase payment object passed to the `payable-ipg-js` SDK on the frontend.
+ *   import { payablePayment } from 'payable-ipg-js'
+ *   payablePayment(paymentParams, sandboxMode)
+ *
+ * Wire values match the SDK's documented contract:
+ *   - paymentType: "1" (ONE_TIME) | "2" (RECURRING) | "3" (TOKENIZE)
+ *   - isSaveCard / doFirstPayment: "0" | "1" (only for paymentType === "3")
+ *   - customerRefNo: stable per user (only for paymentType === "3")
+ *
+ * No `cancelUrl` field — the SDK does a full-page redirect, so the browser
+ * back button is the cancel UX.
+ */
 export interface PayableSDKParams {
-  merchant_key: string
-  check_value: string
-  invoice_id: string
-  amount: string
-  currency_code: string
-  payment_type: string
-  order_description: string
-  notify_url: string
-  return_url: string
-  cancel_url: string
-  logo_url: string
-  customer_first_name: string
-  customer_last_name: string
-  customer_email: string
-  customer_mobile_phone: string
-  customer_phone: string
-  billing_address_street: string
-  billing_address_city: string
-  billing_address_province: string
-  billing_address_country: string
-  billing_address_postcode: string
-  custom_1: string
-  custom_2: string
-  /** Tokenize-only — present when payment_type === '3' */
-  is_save_card?: string
-  do_first_payment?: string
-  customer_ref_no?: string
+  merchantKey:               string
+  checkValue:                string
+  invoiceId:                 string
+  amount:                    string
+  currencyCode:              string
+  paymentType:               '1' | '2' | '3'
+  orderDescription:          string
+  notifyUrl:                 string
+  returnUrl:                 string
+  logoUrl:                   string
+  customerFirstName:         string
+  customerLastName:          string
+  customerEmail:             string
+  customerMobilePhone:       string
+  customerPhone:             string
+  billingAddressStreet:      string
+  billingAddressCity:        string
+  billingAddressStateProvince: string
+  billingAddressCountry:     string
+  billingAddressPostcodeZip: string
+  custom1:                   string
+  custom2:                   string
+  /** Tokenize-only — present when paymentType === '3' */
+  isSaveCard?:               '0' | '1'
+  doFirstPayment?:           '0' | '1'
+  customerRefNo?:            string
 }
 
 export interface CreatePaymentSessionResult {
@@ -212,40 +223,41 @@ export async function createPaymentSession(
     ? payableConfig.returnUrlBase.replace('{orderId}', orderId)
     : `${payableConfig.frontendUrl}/checkout/confirm/${orderId}`
 
-  const cancelUrl = payableConfig.cancelUrl || `${payableConfig.frontendUrl}/checkout`
+  // NOTE: `payable-ipg-js` does a full-page redirect to PAYable's hosted
+  // checkout, so there is no `cancelUrl` field. The browser back button is
+  // the cancel UX. Keep `payableConfig.cancelUrl` config-only for now.
 
   const baseParams: PayableSDKParams = {
-    merchant_key:              payableConfig.merchantKey,
-    check_value:               checkValue,
-    invoice_id:                invoiceRef,
-    amount:                    lkrAmount,
-    currency_code:             'LKR',
-    payment_type:              paymentTypeWire,
-    order_description:         `Modett Order ${invoiceRef}`,
-    notify_url:                getWebhookUrl(),
-    return_url:                returnUrl,
-    cancel_url:                cancelUrl,
-    logo_url:                  payableConfig.logoUrl,
-    customer_first_name:       customerFirstName,
-    customer_last_name:        customerLastName,
-    customer_email:            customerEmail,
-    customer_mobile_phone:     customerMobilePhone,
-    customer_phone:            customerMobilePhone,
-    billing_address_street:    billingAddress.street,
-    billing_address_city:      billingAddress.city,
-    billing_address_province:  billingAddress.province || billingAddress.city,
-    billing_address_country:   toAlpha3(billingAddress.country || 'LK'),
-    billing_address_postcode:  billingAddress.postcode || '0000',
-    custom_1:                  orderId,
-    custom_2:                  reservationId,
+    merchantKey:                 payableConfig.merchantKey,
+    checkValue:                  checkValue,
+    invoiceId:                   invoiceRef,
+    amount:                      lkrAmount,
+    currencyCode:                'LKR',
+    paymentType:                 paymentTypeWire,
+    orderDescription:            `Modett Order ${invoiceRef}`,
+    notifyUrl:                   getWebhookUrl(),
+    returnUrl:                   returnUrl,
+    logoUrl:                     payableConfig.logoUrl,
+    customerFirstName:           customerFirstName,
+    customerLastName:            customerLastName,
+    customerEmail:               customerEmail,
+    customerMobilePhone:         customerMobilePhone,
+    customerPhone:               customerMobilePhone,
+    billingAddressStreet:        billingAddress.street,
+    billingAddressCity:          billingAddress.city,
+    billingAddressStateProvince: billingAddress.province || billingAddress.city,
+    billingAddressCountry:       toAlpha3(billingAddress.country || 'LK'),
+    billingAddressPostcodeZip:   billingAddress.postcode || '0000',
+    custom1:                     orderId,
+    custom2:                     reservationId,
   }
 
   const paymentParams: PayableSDKParams = willTokenize
     ? {
         ...baseParams,
-        is_save_card:     '1',
-        do_first_payment: '1',
-        customer_ref_no:  customerRefNo,
+        isSaveCard:     '1',
+        doFirstPayment: '1',
+        customerRefNo:  customerRefNo,
       }
     : baseParams
 
