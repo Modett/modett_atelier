@@ -69,6 +69,28 @@ function trimTrailingSlash(v: string): string {
   return v.replace(/\/+$/, '')
 }
 
+/**
+ * Resolve sandbox/live mode from explicit env, with NODE_ENV as fallback.
+ *
+ *   PAYABLE_MODE=sandbox         → sandbox (regardless of NODE_ENV)
+ *   PAYABLE_MODE=live            → live    (regardless of NODE_ENV)
+ *   PAYABLE_MODE unset:
+ *     PAYABLE_FORCE_LIVE=1       → live    (legacy override)
+ *     NODE_ENV=production        → live
+ *     otherwise                  → sandbox
+ *
+ * This lets us deploy the API to Railway production (NODE_ENV=production) but
+ * still hit the PAYable sandbox while UAT-ing — set PAYABLE_MODE=sandbox on
+ * Railway and flip to PAYABLE_MODE=live for go-live.
+ */
+function resolveSandboxMode(): boolean {
+  const explicit = (process.env.PAYABLE_MODE ?? '').toLowerCase().trim()
+  if (explicit === 'sandbox') return true
+  if (explicit === 'live' || explicit === 'production') return false
+  if (process.env.PAYABLE_FORCE_LIVE === '1') return false
+  return process.env.NODE_ENV !== 'production'
+}
+
 export const payableConfig = {
   merchantKey:    process.env.PAYABLE_MERCHANT_KEY ?? '',
   merchantToken:  process.env.PAYABLE_MERCHANT_TOKEN ?? '',
@@ -89,8 +111,7 @@ export const payableConfig = {
   cancelUrl:      process.env.PAYABLE_CANCEL_URL ?? '',
 
   get sandboxMode(): boolean {
-    if (process.env.PAYABLE_FORCE_LIVE === '1') return false
-    return process.env.NODE_ENV !== 'production'
+    return resolveSandboxMode()
   },
 } as const
 

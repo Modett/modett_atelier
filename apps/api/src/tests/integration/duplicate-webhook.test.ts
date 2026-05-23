@@ -452,7 +452,7 @@ describe('Duplicate webhook delivery — idempotency', () => {
     expect((txRows.rows[0] as { cnt: number }).cnt).toBe(1)
   })
 
-  it('failure path: invalid checkValue throws INVALID_WEBHOOK_SIGNATURE 400', async () => {
+  it('failure path: invalid checkValue throws WEBHOOK_INVALID_CHECKVALUE 400', async () => {
     const { orderId, txId } = await seedConfirmedOrderScenario()
 
     const { handleWebhook } = await import(
@@ -471,7 +471,7 @@ describe('Duplicate webhook delivery — idempotency', () => {
 
     await expect(handleWebhook({ payload: tamperedPayload })).rejects.toMatchObject(
       {
-        code: 'INVALID_WEBHOOK_SIGNATURE',
+        code: 'WEBHOOK_INVALID_CHECKVALUE',
         statusCode: 400,
       },
     )

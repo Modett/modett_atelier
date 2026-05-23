@@ -10,6 +10,26 @@ import { CheckoutOrderSummary } from '@/components/checkout/CheckoutOrderSummary
 import { useCheckoutStore } from '@/store/checkout.store'
 import { useCountry } from '@/hooks/useCountry'
 
+const PAYABLE_SDK_LIVE    = 'https://ipgsdk.payable.lk/sdk/v3/payable-checkout.js'
+const PAYABLE_SDK_SANDBOX = 'https://sandboxipgsdk.payable.lk/sdk/v3/payable-checkout.js'
+
+/**
+ * Pick the PAYable SDK URL.
+ *
+ *   NEXT_PUBLIC_PAYABLE_MODE=sandbox  → sandbox (overrides NODE_ENV)
+ *   NEXT_PUBLIC_PAYABLE_MODE=live     → live    (overrides NODE_ENV)
+ *   NEXT_PUBLIC_PAYABLE_MODE unset    → NODE_ENV (production → live, else sandbox)
+ *
+ * Keep this in sync with PAYABLE_MODE on the API. Mismatch breaks payments
+ * because the SDK and gateway have to agree on which environment they're in.
+ */
+function getPayableSdkUrl(): string {
+  const mode = (process.env.NEXT_PUBLIC_PAYABLE_MODE ?? '').toLowerCase().trim()
+  if (mode === 'sandbox') return PAYABLE_SDK_SANDBOX
+  if (mode === 'live' || mode === 'production') return PAYABLE_SDK_LIVE
+  return process.env.NODE_ENV === 'production' ? PAYABLE_SDK_LIVE : PAYABLE_SDK_SANDBOX
+}
+
 export default function CheckoutLayout({
   children,
 }: {
@@ -25,11 +45,7 @@ export default function CheckoutLayout({
     <div className="min-h-screen bg-background">
       <Script
         id="payable-sdk"
-        src={
-          process.env.NODE_ENV === 'production'
-            ? 'https://ipgsdk.payable.lk/sdk/v3/payable-checkout.js'
-            : 'https://sandboxipgsdk.payable.lk/sdk/v3/payable-checkout.js'
-        }
+        src={getPayableSdkUrl()}
         strategy="afterInteractive"
       />
       <header className="border-b border-muted h-14 flex items-center justify-center px-4">
