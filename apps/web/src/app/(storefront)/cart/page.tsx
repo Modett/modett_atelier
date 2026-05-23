@@ -13,13 +13,19 @@ import type { CartItem } from '@/types'
 
 function ExpiredReservationBanner() {
   const searchParams = useSearchParams()
-  if (searchParams.get('expired') !== '1') return null
+  const expired = searchParams.get('expired') === '1'
+  const checkoutError = searchParams.get('checkoutError')
+
+  if (!expired && !checkoutError) return null
+
+  const message = checkoutError
+    ? checkoutError
+    : 'Your reservation expired — your items have been returned to your bag. Complete checkout within 30 minutes to secure them again.'
+
   return (
     <div className="flex items-start gap-3 bg-highlight/10 border border-highlight/30 px-5 py-3 mt-4">
-      <p className="font-body font-light text-[13px] text-umber">
-        Your reservation expired — your items have been returned to your bag.
-        Complete checkout within 30 minutes to secure them again.
-      </p>
+      <AlertCircle className="w-4 h-4 text-highlight mt-0.5 flex-shrink-0" />
+      <p className="font-body font-light text-[13px] text-umber">{message}</p>
     </div>
   )
 }

@@ -23,9 +23,35 @@ const COUNTRY_ALPHA3: Record<string, string> = {
   JP: 'JPN', AE: 'ARE', IN: 'IND',
 }
 
+const COUNTRY_TO_CURRENCY: Record<string, 'LKR' | 'SGD' | 'USD'> = {
+  LK: 'LKR',
+  SG: 'SGD',
+}
+
 function getAlpha3(alpha2: string): string {
   return COUNTRY_ALPHA3[alpha2.toUpperCase()] ?? 'LKA'
 }
+
+function getCurrencyFromCountry(countryCode: string | undefined): 'LKR' | 'SGD' | 'USD' {
+  if (!countryCode) return 'LKR'
+  return COUNTRY_TO_CURRENCY[countryCode.toUpperCase()] ?? 'USD'
+}
+
+/**
+ * Server-side errors that mean the customer's checkout state is unrecoverable
+ * (stale orderId in sessionStorage, expired reservation, etc.). The only sane
+ * UX is to wipe the checkout store and send them back to the bag.
+ */
+const UNRECOVERABLE_CHECKOUT_CODES = new Set([
+  'ORDER_NOT_FOUND',
+  'ORDER_NOT_DRAFT',
+  'ORDER_ACCESS_DENIED',
+  'ORDER_ALREADY_PAID',
+  'RESERVATION_NOT_FOUND',
+  'RESERVATION_NOT_HELD',
+  'RESERVATION_EXPIRED',
+  'CHECKOUT_CONTEXT_MISSING',
+])
 
 interface PaymentSessionResponse {
   data: {
@@ -70,12 +96,36 @@ export function PaymentStep() {
     if (def) setPaymentChoice({ kind: 'saved-card', cardId: def.id })
   }, [isLoggedIn, savedCards, paymentChoice.kind])
 
+  /**
+   * Unrecoverable error → wipe the checkout store and send the user back to
+   * the bag with a banner explaining what happened. Without this, a stale
+   * orderId in sessionStorage strands the user with the raw API code (the
+   * "ORDER_NOT_FOUND" they were seeing).
+   */
+  function handleUnrecoverableCheckoutError(apiErr: ApiError): void {
+    const message =
+      apiErr?.message ??
+      'Your checkout session is no longer valid. Please start checkout again.'
+    store.clearCheckout()
+    const params = new URLSearchParams({ checkoutError: message })
+    router.push(`/cart?${params.toString()}`)
+  }
+
   async function handlePayWithNewCard() {
     setFormError(null)
     setFieldErrors([])
 
     if (!termsAccepted) {
       setFormError('Please accept the Terms and Conditions to continue.')
+      return
+    }
+    if (!store.orderId || !store.reservationId || !store.cartId) {
+      handleUnrecoverableCheckoutError({
+        code: 'CHECKOUT_STATE_MISSING',
+        message:
+          'Your checkout session has expired. Please start checkout again.',
+        status: 0,
+      })
       return
     }
 
@@ -91,11 +141,7 @@ export function PaymentStep() {
         orderId: store.orderId,
         reservationId: store.reservationId,
         cartId: store.cartId,
-        currency: store.shippingAddress
-          ? (store.shippingAddress.countryCode === 'LK' ? 'LKR'
-            : store.shippingAddress.countryCode === 'SG' ? 'SGD'
-            : 'USD')
-          : 'LKR',
+        currency: getCurrencyFromCountry(store.shippingAddress?.countryCode),
         customerFirstName: billingAddr?.firstName ?? '',
         customerLastName: billingAddr?.lastName ?? '',
         customerEmail: store.email ?? '',
@@ -103,6 +149,9 @@ export function PaymentStep() {
         billingAddress: {
           street: billingAddr?.addressLine1 ?? '',
           city: billingAddr?.city ?? '',
+          // PAYable requires a state/province; we don't collect one explicitly,
+          // so fall back to the city. The API uses the same fallback on the
+          // server side as a defence in depth.
           province: billingAddr?.city ?? '',
           country: getAlpha3(billingAddr?.countryCode ?? 'LK'),
           postcode: billingAddr?.postcode ?? '',
@@ -147,11 +196,17 @@ export function PaymentStep() {
       }
     } catch (err) {
       const apiErr = err as ApiError
+      store.setPaymentSubmitted(false)
+      setIsPending(false)
+
+      if (apiErr?.code && UNRECOVERABLE_CHECKOUT_CODES.has(apiErr.code)) {
+        handleUnrecoverableCheckoutError(apiErr)
+        return
+      }
+
       setFormError(
         apiErr?.message ?? 'Payment could not be initiated. Please try again.',
       )
-      store.setPaymentSubmitted(false)
-      setIsPending(false)
     }
   }
 
@@ -163,7 +218,12 @@ export function PaymentStep() {
       return
     }
     if (!store.orderId) {
-      setFormError('Order not found. Please refresh the page.')
+      handleUnrecoverableCheckoutError({
+        code: 'CHECKOUT_STATE_MISSING',
+        message:
+          'Your checkout session has expired. Please start checkout again.',
+        status: 0,
+      })
       return
     }
 
@@ -190,6 +250,11 @@ export function PaymentStep() {
       const apiErr = err as ApiError
       setIsPending(false)
       store.setPaymentSubmitted(false)
+
+      if (apiErr?.code && UNRECOVERABLE_CHECKOUT_CODES.has(apiErr.code)) {
+        handleUnrecoverableCheckoutError(apiErr)
+        return
+      }
 
       // Saved-card payments require the API to talk to PAYable server-to-server.
       // If that misconfiguration is detected, fall back to "use a new card" so

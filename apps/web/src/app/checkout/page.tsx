@@ -16,6 +16,9 @@ import { PaymentStep } from '@/components/checkout/steps/PaymentStep'
 export default function CheckoutPage() {
   const step = useCheckoutStore((s) => s.step)
   const reservationId = useCheckoutStore((s) => s.reservationId)
+  const orderId = useCheckoutStore((s) => s.orderId)
+  const expiresAt = useCheckoutStore((s) => s.expiresAt)
+  const clearCheckout = useCheckoutStore((s) => s.clearCheckout)
   const setStep = useCheckoutStore((s) => s.setStep)
   const setEmail = useCheckoutStore((s) => s.setEmail)
   const { isLoggedIn, user, isLoading } = useSession()
@@ -27,6 +30,20 @@ export default function CheckoutPage() {
       router.push('/cart')
     }
   }, [step, reservationId, router])
+
+  // Guard against stale persisted state: if the user lands on a non-email
+  // step but the reservation or expiry timestamp is missing/expired, the
+  // sessionStorage snapshot is from a prior aborted checkout. Reset so they
+  // restart cleanly instead of POSTing a stale orderId at PaymentStep.
+  useEffect(() => {
+    if (step === 'email') return
+    if (!orderId || !reservationId) return
+    if (!expiresAt) return
+    if (new Date(expiresAt).getTime() <= Date.now()) {
+      clearCheckout()
+      router.replace('/cart')
+    }
+  }, [step, orderId, reservationId, expiresAt, clearCheckout, router])
 
   useEffect(() => {
     if (cartLoading) return

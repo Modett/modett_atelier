@@ -35,6 +35,16 @@ import { ReservationNotHeldError } from '@modett/db'
 
 const TAX_RATES = { LKR: 0.18, SGD: 0.09, USD: 0 } as const
 
+// Shared, user-facing copy for the most common checkout failures. The frontend
+// surfaces these strings directly in the error toast / inline banner, so they
+// are written for the customer (not for engineers reading logs).
+const ORDER_NOT_FOUND_MSG =
+  'We could not find this order. It may have expired or been completed in another tab. Please return to your bag and start checkout again.'
+const ORDER_NOT_DRAFT_MSG =
+  'This order can no longer be edited. Please return to your bag and start a new checkout.'
+const RESERVATION_NOT_HELD_MSG =
+  'Your item reservation has expired. Please return to your bag and start checkout again.'
+
 type CurrencyCode = 'LKR' | 'SGD' | 'USD'
 
 function resolvePriceAmount({
@@ -113,26 +123,46 @@ export async function startCheckout({
     ? await getActiveCartByUserId({ userId })
     : await getActiveCartBySessionId({ sessionId })
 
-  if (!cart) throw new AppError('CART_NOT_FOUND', 404)
+  if (!cart) {
+    throw new AppError(
+      'CART_NOT_FOUND',
+      404,
+      'Your bag could not be found. Please add an item and try again.',
+    )
+  }
 
   const cartItems = await getCartItems({ cartId: cart.id })
-  if (cartItems.length === 0) throw new AppError('CART_IS_EMPTY', 400)
+  if (cartItems.length === 0) {
+    throw new AppError(
+      'CART_IS_EMPTY',
+      400,
+      'Your bag is empty. Please add an item before starting checkout.',
+    )
+  }
 
   for (const item of cartItems) {
     if (item.stock.availableQty < item.qty) {
       throw new AppError(
         'INSUFFICIENT_STOCK',
         409,
-        `Variant ${item.variantId}: requested ${item.qty}, available ${item.stock.availableQty}`,
+        'One or more items in your bag are no longer in stock. Please review your bag and try again.',
       )
     }
   }
 
   if (!userId && !guestEmail) {
-    throw new AppError('GUEST_EMAIL_REQUIRED', 400)
+    throw new AppError(
+      'GUEST_EMAIL_REQUIRED',
+      400,
+      'Please enter your e-mail address to continue.',
+    )
   }
   if (guestEmail && !isValidEmail(guestEmail)) {
-    throw new AppError('INVALID_EMAIL', 400)
+    throw new AppError(
+      'INVALID_EMAIL',
+      400,
+      'Please enter a valid e-mail address.',
+    )
   }
 
   const taxRate = TAX_RATES[currency]
@@ -236,8 +266,10 @@ export async function saveAddress({
   countryCode: string
 }): Promise<OrderWithDetails> {
   const order = await getOrderById({ id: orderId })
-  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
-  if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
+  if (order.order_state !== 'DRAFT') {
+    throw new AppError('ORDER_NOT_DRAFT', 409, ORDER_NOT_DRAFT_MSG)
+  }
 
   await upsertOrderAddress({ orderId, kind, addressJson, countryCode })
   await appendOrderEvent({
@@ -247,7 +279,7 @@ export async function saveAddress({
   })
 
   const details = await getOrderWithDetails({ id: orderId })
-  if (!details) throw new AppError('ORDER_NOT_FOUND', 404)
+  if (!details) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
   return details
 }
 
@@ -267,13 +299,19 @@ export async function saveContact({
   giftReceiver?: Record<string, unknown> | null
 }): Promise<OrderWithDetails> {
   const order = await getOrderById({ id: orderId })
-  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
-  if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
+  if (order.order_state !== 'DRAFT') {
+    throw new AppError('ORDER_NOT_DRAFT', 409, ORDER_NOT_DRAFT_MSG)
+  }
 
   let giftReceiverJson: Record<string, unknown> | null = null
   if (isGift === true) {
     if (giftReceiver == null) {
-      throw new AppError('GIFT_RECEIVER_REQUIRED', 400)
+      throw new AppError(
+        'GIFT_RECEIVER_REQUIRED',
+        400,
+        'Gift receiver details are required when marking an order as a gift.',
+      )
     }
     giftReceiverJson = giftReceiver
   }
@@ -296,7 +334,7 @@ export async function saveContact({
   })
 
   const details = await getOrderWithDetails({ id: orderId })
-  if (!details) throw new AppError('ORDER_NOT_FOUND', 404)
+  if (!details) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
   return details
 }
 
@@ -338,15 +376,21 @@ export async function selectShippingMethod({
   currency: CurrencyCode
 }): Promise<OrderWithDetails> {
   const order = await getOrderById({ id: orderId })
-  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
-  if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
+  if (order.order_state !== 'DRAFT') {
+    throw new AppError('ORDER_NOT_DRAFT', 409, ORDER_NOT_DRAFT_MSG)
+  }
 
   const { method, cost } = await getMethodForOrder({
     methodId: shippingMethodId,
     currency,
   })
   if (cost == null) {
-    throw new AppError('SHIPPING_COST_NOT_AVAILABLE', 400)
+    throw new AppError(
+      'SHIPPING_COST_NOT_AVAILABLE',
+      400,
+      'Shipping is not available for the selected destination. Please pick a different shipping method.',
+    )
   }
   const shippingCost = new Decimal(cost.amount)
 
@@ -383,7 +427,7 @@ export async function selectShippingMethod({
   })
 
   const details = await getOrderWithDetails({ id: orderId })
-  if (!details) throw new AppError('ORDER_NOT_FOUND', 404)
+  if (!details) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
   return details
 }
 
@@ -406,24 +450,42 @@ export async function initiatePayment({
   reservationId: string
 }): Promise<InitiatePaymentResult> {
   const order = await getOrderById({ id: orderId })
-  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
-  if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
+  if (order.order_state !== 'DRAFT') {
+    throw new AppError('ORDER_NOT_DRAFT', 409, ORDER_NOT_DRAFT_MSG)
+  }
   if (!order.shipping_method_id) {
-    throw new AppError('SHIPPING_NOT_SELECTED', 400)
+    throw new AppError(
+      'SHIPPING_NOT_SELECTED',
+      400,
+      'Please select a shipping method before continuing to payment.',
+    )
   }
 
   const addresses = await getOrderAddresses({ orderId })
   const hasShipping = addresses.some((a) => a.kind === 'SHIPPING')
-  if (!hasShipping) throw new AppError('SHIPPING_ADDRESS_REQUIRED', 400)
+  if (!hasShipping) {
+    throw new AppError(
+      'SHIPPING_ADDRESS_REQUIRED',
+      400,
+      'Please provide a shipping address before continuing to payment.',
+    )
+  }
 
   const contact = await getOrderContact({ orderId })
-  if (!contact) throw new AppError('CONTACT_REQUIRED', 400)
+  if (!contact) {
+    throw new AppError(
+      'CONTACT_REQUIRED',
+      400,
+      'Please provide a contact phone number before continuing to payment.',
+    )
+  }
 
   try {
     await stampPaymentSubmitted({ reservationId })
   } catch (err) {
     if (err instanceof ReservationNotHeldError) {
-      throw new AppError('RESERVATION_EXPIRED', 410)
+      throw new AppError('RESERVATION_EXPIRED', 410, RESERVATION_NOT_HELD_MSG)
     }
     throw err
   }
@@ -450,20 +512,23 @@ export async function getOrderConfirmation({
   guestEmail?: string | null
 }): Promise<OrderWithDetails> {
   const details = await getOrderWithDetails({ id: orderId })
-  if (!details) throw new AppError('ORDER_NOT_FOUND', 404)
+  if (!details) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
 
   const { order } = details
+  const accessDeniedMsg = 'You do not have access to this order.'
 
   if (userId != null) {
-    if (order.user_id !== userId) throw new AppError('ORDER_ACCESS_DENIED', 403)
+    if (order.user_id !== userId) {
+      throw new AppError('ORDER_ACCESS_DENIED', 403, accessDeniedMsg)
+    }
   } else if (guestEmail != null) {
     const orderGuest = order.guest_email?.trim().toLowerCase() ?? ''
     const requestedGuest = guestEmail.trim().toLowerCase()
     if (orderGuest !== requestedGuest) {
-      throw new AppError('ORDER_ACCESS_DENIED', 403)
+      throw new AppError('ORDER_ACCESS_DENIED', 403, accessDeniedMsg)
     }
   } else {
-    throw new AppError('ORDER_ACCESS_DENIED', 403)
+    throw new AppError('ORDER_ACCESS_DENIED', 403, accessDeniedMsg)
   }
 
   return details

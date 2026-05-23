@@ -29,11 +29,25 @@ export function EmailStep() {
   const [error, setError] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
 
+  // Auto-start checkout when a logged-in user lands on the email step — but
+  // only if there isn't already a live reservation. Without this guard, the
+  // user clicking "Edit" on the email summary re-mounts EmailStep and would
+  // create another order + hold inventory again, abandoning the previous one.
   useEffect(() => {
-    if (isLoggedIn && user) {
+    if (!isLoggedIn || !user) return
+    const snap = useCheckoutStore.getState()
+    const hasLiveReservation =
+      snap.reservationId != null &&
+      snap.orderId != null &&
+      snap.expiresAt != null &&
+      new Date(snap.expiresAt).getTime() > Date.now()
+    if (hasLiveReservation) {
       storeEmail(user.email, false)
-      handleStartCheckout(user.email, false)
+      setStep('shipping')
+      return
     }
+    storeEmail(user.email, false)
+    handleStartCheckout(user.email, false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn])
 

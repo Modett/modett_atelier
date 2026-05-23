@@ -76,6 +76,21 @@ import { earnPointsForOrder } from '../loyalty'
 
 type CurrencyCode = 'LKR' | 'SGD' | 'USD'
 
+// Shared user-facing copy. The frontend surfaces these directly, so they are
+// written for the customer (not for engineers reading logs).
+const ORDER_NOT_FOUND_MSG =
+  'We could not find this order. It may have expired or been completed in another tab. Please return to your bag and start checkout again.'
+const ORDER_NOT_DRAFT_MSG =
+  'This order is no longer payable. Please return to your bag and start a new checkout.'
+const ORDER_ALREADY_PAID_MSG =
+  'This order has already been paid for.'
+const RESERVATION_NOT_HELD_MSG =
+  'Your item reservation has expired. Please return to your bag and start checkout again.'
+const RESERVATION_NOT_FOUND_MSG =
+  'Your checkout session could not be found. Please return to your bag and start checkout again.'
+const ORDER_ACCESS_DENIED_MSG =
+  'You do not have access to this order.'
+
 function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string })?.code === '23505'
 }
@@ -186,8 +201,10 @@ export async function createPaymentSession(
   } = params
 
   const order = await getOrderById({ id: orderId })
-  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
-  if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
+  if (order.order_state !== 'DRAFT') {
+    throw new AppError('ORDER_NOT_DRAFT', 409, ORDER_NOT_DRAFT_MSG)
+  }
 
   // Server-authoritative amount from DB.
   const originalAmount = new Decimal(String(order.total))
@@ -267,7 +284,7 @@ export async function createPaymentSession(
     const existing = await getPaymentIntentByOrderId({ orderId })
 
     if (existing && existing.status === 'SUCCEEDED') {
-      throw new AppError('ORDER_ALREADY_PAID', 409)
+      throw new AppError('ORDER_ALREADY_PAID', 409, ORDER_ALREADY_PAID_MSG)
     }
 
     // Stamp payment_submitted_at if not already stamped. Re-attempts after
@@ -277,9 +294,19 @@ export async function createPaymentSession(
       await stampPaymentSubmitted({ reservationId })
     } catch (err) {
       const reservation = await getReservationById({ id: reservationId })
-      if (!reservation) throw new AppError('RESERVATION_NOT_FOUND', 404)
+      if (!reservation) {
+        throw new AppError(
+          'RESERVATION_NOT_FOUND',
+          404,
+          RESERVATION_NOT_FOUND_MSG,
+        )
+      }
       if (reservation.status !== 'HELD') {
-        throw new AppError('RESERVATION_NOT_HELD', 409)
+        throw new AppError(
+          'RESERVATION_NOT_HELD',
+          409,
+          RESERVATION_NOT_HELD_MSG,
+        )
       }
       // Reservation is HELD and already stamped from a prior attempt — fine.
       void err
@@ -374,14 +401,28 @@ async function payWithSavedCardLocked({
   userId: string
 }): Promise<PayWithSavedCardResult> {
   const order = await getOrderById({ id: orderId })
-  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
-  if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
-  if (order.user_id !== userId) throw new AppError('ORDER_ACCESS_DENIED', 403)
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
+  if (order.order_state !== 'DRAFT') {
+    throw new AppError('ORDER_NOT_DRAFT', 409, ORDER_NOT_DRAFT_MSG)
+  }
+  if (order.user_id !== userId) {
+    throw new AppError('ORDER_ACCESS_DENIED', 403, ORDER_ACCESS_DENIED_MSG)
+  }
 
   const savedCard = await getSavedCardOwnedByUser({ id: savedCardId, userId })
-  if (!savedCard) throw new AppError('SAVED_CARD_NOT_FOUND', 404)
+  if (!savedCard) {
+    throw new AppError(
+      'SAVED_CARD_NOT_FOUND',
+      404,
+      'The saved card could not be found. Please choose a different payment option.',
+    )
+  }
   if (!savedCard.payable_customer_id) {
-    throw new AppError('SAVED_CARD_MISSING_CUSTOMER_ID', 409)
+    throw new AppError(
+      'SAVED_CARD_MISSING_CUSTOMER_ID',
+      409,
+      'This saved card is not fully set up for payments. Please choose a different payment option.',
+    )
   }
 
   const originalAmount = new Decimal(String(order.total))
@@ -419,7 +460,11 @@ async function payWithSavedCardLocked({
   const contextKey = `checkout:context:${orderId}`
   const contextRaw = await redis.get(contextKey)
   if (!contextRaw) {
-    throw new AppError('CHECKOUT_CONTEXT_MISSING', 409)
+    throw new AppError(
+      'CHECKOUT_CONTEXT_MISSING',
+      409,
+      'Your checkout session has expired. Please return to your bag and start checkout again.',
+    )
   }
 
   const resp = await payWithSavedCardRequest({
@@ -470,7 +515,13 @@ async function payWithSavedCardLocked({
   }
 
   const txId = resp.payableTransactionId
-  if (!txId) throw new AppError('PAYABLE_NO_TRANSACTION_ID', 502)
+  if (!txId) {
+    throw new AppError(
+      'PAYABLE_NO_TRANSACTION_ID',
+      502,
+      'The payment gateway did not return a transaction reference. Please try again.',
+    )
+  }
 
   const { reservationId, cartId } = JSON.parse(contextRaw) as {
     reservationId: string
@@ -580,10 +631,22 @@ export async function deleteSavedCard({
   userId: string
 }): Promise<{ ok: true }> {
   const card = await getSavedCardOwnedByUser({ id: savedCardId, userId })
-  if (!card) throw new AppError('SAVED_CARD_NOT_FOUND', 404)
+  if (!card) {
+    throw new AppError(
+      'SAVED_CARD_NOT_FOUND',
+      404,
+      'The saved card could not be found.',
+    )
+  }
 
   const removed = await softDeleteSavedCard({ id: savedCardId, userId })
-  if (!removed) throw new AppError('SAVED_CARD_NOT_FOUND', 404)
+  if (!removed) {
+    throw new AppError(
+      'SAVED_CARD_NOT_FOUND',
+      404,
+      'The saved card could not be found.',
+    )
+  }
 
   // Best-effort: tell PAYable to remove the token too. Failures here are logged
   // but don't fail the request — the local card is already inaccessible.
@@ -611,7 +674,13 @@ export async function setDefaultSavedCard({
   userId: string
 }): Promise<{ ok: true }> {
   const card = await getSavedCardOwnedByUser({ id: savedCardId, userId })
-  if (!card) throw new AppError('SAVED_CARD_NOT_FOUND', 404)
+  if (!card) {
+    throw new AppError(
+      'SAVED_CARD_NOT_FOUND',
+      404,
+      'The saved card could not be found.',
+    )
+  }
   await setDefaultSavedCardQuery({ id: savedCardId, userId })
   return { ok: true }
 }
@@ -632,6 +701,7 @@ export async function handleWebhook({
   payload: PayableWebhookPayload
 }): Promise<HandleWebhookResult> {
   // Rule 8.1: checkValue MUST be the VERY FIRST check — no exceptions.
+  // No customer-facing message — this only ever returns to PAYable, never the UI.
   if (!payload.checkValue) {
     throw new AppError('WEBHOOK_INVALID_CHECKVALUE', 400)
   }
@@ -883,16 +953,20 @@ export async function getPaymentStatus({
   guestEmail?: string | null
 }): Promise<GetPaymentStatusResult> {
   const order = await getOrderById({ id: orderId })
-  if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
+  if (!order) throw new AppError('ORDER_NOT_FOUND', 404, ORDER_NOT_FOUND_MSG)
 
   if (userId != null) {
-    if (order.user_id !== userId) throw new AppError('ORDER_ACCESS_DENIED', 403)
+    if (order.user_id !== userId) {
+      throw new AppError('ORDER_ACCESS_DENIED', 403, ORDER_ACCESS_DENIED_MSG)
+    }
   } else if (guestEmail != null) {
     const orderGuest = order.guest_email?.trim().toLowerCase() ?? ''
     const requestedGuest = guestEmail.trim().toLowerCase()
-    if (orderGuest !== requestedGuest) throw new AppError('ORDER_ACCESS_DENIED', 403)
+    if (orderGuest !== requestedGuest) {
+      throw new AppError('ORDER_ACCESS_DENIED', 403, ORDER_ACCESS_DENIED_MSG)
+    }
   } else {
-    throw new AppError('ORDER_ACCESS_DENIED', 403)
+    throw new AppError('ORDER_ACCESS_DENIED', 403, ORDER_ACCESS_DENIED_MSG)
   }
 
   const intent = await getPaymentIntentByOrderId({ orderId })

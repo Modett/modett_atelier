@@ -291,6 +291,13 @@ export function InformationStep() {
       }
     }
 
+    if (!store.orderId) {
+      setFormError(
+        'Your checkout session has expired. Please return to your bag and start again.',
+      )
+      return
+    }
+
     setIsPending(true)
     try {
       const shippingAddr: ShippingAddress = {
@@ -319,10 +326,30 @@ export function InformationStep() {
             postcode: billing.postcode,
           }
 
+      // Persist the shipping address. The billing address is also persisted
+      // (kind=BILLING) when it differs from shipping so the order has the full
+      // pair on the API side — previously only shipping was sent.
       await api.post(`/checkout/${store.orderId}/address`, {
         kind: 'SHIPPING',
         addressJson: shippingAddr,
         countryCode: shipping.countryCode,
+      })
+
+      if (!sameAsBilling) {
+        await api.post(`/checkout/${store.orderId}/address`, {
+          kind: 'BILLING',
+          addressJson: billingAddr,
+          countryCode: billing.countryCode,
+        })
+      }
+
+      // Persist the customer contact (phone) so initiatePayment / admin views
+      // can find it. The web flow previously skipped this endpoint entirely
+      // and the phone only lived inside the shipping address JSON.
+      await api.post(`/checkout/${store.orderId}/contact`, {
+        primaryPhone: shipping.phone,
+        extraPhones: [],
+        isGift: false,
       })
 
       store.setAddresses(shippingAddr, sameAsBilling ? null : billingAddr, sameAsBilling, shipping.title)
