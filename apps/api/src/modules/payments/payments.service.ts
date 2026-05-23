@@ -53,17 +53,19 @@ import {
   PAYMENT_TYPE,
 } from '../../config/payable'
 import type { PayableWebhookPayload } from '../../config/payable'
-import { redis } from '@modett/db'
+import { redis, withPaymentLock } from '@modett/db'
 import {
   getPaymentIntentByOrderId,
   createPaymentIntent,
   updatePaymentIntentStatus,
+  rearmPaymentIntent,
   createPaymentTransaction,
   confirmOrderTransaction,
   getOrderById,
   getOrderItems,
   appendOrderEvent,
   stampPaymentSubmitted,
+  getReservationById,
   listSavedCardsByUser,
   getSavedCardOwnedByUser,
   softDeleteSavedCard,
@@ -247,47 +249,69 @@ export async function createPaymentSession(
       }
     : baseParams
 
-  // Idempotent — if a PENDING intent already exists, return the cached params.
-  const existing = await getPaymentIntentByOrderId({ orderId })
-  if (existing && existing.status === 'PENDING') {
+  // Concurrency: serialize per-order session creation so two rapid clicks from
+  // the same customer don't race on the (orderRef-unique) intent insert.
+  return await withPaymentLock(orderId, 'session', async () => {
+    const existing = await getPaymentIntentByOrderId({ orderId })
+
+    if (existing && existing.status === 'SUCCEEDED') {
+      throw new AppError('ORDER_ALREADY_PAID', 409)
+    }
+
+    // Stamp payment_submitted_at if not already stamped. Re-attempts after
+    // FAILED or popup-dismissal must succeed too, so we don't surface
+    // RESERVATION_NOT_HELD when the only thing wrong is "already stamped".
+    try {
+      await stampPaymentSubmitted({ reservationId })
+    } catch (err) {
+      const reservation = await getReservationById({ id: reservationId })
+      if (!reservation) throw new AppError('RESERVATION_NOT_FOUND', 404)
+      if (reservation.status !== 'HELD') {
+        throw new AppError('RESERVATION_NOT_HELD', 409)
+      }
+      // Reservation is HELD and already stamped from a prior attempt — fine.
+      void err
+    }
+
+    // Cache (or refresh) the reservation context for the webhook handler.
+    // Tokenize callbacks need userId to insert the saved_cards row.
+    await redis.set(
+      `checkout:context:${orderId}`,
+      JSON.stringify({ reservationId, cartId, userId: userId ?? null, customerRefNo }),
+      'EX',
+      3600,
+    )
+
+    let intentId: string
+    if (existing) {
+      // Reuse the existing intent row. Re-arm to PENDING and persist the
+      // (possibly updated) payment type — the customer may have toggled the
+      // "Save card" checkbox between attempts.
+      await rearmPaymentIntent({
+        intentId: existing.id,
+        paymentType: paymentTypeColumn,
+      })
+      intentId = existing.id
+    } else {
+      const created = await createPaymentIntent({
+        orderId,
+        providerIntentId: invoiceRef,
+        amount: lkrAmount,
+        currency: 'LKR' as CurrencyCode,
+        paymentType: paymentTypeColumn,
+      })
+      intentId = created.id
+    }
+
     return {
-      intentId: existing.id,
+      intentId,
       orderId,
       orderRef: order.order_ref,
       sandboxMode: payableConfig.sandboxMode,
       paymentType: paymentTypeColumn,
       paymentParams,
     }
-  }
-
-  // Stamp payment_submitted_at — starts the 10-min grace window.
-  await stampPaymentSubmitted({ reservationId })
-
-  // Cache reservation context for the webhook handler. Tokenize callbacks need
-  // userId to insert the saved_cards row.
-  await redis.set(
-    `checkout:context:${orderId}`,
-    JSON.stringify({ reservationId, cartId, userId: userId ?? null, customerRefNo }),
-    'EX',
-    3600,
-  )
-
-  const paymentIntent = await createPaymentIntent({
-    orderId,
-    providerIntentId: invoiceRef,
-    amount: lkrAmount,
-    currency: 'LKR' as CurrencyCode,
-    paymentType: paymentTypeColumn,
   })
-
-  return {
-    intentId: paymentIntent.id,
-    orderId,
-    orderRef: order.order_ref,
-    sandboxMode: payableConfig.sandboxMode,
-    paymentType: paymentTypeColumn,
-    paymentParams,
-  }
 }
 
 // ——— payWithSavedCard ———
@@ -316,6 +340,27 @@ export async function payWithSavedCard({
   savedCardId: string
   userId: string
 }): Promise<PayWithSavedCardResult> {
+  // Serialize all saved-card charges for the same order. The lock prevents:
+  //   1. Double-charging on a frantic double-click (two requests reach the
+  //      server before either has talked to PAYable),
+  //   2. A second click landing while the first request is mid-flight.
+  // The lock TTL (30s) covers a typical PAYable round-trip with plenty of
+  // headroom. On contention we surface PAYMENT_IN_PROGRESS (409) so the UI
+  // can show a friendly message instead of retrying blindly.
+  return await withPaymentLock(orderId, 'saved-card-pay', async () =>
+    payWithSavedCardLocked({ orderId, savedCardId, userId }),
+  )
+}
+
+async function payWithSavedCardLocked({
+  orderId,
+  savedCardId,
+  userId,
+}: {
+  orderId: string
+  savedCardId: string
+  userId: string
+}): Promise<PayWithSavedCardResult> {
   const order = await getOrderById({ id: orderId })
   if (!order) throw new AppError('ORDER_NOT_FOUND', 404)
   if (order.order_state !== 'DRAFT') throw new AppError('ORDER_NOT_DRAFT', 409)
@@ -333,12 +378,27 @@ export async function payWithSavedCard({
     : originalAmount.mul(TO_LKR[order.currency] ?? 1).toDecimalPlaces(2).toFixed(2)
 
   const intent = await getPaymentIntentByOrderId({ orderId })
-  if (!intent || intent.status !== 'PENDING') {
+  if (intent && intent.status === 'SUCCEEDED') {
+    // Already paid (e.g., webhook arrived first). Treat as confirmed; the
+    // route handler returns the same shape so the UI lands on the receipt.
+    return {
+      status:   'confirmed',
+      orderId,
+      orderRef: order.order_ref,
+    }
+  }
+  if (!intent) {
     await createPaymentIntent({
       orderId,
       providerIntentId: order.order_ref,
       amount: lkrAmount,
       currency: 'LKR' as CurrencyCode,
+      paymentType: 'SAVED_CARD_PAY',
+      savedCardId,
+    })
+  } else {
+    await rearmPaymentIntent({
+      intentId: intent.id,
       paymentType: 'SAVED_CARD_PAY',
       savedCardId,
     })

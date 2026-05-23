@@ -91,6 +91,35 @@ export async function updatePaymentIntentStatus({
   }
 }
 
+/**
+ * Re-arm an intent for another attempt — used when the customer retries
+ * checkout after a prior FAILED attempt or toggles the "save card" choice
+ * between popup attempts. Resets status to PENDING and updates payment_type
+ * / saved_card_id to match the latest intent.
+ *
+ * Idempotent — safe to call when status is already PENDING. We deliberately
+ * never modify SUCCEEDED intents.
+ */
+export async function rearmPaymentIntent({
+  intentId,
+  paymentType,
+  savedCardId,
+}: {
+  intentId: string
+  paymentType: PaymentTypeColumn
+  savedCardId?: string | null
+}): Promise<void> {
+  await db.execute(sql`
+    UPDATE payments.payment_intents
+    SET status        = 'PENDING',
+        payment_type  = ${paymentType},
+        saved_card_id = ${savedCardId ?? null},
+        updated_at    = now()
+    WHERE id     = ${intentId}
+      AND status <> 'SUCCEEDED'
+  `)
+}
+
 // —— PaymentTransaction ——
 
 export async function createPaymentTransaction({

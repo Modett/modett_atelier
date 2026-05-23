@@ -8,7 +8,12 @@
  */
 
 export { db, type Database, type TransactionClient } from './client'
-export { redis, withInventoryLock } from './redis'
+export {
+  redis,
+  withInventoryLock,
+  withPaymentLock,
+  PaymentInProgressError,
+} from './redis'
 export {
   LockNotAcquiredError,
   ReservationNotHeldError,

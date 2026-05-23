@@ -64,3 +64,51 @@ export async function withInventoryLock<T>(
     )
   }
 }
+
+/**
+ * Per-payment-operation lock — used by /payments/session and saved-card pay to
+ * serialize work on the same order. Each (orderId, op) gets its own key so
+ * different operations on the same order don't collide unnecessarily.
+ *
+ * TTL 30s (long enough to cover a PAYable server-to-server call). Throws
+ * PaymentInProgressError (409) on contention — callers should surface a
+ * friendly "Your payment is still being processed" message rather than retry.
+ */
+export async function withPaymentLock<T>(
+  orderId: string,
+  op: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const key = `lock:payment:${op}:${orderId}`
+  const lockId = randomUUID()
+
+  const acquired = await redis.set(key, lockId, 'EX', 30, 'NX')
+  if (!acquired) {
+    throw new PaymentInProgressError()
+  }
+
+  try {
+    return await fn()
+  } finally {
+    await redis.eval(
+      `if redis.call('get', KEYS[1]) == ARGV[1]
+       then return redis.call('del', KEYS[1])
+       else return 0
+       end`,
+      1,
+      key,
+      lockId,
+    )
+  }
+}
+
+export class PaymentInProgressError extends Error {
+  readonly code = 'PAYMENT_IN_PROGRESS'
+  readonly statusCode = 409
+
+  constructor() {
+    super('Another payment operation is already in progress for this order')
+    this.name = 'PaymentInProgressError'
+    Object.setPrototypeOf(this, PaymentInProgressError.prototype)
+  }
+}

@@ -321,40 +321,13 @@ export function PaymentStep() {
         </div>
       )}
 
-      {isLoggedIn && paymentChoice.kind === 'new-card' && (
-        <label className="flex items-start gap-3 cursor-pointer">
-          <div
-            className={cn(
-              'w-4 h-4 border flex items-center justify-center shrink-0 mt-0.5',
-              'transition-colors duration-200',
-              saveCard ? 'bg-umber border-umber' : 'bg-transparent border-muted-foreground',
-            )}
-          >
-            {saveCard && (
-              <svg viewBox="0 0 10 8" className="w-2.5 h-2 text-background" aria-hidden="true">
-                <path
-                  d="M1 4l2.5 2.5L9 1"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
-          </div>
-          <input
-            type="checkbox"
-            className="sr-only"
-            checked={saveCard}
-            onChange={(e) => setSaveCard(e.target.checked)}
-          />
-          <span className="font-body font-light text-[12px] text-umber/80">
-            Save this card for faster checkout next time. Your full card details
-            are never stored on Modett servers &mdash; only a secure token issued
-            by PAYable.
-          </span>
-        </label>
+      {paymentChoice.kind === 'new-card' && (
+        <SaveCardOption
+          checked={isLoggedIn && saveCard}
+          disabled={!isLoggedIn}
+          onChange={(next) => setSaveCard(next)}
+          isLoggedIn={isLoggedIn}
+        />
       )}
 
       <div className="flex items-start gap-3 bg-surface-raised/50 p-4">
@@ -499,6 +472,86 @@ function SavedCardOption({ card, selected, onSelect }: SavedCardOptionProps) {
         </span>
       )}
     </button>
+  )
+}
+
+interface SaveCardOptionProps {
+  checked: boolean
+  disabled: boolean
+  onChange: (next: boolean) => void
+  isLoggedIn: boolean
+}
+
+function SaveCardOption({ checked, disabled, onChange, isLoggedIn }: SaveCardOptionProps) {
+  return (
+    <div className="border border-muted/60 bg-surface-raised/20 p-4">
+      <label
+        className={cn(
+          'flex items-start gap-3',
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        )}
+      >
+        <div
+          className={cn(
+            'w-4 h-4 border flex items-center justify-center shrink-0 mt-0.5',
+            'transition-colors duration-200',
+            disabled
+              ? 'bg-transparent border-muted'
+              : checked
+                ? 'bg-umber border-umber'
+                : 'bg-transparent border-muted-foreground',
+          )}
+        >
+          {checked && !disabled && (
+            <svg viewBox="0 0 10 8" className="w-2.5 h-2 text-background" aria-hidden="true">
+              <path
+                d="M1 4l2.5 2.5L9 1"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </div>
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span
+          className={cn(
+            'font-body font-light text-[12px]',
+            disabled ? 'text-umber/40' : 'text-umber/80',
+          )}
+        >
+          Save this card for faster checkout next time. Your full card details
+          are never stored on Modett servers &mdash; only a secure token issued
+          by PAYable.
+        </span>
+      </label>
+      {!isLoggedIn && (
+        <p className="ml-7 mt-2 font-body font-light text-[11px] text-umber/60">
+          <Link
+            href="/login?returnTo=/checkout"
+            className="underline hover:text-ink transition-colors"
+          >
+            Sign in
+          </Link>{' '}
+          or{' '}
+          <Link
+            href="/signup?returnTo=/checkout"
+            className="underline hover:text-ink transition-colors"
+          >
+            create an account
+          </Link>{' '}
+          to save your card for future orders.
+        </p>
+      )}
+    </div>
   )
 }
 
