@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
+import { payablePayment, type PayableSDKPayment } from '@/lib/payable'
 import { useCheckoutStore } from '@/store/checkout.store'
 import { useSession } from '@/hooks/useSession'
 import {
@@ -15,21 +16,6 @@ import {
   type SavedCardSummary,
 } from '@/hooks/useSavedCards'
 import type { ApiError } from '@/types'
-
-declare global {
-  interface Window {
-    payable?: {
-      startPayment: (params: Record<string, string>) => void
-      onCompleted: ((data: Record<string, unknown>) => void) | null
-      onDismissed: (() => void) | null
-      onError: ((error: {
-        code: number
-        error?: string
-        fields?: Array<{ error: string }>
-      }) => void) | null
-    }
-  }
-}
 
 const COUNTRY_ALPHA3: Record<string, string> = {
   LK: 'LKA', SG: 'SGP', US: 'USA', GB: 'GBR',
@@ -48,8 +34,13 @@ interface PaymentSessionResponse {
     orderRef: string
     sandboxMode: boolean
     paymentType: 'ONE_TIME' | 'TOKENIZE'
-    paymentParams: Record<string, string>
+    paymentParams: PayableSDKPayment
   }
+}
+
+function extractFieldErrors(error: string | Record<string, string[]>): string[] {
+  if (typeof error === 'string') return []
+  return Object.values(error).flat()
 }
 
 type PaymentChoice =
@@ -121,44 +112,39 @@ export function PaymentStep() {
         saveCard: isLoggedIn && saveCard,
       })
 
-      const { paymentParams } = res.data
+      const { paymentParams, sandboxMode } = res.data
 
-      if (typeof window === 'undefined' || !window.payable) {
-        throw new Error(
-          'Payment gateway not loaded. Please refresh the page and try again.',
-        )
+      // payable-ipg-js full-page-redirects to PAYable's hosted checkout on
+      // success. On failure (validation / network) it returns an error object
+      // and does NOT navigate — we surface that to the user inline.
+      const result = await payablePayment(paymentParams, sandboxMode)
+
+      if (result.success) {
+        // Navigation is already in flight; keep the overlay visible until the
+        // browser unloads. No state cleanup needed.
+        return
       }
 
-      window.payable.onError = (error) => {
-        setIsPending(false)
-        store.setPaymentSubmitted(false)
-        if (error.code === 3009) {
-          const msgs = (error.fields ?? []).map((f) => f.error)
-          setFieldErrors(msgs)
-          console.error('[PAYable] Validation errors:', msgs)
-        } else if (error.code === 3008) {
-          setFormError(error.error ?? 'Payment gateway error. Please try again.')
-          console.error('[PAYable] General error:', error.error)
-        } else {
-          setFormError('An unexpected error occurred. Please try again.')
-          console.error('[PAYable] Error code:', error.code, error)
+      store.setPaymentSubmitted(false)
+      setIsPending(false)
+
+      if (result.status === 3009) {
+        const msgs = extractFieldErrors(result.error)
+        setFieldErrors(msgs)
+        if (msgs.length === 0) {
+          setFormError(
+            'Some payment fields are invalid. Please review and try again.',
+          )
         }
+        console.error('[PAYable] Validation errors:', result.error)
+      } else {
+        setFormError(
+          typeof result.error === 'string'
+            ? result.error
+            : 'Payment gateway returned an error. Please try again.',
+        )
+        console.error('[PAYable] Error status:', result.status, result.error)
       }
-
-      window.payable.onDismissed = () => {
-        setIsPending(false)
-        store.setPaymentSubmitted(false)
-        setFormError(null)
-        console.log('[PAYable] Payment dismissed by user')
-      }
-
-      window.payable.onCompleted = (data) => {
-        console.log('[PAYable] onCompleted fired:', data)
-        // The webhook performs the canonical order confirmation; the return_url
-        // brings the user to the confirmation page.
-      }
-
-      window.payable.startPayment(paymentParams)
     } catch (err) {
       const apiErr = err as ApiError
       setFormError(
