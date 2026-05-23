@@ -190,6 +190,21 @@ export function PaymentStep() {
       const apiErr = err as ApiError
       setIsPending(false)
       store.setPaymentSubmitted(false)
+
+      // Saved-card payments require the API to talk to PAYable server-to-server.
+      // If that misconfiguration is detected, fall back to "use a new card" so
+      // the customer isn't stranded on a broken option.
+      if (
+        apiErr?.code === 'PAYABLE_BUSINESS_CREDS_MISSING' ||
+        apiErr?.code === 'PAYABLE_BUSINESS_AUTH_FAILED'
+      ) {
+        setPaymentChoice({ kind: 'new-card' })
+        setFormError(
+          'Saved-card payments are temporarily unavailable. Please continue with a new card.',
+        )
+        return
+      }
+
       setFormError(
         apiErr?.message ?? 'Payment could not be processed. Please try again.',
       )

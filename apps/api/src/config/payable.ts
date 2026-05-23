@@ -46,6 +46,7 @@
 
 import crypto from 'node:crypto'
 import { redis } from '@modett/db'
+import { AppError } from '../lib/errors'
 
 const sha512 = (s: string): string =>
   crypto.createHash('sha512').update(s).digest('hex').toUpperCase()
@@ -308,8 +309,15 @@ export async function getPayableAccessToken(): Promise<string> {
 
   const { businessKey, businessToken } = payableConfig
   if (!businessKey || !businessToken) {
-    throw new Error(
-      'PAYABLE_BUSINESS_KEY/PAYABLE_BUSINESS_TOKEN must be set to use tokenize REST endpoints',
+    // Missing configuration — never let this round-trip to PAYable with empty
+    // basic-auth, since the gateway replies with a confusing
+    //   { status: 404, error: "Invalid authentication" }
+    // that gets surfaced to the customer as a payment failure. Fail fast with
+    // a clear server-side error instead.
+    throw new AppError(
+      'PAYABLE_BUSINESS_CREDS_MISSING',
+      503,
+      'Saved-card payments are unavailable: PAYABLE_BUSINESS_KEY / PAYABLE_BUSINESS_TOKEN are not configured.',
     )
   }
 
@@ -321,23 +329,40 @@ export async function getPayableAccessToken(): Promise<string> {
     headers: {
       'Content-Type':  'application/json',
       // PAYable's docs show: "Authorization: {basicAuthToken}" without "Basic "
-      // prefix for this exchange. We send both forms is unsafe — stick to docs.
+      // prefix for this exchange. We stay on the documented form.
       Authorization:   basic,
     },
     body: JSON.stringify({ grant_type: 'client_credentials' }),
   })
 
-  const json = (await res.json().catch(() => ({}))) as PayableAuthResponse
+  const json = (await res.json().catch(() => ({}))) as PayableAuthResponse & {
+    error?: unknown
+  }
   const token = json.accessToken ?? json.access_token
-  if (!res.ok || !token) {
-    throw new Error(
-      `PAYable auth failed (HTTP ${res.status}): ${JSON.stringify(json)}`,
-    )
+
+  if (res.ok && token) {
+    const ttl = Math.max((json.expires_in ?? 3600) - 60, 60)
+    await redis.set(ACCESS_TOKEN_REDIS_KEY, token, 'EX', ttl).catch(() => {})
+    return token
   }
 
-  const ttl = Math.max((json.expires_in ?? 3600) - 60, 60)
-  await redis.set(ACCESS_TOKEN_REDIS_KEY, token, 'EX', ttl).catch(() => {})
-  return token
+  // PAYable returns { status, error } for auth failures (often HTTP 200 with
+  // status:404 in the body, sometimes HTTP 401). The most common cause in
+  // practice is wrong / typo'd PAYABLE_BUSINESS_KEY/PAYABLE_BUSINESS_TOKEN, or
+  // sandbox creds used against the live endpoint (and vice versa).
+  const gatewayMessage =
+    typeof json.error === 'string'
+      ? json.error
+      : `HTTP ${res.status}`
+
+  throw new AppError(
+    'PAYABLE_BUSINESS_AUTH_FAILED',
+    503,
+    `PAYable rejected the business credentials (${gatewayMessage}). ` +
+      'Verify PAYABLE_BUSINESS_KEY and PAYABLE_BUSINESS_TOKEN in the API ' +
+      'environment match the PAYable merchant portal for the current mode ' +
+      `(${payableConfig.sandboxMode ? 'sandbox' : 'live'}).`,
+  )
 }
 
 // ——— Tokenize REST helpers ———
