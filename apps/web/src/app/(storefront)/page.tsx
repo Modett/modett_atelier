@@ -1,5 +1,4 @@
 import { HomepageHero } from '@/components/storefront/HomepageHero'
-import { HomepageNewsletter } from '@/components/storefront/HomepageNewsletter'
 import { HomepageBestsellers } from '@/components/storefront/HomepageBestsellers'
 import { HomepageReviews } from '@/components/storefront/HomepageReviews'
 import { EditorialCarousel } from '@modett/ui'
@@ -21,8 +20,6 @@ export default function HomePage() {
         ctaText="Learn More"
         ctaHref="/brand-philosophy"
       />
-
-      <HomepageNewsletter />
     </>
   )
 }

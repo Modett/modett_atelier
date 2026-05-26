@@ -20,6 +20,8 @@ export interface NewsletterSectionProps {
   error?: string
   /** Privacy policy link URL */
   privacyPolicyUrl?: string
+  /** Layout density — compact for footer, default for standalone sections */
+  variant?: 'default' | 'compact'
   /** Additional className for the outer section */
   className?: string
 }
@@ -33,9 +35,11 @@ export function NewsletterSection({
   successMessage,
   error,
   privacyPolicyUrl,
+  variant = 'default',
   className,
 }: NewsletterSectionProps) {
   const [email, setEmail] = useState('')
+  const isCompact = variant === 'compact'
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,33 +55,51 @@ export function NewsletterSection({
   }, [isSuccess])
 
   return (
-    <section className={cn('bg-deep', className)} aria-label="Newsletter signup">
+    <section
+      className={cn(
+        isCompact
+          ? 'bg-graphite border-t border-highlight/35 border-b border-background/10'
+          : 'bg-deep',
+        className,
+      )}
+      aria-label="Newsletter signup"
+    >
       <div
         className={cn(
-          'max-w-7xl mx-auto',
-          'px-5 md:px-8 lg:px-12',
-          'py-12 md:py-16 lg:py-20',
-          'flex flex-col md:flex-row md:items-center md:justify-between',
-          'gap-8 md:gap-12',
+          'max-w-page mx-auto',
+          'px-4 md:px-6 lg:px-8',
+          isCompact
+            ? 'py-6 md:py-7 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 lg:gap-10'
+            : 'py-12 md:py-16 lg:py-20 flex flex-col md:flex-row md:items-center md:justify-between gap-8 md:gap-12',
         )}
       >
-        {/* Left: text content */}
-        <div className="flex flex-col">
-          <h2 className="font-display text-3xl md:text-4xl font-normal italic text-background">
+        <div className={cn('flex flex-col', isCompact && 'lg:max-w-sm shrink-0')}>
+          <h2
+            className={cn(
+              'font-display font-normal italic text-background',
+              isCompact
+                ? 'text-xl md:text-2xl leading-tight'
+                : 'text-3xl md:text-4xl',
+            )}
+          >
             {heading ?? 'Join the Modett community'}
           </h2>
-          <p className="font-body text-sm md:text-base font-light text-background/70 mt-3">
+          <p
+            className={cn(
+              'font-body font-light text-background/70',
+              isCompact ? 'text-xs md:text-sm mt-1' : 'text-sm md:text-base mt-3',
+            )}
+          >
             {subtitle ?? 'Get the latest fashion trends and exclusive offers'}
           </p>
         </div>
 
-        {/* Right: form or success state */}
-        <div className="flex flex-col w-full md:max-w-md">
+        <div className={cn('flex flex-col w-full', isCompact ? 'lg:max-w-lg' : 'md:max-w-md')}>
           {isSuccess ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <svg
-                width={20}
-                height={20}
+                width={isCompact ? 16 : 20}
+                height={isCompact ? 16 : 20}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -91,13 +113,13 @@ export function NewsletterSection({
                   strokeLinejoin="round"
                 />
               </svg>
-              <p className="font-body text-sm font-normal text-background">
+              <p className={cn('font-body font-normal text-background', isCompact ? 'text-xs' : 'text-sm')}>
                 {successMessage ?? 'Thank you for subscribing!'}
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="w-full">
-              <div className="flex flex-col md:flex-row">
+              <div className="flex flex-col sm:flex-row">
                 <input
                   type="email"
                   placeholder="Enter e-mail"
@@ -107,14 +129,13 @@ export function NewsletterSection({
                   disabled={isSubmitting || isSuccess}
                   aria-label="Email address"
                   className={cn(
-                    'flex-1',
-                    'h-12 md:h-14',
-                    'px-4',
+                    'flex-1 min-w-0',
+                    isCompact ? 'h-10 px-3 text-xs' : 'h-12 md:h-14 px-4 text-sm',
                     'bg-background text-text',
-                    'font-body text-sm font-normal',
+                    'font-body font-normal',
                     'placeholder:text-muted-foreground/60',
                     'border border-background/30',
-                    'md:border-r-0',
+                    'sm:border-r-0',
                     'focus:outline-none focus:ring-2 focus:ring-inset focus:ring-highlight',
                     'disabled:opacity-50',
                     'rounded-none',
@@ -124,12 +145,11 @@ export function NewsletterSection({
                   type="submit"
                   disabled={isSubmitting || isSuccess}
                   className={cn(
-                    'h-12 md:h-14',
-                    'px-6 md:px-8',
-                    'flex items-center justify-center gap-2',
+                    isCompact ? 'h-10 px-4 text-[10px]' : 'h-12 md:h-14 px-6 md:px-8 text-sm',
+                    'flex items-center justify-center gap-1.5',
                     'border border-background/50',
                     'bg-transparent',
-                    'font-body font-light text-sm uppercase tracking-[0.25em]',
+                    'font-body font-light uppercase tracking-[0.25em]',
                     'text-background',
                     'hover:bg-background/10 hover:border-background',
                     'active:bg-background/15',
@@ -137,13 +157,13 @@ export function NewsletterSection({
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-highlight',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'rounded-none',
-                    'w-full md:w-auto',
-                    'mt-2 md:mt-0',
+                    'w-full sm:w-auto shrink-0',
+                    'mt-2 sm:mt-0',
                   )}
                 >
                   <svg
-                    width={16}
-                    height={16}
+                    width={isCompact ? 14 : 16}
+                    height={isCompact ? 14 : 16}
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -164,7 +184,7 @@ export function NewsletterSection({
 
               {error && (
                 <p
-                  className="font-body text-xs font-normal text-editorial mt-2"
+                  className="font-body text-xs font-normal text-editorial mt-1.5"
                   role="alert"
                 >
                   {error}
@@ -175,14 +195,17 @@ export function NewsletterSection({
 
           <p
             className={cn(
-              'font-body text-[11px] font-light text-background/50 mt-3 leading-relaxed max-w-md',
+              'font-body font-light text-background/50 leading-relaxed',
+              isCompact
+                ? 'text-[10px] mt-2 max-w-none'
+                : 'text-[11px] mt-3 max-w-md',
             )}
           >
             By entering your e-mail address, you agree to receive Modett
             communications regarding the brand&apos;s collections, news, and
             special content. For more information, see our{' '}
             <a
-              href={privacyPolicyUrl ?? '/privacy-policy'}
+              href={privacyPolicyUrl ?? '/privacy'}
               className="underline underline-offset-2 decoration-background/30 hover:decoration-background/60 hover:text-background/70 transition-colors duration-200"
             >
               Privacy Policy

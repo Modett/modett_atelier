@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { ShoppingBag, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CheckoutOrderSummary } from '@/components/checkout/CheckoutOrderSummary'
+import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { useCheckoutStore } from '@/store/checkout.store'
 import { useCountry } from '@/hooks/useCountry'
 
@@ -26,7 +27,7 @@ export default function CheckoutLayout({
   const countryCode = shippingAddress?.countryCode ?? detectedCountry
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-muted h-14 flex items-center justify-center px-4">
         <Link href="/" aria-label="Modett — return to homepage">
           <Image
@@ -72,7 +73,7 @@ export default function CheckoutLayout({
         />
       </div>
 
-      <div className="max-w-[1024px] mx-auto px-4 md:px-6 lg:px-8 py-8 flex flex-col lg:flex-row lg:gap-16 lg:items-start">
+      <div className="max-w-[1024px] mx-auto px-4 md:px-6 lg:px-8 py-8 flex flex-col lg:flex-row lg:gap-16 lg:items-start flex-1 w-full">
         <div className="flex-1 min-w-0">
           {children}
         </div>
@@ -85,6 +86,8 @@ export default function CheckoutLayout({
           />
         </div>
       </div>
+
+      <StorefrontFooter />
     </div>
   )
 }

@@ -5,6 +5,7 @@ export type { MobileMenuProps } from './MobileMenu'
 export { SiteFooter } from './SiteFooter'
 export type {
   SiteFooterProps,
+  SiteFooterNewsletterProps,
   FooterColumn,
   FooterLinkItem,
   SocialLink,

@@ -95,7 +95,6 @@ export function StorefrontNavbar({
                 variant={inverse ? 'light' : 'dark'}
                 size="sm"
                 href="/"
-                className="[&_img]:h-9 md:[&_img]:h-10"
               />
             </div>
 
