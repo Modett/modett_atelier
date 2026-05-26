@@ -2,7 +2,7 @@ import { StorefrontNavbar } from '@/components/storefront/StorefrontNavbar'
 import { StorefrontMain } from '@/components/storefront/StorefrontMain'
 import { NewsletterPopup } from '@/components/storefront/NewsletterPopup'
 import { PageTracker } from '@/components/storefront/PageTracker'
-import { SiteFooter } from '@modett/ui'
+import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 
 export default function StorefrontLayout({
   children,
@@ -14,7 +14,7 @@ export default function StorefrontLayout({
       <PageTracker />
       <StorefrontNavbar />
       <StorefrontMain>{children}</StorefrontMain>
-      <SiteFooter logoUrl="/images/modett-logo-foreground.png" />
+      <StorefrontFooter />
       <NewsletterPopup />
     </>
   )

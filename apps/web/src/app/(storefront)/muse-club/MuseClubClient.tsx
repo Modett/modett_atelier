@@ -685,7 +685,7 @@ function ClosingSection() {
   const { isLoggedIn } = useSession()
 
   return (
-    <section className="bg-deep py-24 md:py-36 px-5 md:px-10 text-center relative overflow-hidden">
+    <section className="bg-deep py-20 md:py-28 px-5 md:px-10 text-center relative overflow-hidden border-b border-background/15">
       <div className="absolute inset-0 z-0">
         <Image
           src="/images/studio.png"

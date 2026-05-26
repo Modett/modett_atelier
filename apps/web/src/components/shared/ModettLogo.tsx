@@ -4,10 +4,20 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
+const LOGO_SRC = {
+  light: '/images/logo.png',
+  dark: '/images/logo_blue.png',
+} as const
+
 const sizeClasses = {
-  sm: 'h-8',
-  md: 'h-11',
-  lg: 'h-14',
+  sm: 'h-11 md:h-12',
+  md: 'h-12 md:h-13',
+  lg: 'h-14 md:h-16',
+} as const
+
+const logoDimensions = {
+  light: { height: 48, width: 180 },
+  dark: { height: 48, width: 139 },
 } as const
 
 export function ModettLogo({
@@ -16,13 +26,15 @@ export function ModettLogo({
   href = '/',
   className,
 }: ModettLogoProps) {
+  const dims = logoDimensions[variant]
+
   const logoElement = (
     <div className={cn('flex items-center', className)}>
       <Image
-        src="/images/logo.png"
+        src={LOGO_SRC[variant]}
         alt="Modett"
-        height={44}
-        width={160}
+        height={dims.height}
+        width={dims.width}
         className={cn(
           sizeClasses[size],
           'w-auto',

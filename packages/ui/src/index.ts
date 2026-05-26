@@ -33,6 +33,7 @@ export type {
   SiteHeaderProps,
   MobileMenuProps,
   SiteFooterProps,
+  SiteFooterNewsletterProps,
   FooterColumn,
   FooterLinkItem,
   SocialLink,
