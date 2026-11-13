@@ -39,6 +39,8 @@ export interface OrderSummaryRow {
   order_ref: string
   user_id: string | null
   guest_email: string | null
+  customer_first_name?: string | null
+  customer_last_name?: string | null
   order_state: string
   payment_state: string
   fulfillment_state: string
@@ -117,12 +119,17 @@ export async function listOrdersAdmin({
   const offset = (page - 1) * safeLimit
 
   const conditions: ReturnType<typeof sql>[] = [sql`1 = 1`]
-  if (orderState != null) conditions.push(sql`order_state = ${orderState}`)
-  if (paymentState != null) conditions.push(sql`payment_state = ${paymentState}`)
-  if (fulfillmentState != null) conditions.push(sql`fulfillment_state = ${fulfillmentState}`)
+  if (orderState != null) conditions.push(sql`os.order_state = ${orderState}`)
+  if (paymentState != null) conditions.push(sql`os.payment_state = ${paymentState}`)
+  if (fulfillmentState != null) conditions.push(sql`os.fulfillment_state = ${fulfillmentState}`)
   if (search != null && search.trim() !== '') {
     const pattern = `%${search.trim()}%`
-    conditions.push(sql`(order_ref ILIKE ${pattern} OR guest_email ILIKE ${pattern})`)
+    conditions.push(sql`(
+      os.order_ref ILIKE ${pattern}
+      OR os.guest_email ILIKE ${pattern}
+      OR u.email ILIKE ${pattern}
+      OR CONCAT(u.first_name, ' ', u.last_name) ILIKE ${pattern}
+    )`)
   }
 
   const whereClause = conditions.length > 1
@@ -131,17 +138,24 @@ export async function listOrdersAdmin({
 
   const countResult = await db.execute(sql`
     SELECT COUNT(*)::int AS total
-    FROM orders.order_summary
+    FROM orders.order_summary os
+    LEFT JOIN iam.users u ON u.id = os.user_id AND u.deleted_at IS NULL
     WHERE ${whereClause}
   `)
   const total = (countResult.rows[0] as { total: number } | undefined)?.total ?? 0
 
   const result = await db.execute(sql`
-    SELECT id, order_ref, user_id, guest_email, order_state, payment_state,
-           fulfillment_state, return_state, currency, total, placed_at, created_at, item_count
-    FROM orders.order_summary
+    SELECT os.id, os.order_ref, os.user_id,
+           COALESCE(NULLIF(os.guest_email, ''), u.email) AS guest_email,
+           u.first_name AS customer_first_name,
+           u.last_name AS customer_last_name,
+           os.order_state, os.payment_state,
+           os.fulfillment_state, os.return_state, os.currency, os.total,
+           os.placed_at, os.created_at, os.item_count
+    FROM orders.order_summary os
+    LEFT JOIN iam.users u ON u.id = os.user_id AND u.deleted_at IS NULL
     WHERE ${whereClause}
-    ORDER BY placed_at DESC NULLS LAST, created_at DESC
+    ORDER BY os.placed_at DESC NULLS LAST, os.created_at DESC
     LIMIT ${safeLimit} OFFSET ${offset}
   `)
 
@@ -387,7 +401,7 @@ export async function updateOrderAddress({
 }: {
   orderId: string
   kind: 'SHIPPING' | 'BILLING'
-  addressJson: Record<string, unknown>
+  addressJson: object
   countryCode: string
   adminId: string
 }): Promise<void> {

@@ -169,6 +169,9 @@ export interface OrderAddress {
   kind: 'SHIPPING' | 'BILLING'
   addressJson: {
     fullName: string
+    firstName?: string
+    lastName?: string
+    phone?: string
     line1: string
     line2?: string
     city: string
@@ -177,6 +180,12 @@ export interface OrderAddress {
     country: string
   }
   countryCode: string
+}
+
+export interface OrderCustomer {
+  email: string | null
+  firstName: string | null
+  lastName: string | null
 }
 
 export interface OrderContact {
@@ -219,6 +228,7 @@ export interface OrderDetailResponse {
   contact: OrderContact | null
   events: OrderEvent[]
   allocations: OrderAllocation[]
+  customer: OrderCustomer
 }
 
 export interface PackingStatus {

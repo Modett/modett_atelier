@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import type { CurrencyCode } from '@/types'
+import { normalizeOrderAddressJson } from '@/lib/orderAddress'
 import type {
   AdminOrdersResponse,
   FulfillmentState,
@@ -40,6 +41,8 @@ interface OrderSummaryApiRow {
   order_ref: string
   user_id: string | null
   guest_email: string | null
+  customer_first_name?: string | null
+  customer_last_name?: string | null
   order_state: string
   payment_state: string
   fulfillment_state: string
@@ -52,12 +55,11 @@ interface OrderSummaryApiRow {
 
 function mapOrderSummaryRow(row: OrderSummaryApiRow): AdminOrdersResponse['orders'][number] {
   const email = row.guest_email?.trim() || '—'
+  const nameFromUser =
+    `${row.customer_first_name ?? ''} ${row.customer_last_name ?? ''}`.trim()
   const name =
-    row.user_id != null
-      ? 'Registered customer'
-      : email !== '—'
-        ? (email.split('@')[0] ?? 'Guest')
-        : 'Guest'
+    nameFromUser ||
+    (email !== '—' ? (email.split('@')[0] ?? 'Guest') : 'Guest')
   return {
     id: row.id,
     orderRef: row.order_ref,
@@ -105,7 +107,23 @@ function transformOrderDetail(data: Record<string, unknown>): OrderDetailRespons
     contact: Record<string, unknown> | null
     events: Record<string, unknown>[]
     allocations: Record<string, unknown>[]
+    customer?: {
+      email?: string | null
+      firstName?: string | null
+      lastName?: string | null
+    }
   }
+
+  const addresses = raw.addresses.map((addr) => {
+    const countryCode = String(addr.country_code ?? '')
+    return {
+      id: addr.id as string,
+      kind: addr.kind as 'SHIPPING' | 'BILLING',
+      addressJson: normalizeOrderAddressJson(addr.address_json, countryCode),
+      countryCode,
+    }
+  })
+  const shipping = addresses.find((addr) => addr.kind === 'SHIPPING')
 
   return {
     order: {
@@ -139,12 +157,7 @@ function transformOrderDetail(data: Record<string, unknown>): OrderDetailRespons
       taxAmount: String(item.tax_amount ?? '0'),
       productSnapshot: normalizeProductSnapshot(item.product_snapshot_json),
     })),
-    addresses: raw.addresses.map((addr) => ({
-      id: addr.id as string,
-      kind: addr.kind as 'SHIPPING' | 'BILLING',
-      addressJson: addr.address_json as OrderDetailResponse['addresses'][number]['addressJson'],
-      countryCode: addr.country_code as string,
-    })),
+    addresses,
     contact: raw.contact
       ? {
           primaryPhone: String(raw.contact.primary_phone ?? ''),
@@ -177,6 +190,11 @@ function transformOrderDetail(data: Record<string, unknown>): OrderDetailRespons
       barcodeValue: String(alloc.barcode_value ?? ''),
       unitStatus: String(alloc.unit_status ?? ''),
     })),
+    customer: {
+      email: raw.customer?.email ?? (raw.order.guest_email as string | null) ?? null,
+      firstName: raw.customer?.firstName || shipping?.addressJson.firstName || null,
+      lastName: raw.customer?.lastName || shipping?.addressJson.lastName || null,
+    },
   }
 }
 

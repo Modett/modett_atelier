@@ -163,9 +163,9 @@ export function PaymentStep() {
 
       const { paymentParams, sandboxMode } = res.data
 
-      // payable-ipg-js full-page-redirects to PAYable's hosted checkout on
-      // success. On failure (validation / network) it returns an error object
-      // and does NOT navigate — we surface that to the user inline.
+      // Live: v4 payable-checkout.js. Sandbox: payable-ipg-js.
+      // Success full-page-redirects to hosted checkout. Failure returns an
+      // error object and does NOT navigate — we surface that inline.
       const result = await payablePayment(paymentParams, sandboxMode)
 
       if (result.success) {

@@ -5,7 +5,7 @@
  *   Sandbox URLs : https://sandboxipgpayment.payable.lk
  *                 https://sandboxipgsdk.payable.lk/sdk/v3/payable-checkout.js
  *   Live URLs    : https://ipgpayment.payable.lk
- *                 https://ipgsdk.payable.lk/sdk/v3/payable-checkout.js
+ *                 https://ipgsdk.payable.lk/sdk/v4/payable-checkout.js
  *
  * Payment types (PAYable wire values):
  *   1 = ONE_TIME_PAYMENT

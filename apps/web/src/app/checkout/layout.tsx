@@ -10,10 +10,9 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { useCheckoutStore } from '@/store/checkout.store'
 import { useCountry } from '@/hooks/useCountry'
 
-// PAYable SDK is bundled via the `payable-ipg-js` npm package and imported
-// where it's used. The sandbox/live environment is decided server-side via
-// `sandboxMode` returned from POST /payments/session and passed straight to
-// payablePayment() — no script tag, no NEXT_PUBLIC_PAYABLE_MODE.
+// PAYable: sandbox uses `payable-ipg-js`; live loads
+// https://ipgsdk.payable.lk/sdk/v4/payable-checkout.js from payablePayment().
+// sandboxMode comes from POST /payments/session — no NEXT_PUBLIC_PAYABLE_MODE.
 
 export default function CheckoutLayout({
   children,

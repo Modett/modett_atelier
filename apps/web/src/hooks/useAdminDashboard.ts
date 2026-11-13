@@ -35,6 +35,8 @@ interface OrderSummaryApiRow {
   order_ref: string
   user_id: string | null
   guest_email: string | null
+  customer_first_name?: string | null
+  customer_last_name?: string | null
   order_state: string
   payment_state: string
   fulfillment_state: string
@@ -47,12 +49,11 @@ interface OrderSummaryApiRow {
 
 function mapOrderRow(row: OrderSummaryApiRow): AdminOrderSummary {
   const email = row.guest_email?.trim() || '—'
+  const nameFromUser =
+    `${row.customer_first_name ?? ''} ${row.customer_last_name ?? ''}`.trim()
   const name =
-    row.user_id != null
-      ? 'Registered customer'
-      : email !== '—'
-        ? email.split('@')[0] ?? 'Guest'
-        : 'Guest'
+    nameFromUser ||
+    (email !== '—' ? (email.split('@')[0] ?? 'Guest') : 'Guest')
   return {
     id:                 row.id,
     orderRef:           row.order_ref,

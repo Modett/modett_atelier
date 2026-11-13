@@ -5,6 +5,7 @@
 
 import Decimal from 'decimal.js'
 import { AppError } from '../../lib/errors'
+import { normalizeOrderAddressJson } from '../../lib/orderAddress'
 import {
   createReservation,
   createDraftOrder,
@@ -271,7 +272,12 @@ export async function saveAddress({
     throw new AppError('ORDER_NOT_DRAFT', 409, ORDER_NOT_DRAFT_MSG)
   }
 
-  await upsertOrderAddress({ orderId, kind, addressJson, countryCode })
+  await upsertOrderAddress({
+    orderId,
+    kind,
+    addressJson: normalizeOrderAddressJson(addressJson, countryCode),
+    countryCode,
+  })
   await appendOrderEvent({
     orderId,
     eventType: 'ADDRESS_SAVED',

@@ -149,9 +149,18 @@ export default function AdminOrderDetailPage() {
   return <OrderDetailContent data={data} orderId={orderId} />
 }
 
+function customerDisplayName(data: OrderDetailResponse): string {
+  const fromCustomer = `${data.customer.firstName ?? ''} ${data.customer.lastName ?? ''}`.trim()
+  if (fromCustomer) return fromCustomer
+  const shipping = data.addresses.find((a) => a.kind === 'SHIPPING')
+  const fromAddress = shipping?.addressJson.fullName.trim() ?? ''
+  if (fromAddress) return fromAddress
+  return '—'
+}
+
 function OrderDetailContent({ data, orderId }: { data: OrderDetailResponse; orderId: string }) {
   const router = useRouter()
-  const { order, items, addresses, contact, events } = data
+  const { order, items, addresses, contact, events, customer } = data
 
   const [showShipModal, setShowShipModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
@@ -409,18 +418,26 @@ function OrderDetailContent({ data, orderId }: { data: OrderDetailResponse; orde
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <div className="text-sm text-gray-500">Email</div>
-                <div className="font-medium">{order.guestEmail ?? 'Registered customer'}</div>
+                <div className="text-sm text-gray-500">Name</div>
+                <div className="font-medium">{customerDisplayName(data)}</div>
               </div>
-              {contact && (
-                <div>
-                  <div className="text-sm text-gray-500">Phone</div>
-                  <div className="font-medium">{contact.primaryPhone}</div>
-                  {contact.extraPhones.length > 0 && (
-                    <div className="text-sm text-gray-500">{contact.extraPhones.join(', ')}</div>
-                  )}
+              <div>
+                <div className="text-sm text-gray-500">Email</div>
+                <div className="font-medium">
+                  {customer.email ?? order.guestEmail ?? '—'}
                 </div>
-              )}
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Phone</div>
+                <div className="font-medium">
+                  {contact?.primaryPhone ||
+                    shippingAddress?.addressJson.phone ||
+                    '—'}
+                </div>
+                {contact && contact.extraPhones.length > 0 && (
+                  <div className="text-sm text-gray-500">{contact.extraPhones.join(', ')}</div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -444,9 +461,16 @@ function OrderDetailContent({ data, orderId }: { data: OrderDetailResponse; orde
                       }
                       const nm = shippingAddress.addressJson.fullName.trim().split(/\s+/)
                       setAddrForm({
-                        firstName: nm[0] ?? '',
-                        lastName: nm.slice(1).join(' ') ?? '',
-                        phone: contact?.primaryPhone ?? '',
+                        firstName:
+                          shippingAddress.addressJson.firstName || nm[0] || '',
+                        lastName:
+                          shippingAddress.addressJson.lastName ||
+                          nm.slice(1).join(' ') ||
+                          '',
+                        phone:
+                          shippingAddress.addressJson.phone ||
+                          contact?.primaryPhone ||
+                          '',
                         line1: shippingAddress.addressJson.line1,
                         line2: shippingAddress.addressJson.line2 ?? '',
                         city: shippingAddress.addressJson.city,
@@ -610,18 +634,33 @@ function OrderDetailContent({ data, orderId }: { data: OrderDetailResponse; orde
                   </div>
                 ) : (
                   <div className="space-y-1 text-sm">
-                    <div className="font-medium">{shippingAddress.addressJson.fullName}</div>
-                    <div>{shippingAddress.addressJson.line1}</div>
+                    {shippingAddress.addressJson.fullName && (
+                      <div className="font-medium">{shippingAddress.addressJson.fullName}</div>
+                    )}
+                    {shippingAddress.addressJson.line1 && (
+                      <div>{shippingAddress.addressJson.line1}</div>
+                    )}
                     {shippingAddress.addressJson.line2 && (
                       <div>{shippingAddress.addressJson.line2}</div>
                     )}
-                    <div>
-                      {shippingAddress.addressJson.city}
-                      {shippingAddress.addressJson.state &&
-                        `, ${shippingAddress.addressJson.state}`}{' '}
-                      {shippingAddress.addressJson.postalCode}
-                    </div>
-                    <div>{shippingAddress.addressJson.country}</div>
+                    {(shippingAddress.addressJson.city ||
+                      shippingAddress.addressJson.state ||
+                      shippingAddress.addressJson.postalCode) && (
+                      <div>
+                        {[
+                          shippingAddress.addressJson.city,
+                          shippingAddress.addressJson.state,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')}
+                        {shippingAddress.addressJson.postalCode
+                          ? ` ${shippingAddress.addressJson.postalCode}`
+                          : ''}
+                      </div>
+                    )}
+                    {shippingAddress.addressJson.country && (
+                      <div>{shippingAddress.addressJson.country}</div>
+                    )}
                   </div>
                 )}
               </CardContent>

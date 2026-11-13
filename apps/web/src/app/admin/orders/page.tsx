@@ -411,7 +411,12 @@ export default function AdminOrdersPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-[200px] truncate">{order.customerEmail}</div>
+                        <div className="max-w-[220px]">
+                          <div className="truncate font-medium">{order.customerName}</div>
+                          <div className="truncate text-sm text-gray-500">
+                            {order.customerEmail}
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <FulfillmentBadge state={order.fulfillmentState} />

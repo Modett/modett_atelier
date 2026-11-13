@@ -21,7 +21,9 @@ import {
   getInventoryUnitByBarcode,
   getProductVariantById,
   getOrderById,
+  getUserById,
 } from '@modett/db'
+import { normalizeOrderAddressJson } from '../../lib/orderAddress'
 import type { OrderItem, OrderEvent } from '@modett/db'
 import { generateTokensAfterDelivery } from '../reviews'
 import {
@@ -104,13 +106,45 @@ export async function adminListOrders({
 export async function adminGetOrderDetail({ orderId }: { orderId: string }) {
   const full = await getOrderWithFullDetail({ id: orderId })
   if (!full || !full.order) throw new AppError('ORDER_NOT_FOUND', 404)
+
+  const addresses = full.addresses.map((address) => ({
+    ...address,
+    address_json: normalizeOrderAddressJson(
+      (address.address_json ?? {}) as Record<string, unknown>,
+      address.country_code,
+    ),
+  }))
+
+  const shipping = addresses.find((address) => address.kind === 'SHIPPING')
+  const shippingJson = shipping?.address_json
+
+  let email = full.order.guest_email
+  let firstName = shippingJson?.firstName || null
+  let lastName = shippingJson?.lastName || null
+
+  if (full.order.user_id) {
+    const user = await getUserById({ id: full.order.user_id })
+    if (user) {
+      email = email && email.trim() !== '' ? email : user.email
+      if (!firstName && !lastName) {
+        firstName = user.firstName
+        lastName = user.lastName
+      }
+    }
+  }
+
   return {
     order: full.order,
     items: full.items,
-    addresses: full.addresses,
+    addresses,
     contact: full.contact,
     events: full.events,
     allocations: full.allocations,
+    customer: {
+      email,
+      firstName,
+      lastName,
+    },
   }
 }
 
@@ -265,7 +299,7 @@ export async function updateShippingAddress({
   await updateOrderAddress({
     orderId,
     kind,
-    addressJson,
+    addressJson: normalizeOrderAddressJson(addressJson, countryCode),
     countryCode,
     adminId,
   })

@@ -1,24 +1,25 @@
 /**
- * Typed wrapper around `payable-ipg-js`.
+ * PAYable checkout wrapper.
  *
- * The npm package is plain JavaScript with no .d.ts file. We declare the
- * shape inline here and re-export a strictly-typed `payablePayment` so the
- * rest of the app can use it safely.
+ *   Sandbox (`isTestMode=true`):
+ *     `payable-ipg-js` npm package → https://sandboxipgpayment.payable.lk/ipg/sandbox
+ *
+ *   Live (`isTestMode=false`):
+ *     https://ipgsdk.payable.lk/sdk/v4/payable-checkout.js
+ *     Hosted checkout: https://ipgpayment.payable.lk/ipg/pro
  *
  *   payablePayment(payment, isTestMode):
  *     - POSTs `payment` (camelCase fields) to PAYable.
  *     - On success: full-page redirect to PAYable's hosted checkout.
  *     - On error: returns { success: false, status, error } and does NOT
  *       navigate; we surface the error to the user.
- *
- * Resolved environment is decided by `isTestMode`:
- *   true  → https://sandboxipgpayment.payable.lk/ipg/sandbox
- *   false → https://ipgpayment.payable.lk/ipg/pro
  */
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — the npm package ships no type declarations.
 import { payablePayment as rawPayablePayment } from 'payable-ipg-js'
+
+const LIVE_SDK_SRC = 'https://ipgsdk.payable.lk/sdk/v4/payable-checkout.js'
 
 /** Fields the SDK forwards to the gateway. Server-built, client-passthrough. */
 export interface PayableSDKPayment {
@@ -63,9 +64,77 @@ export type PayablePaymentResult =
   | { success: true; status: number; message: string }
   | { success: false; status: number; error: string | Record<string, string[]> }
 
+type LivePayablePayment = (
+  payment: PayableSDKPayment,
+) => Promise<PayablePaymentResult>
+
+declare global {
+  interface Window {
+    payablePayment?: LivePayablePayment
+  }
+}
+
+let liveSdkLoad: Promise<LivePayablePayment> | null = null
+
+function loadLivePayablePayment(): Promise<LivePayablePayment> {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('PAYable live SDK can only run in the browser'))
+  }
+  if (window.payablePayment) return Promise.resolve(window.payablePayment)
+  if (liveSdkLoad) return liveSdkLoad
+
+  liveSdkLoad = new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${LIVE_SDK_SRC}"]`,
+    )
+    const onReady = () => {
+      if (!window.payablePayment) {
+        liveSdkLoad = null
+        reject(new Error('PAYable live SDK loaded without payablePayment()'))
+        return
+      }
+      resolve(window.payablePayment)
+    }
+
+    if (existing) {
+      if (window.payablePayment) {
+        resolve(window.payablePayment)
+        return
+      }
+      existing.addEventListener('load', onReady, { once: true })
+      existing.addEventListener(
+        'error',
+        () => {
+          liveSdkLoad = null
+          reject(new Error('Failed to load PAYable live checkout SDK'))
+        },
+        { once: true },
+      )
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = LIVE_SDK_SRC
+    script.async = true
+    script.onload = onReady
+    script.onerror = () => {
+      liveSdkLoad = null
+      reject(new Error('Failed to load PAYable live checkout SDK'))
+    }
+    document.head.appendChild(script)
+  })
+
+  return liveSdkLoad
+}
+
 export async function payablePayment(
   payment: PayableSDKPayment,
   isTestMode: boolean,
 ): Promise<PayablePaymentResult> {
-  return (await rawPayablePayment(payment, isTestMode)) as PayablePaymentResult
+  if (isTestMode) {
+    return (await rawPayablePayment(payment, true)) as PayablePaymentResult
+  }
+
+  const livePayablePayment = await loadLivePayablePayment()
+  return livePayablePayment(payment)
 }

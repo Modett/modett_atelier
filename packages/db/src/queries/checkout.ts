@@ -421,7 +421,7 @@ export async function upsertOrderAddress({
 }: {
   orderId: string
   kind: 'SHIPPING' | 'BILLING'
-  addressJson: Record<string, unknown>
+  addressJson: object
   countryCode: string
   tx?: TransactionClient
 }): Promise<OrderAddress> {
