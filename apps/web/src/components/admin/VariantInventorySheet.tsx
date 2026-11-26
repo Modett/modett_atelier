@@ -374,7 +374,7 @@ export function VariantInventorySheet({
                         min={0}
                         max={100}
                         step={1}
-                        className="h-9 w-20 rounded-md border border-gray-200 px-2 text-sm"
+                        className="h-9 w-20 rounded-md border border-gray-300 px-2 text-sm"
                         value={thresholdInput}
                         onChange={(e) => setThresholdInput(e.target.value)}
                       />
@@ -478,7 +478,7 @@ export function VariantInventorySheet({
                         min={1}
                         max={500}
                         step={1}
-                        className="mt-1 block h-9 w-full max-w-[200px] rounded-md border border-gray-200 px-2 text-sm"
+                        className="mt-1 block h-9 w-full max-w-[200px] rounded-md border border-gray-300 px-2 text-sm"
                         value={restockQty}
                         onChange={(e) =>
                           setRestockQty(

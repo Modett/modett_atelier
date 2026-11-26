@@ -216,7 +216,7 @@ export default function AdminAuditLogPage() {
 
           <input
             type="date"
-            className="h-9 rounded-md border border-gray-200 px-2 text-sm"
+            className="h-9 rounded-md border border-gray-300 px-2 text-sm"
             value={from}
             onChange={(e) => {
               setPage(1)
@@ -226,7 +226,7 @@ export default function AdminAuditLogPage() {
           />
           <input
             type="date"
-            className="h-9 rounded-md border border-gray-200 px-2 text-sm"
+            className="h-9 rounded-md border border-gray-300 px-2 text-sm"
             value={to}
             onChange={(e) => {
               setPage(1)

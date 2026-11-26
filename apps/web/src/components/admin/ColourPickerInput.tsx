@@ -65,7 +65,7 @@ export function ColourPickerInput({ value, onChange, label }: ColourPickerInputP
             const next = normalizeHex(e.target.value)
             if (next) onChange(next)
           }}
-          className="w-24 rounded border border-gray-200 px-2 py-1 font-mono text-sm uppercase"
+          className="w-24 rounded border border-gray-300 px-2 py-1 font-mono text-sm uppercase"
           aria-label="Hex colour without hash"
         />
         <span

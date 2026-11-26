@@ -140,7 +140,7 @@ export default function AdminProductsPage() {
                 placeholder="Search name or product code…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:ring-2 focus:ring-gray-200 focus:outline-none"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-gray-200 focus:outline-none"
               />
             </div>
             <div className="w-full min-w-[160px] sm:w-48">

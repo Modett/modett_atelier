@@ -37,7 +37,7 @@ export function DeleteAccountModal({
           onChange={(e) => onConfirmChange(e.target.value)}
           placeholder='Type "DELETE" to confirm'
           className={cn(
-            'w-full h-12 px-4 border border-muted rounded-none',
+            'w-full h-12 px-4 border border-field-border rounded-none',
             'font-body font-light text-[14px] text-umber',
             'outline-none focus:border-umber',
           )}

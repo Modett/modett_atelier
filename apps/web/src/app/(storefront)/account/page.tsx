@@ -151,7 +151,7 @@ export default function AccountPersonalDetailsPage() {
             value={dob}
             onChange={(e) => setDob(e.target.value)}
             className={cn(
-              'w-full h-12 border border-muted px-4 rounded-none',
+              'w-full h-12 border border-field-border px-4 rounded-none',
               'font-body font-light text-[14px] text-graphite',
               'outline-none focus:border-umber',
             )}
@@ -269,7 +269,7 @@ function Field({
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          'w-full h-12 border border-muted px-4 rounded-none',
+          'w-full h-12 border border-field-border px-4 rounded-none',
           'font-body font-light text-[14px] text-graphite',
           'outline-none focus:border-umber',
         )}

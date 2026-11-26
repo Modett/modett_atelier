@@ -113,7 +113,7 @@ function ResetPasswordForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className={cn(
-              'h-12 px-3 border border-muted bg-background',
+              'h-12 px-3 border border-field-border bg-background',
               'font-body text-[14px] text-ink',
               'focus:outline-none focus:ring-1 focus:ring-umber',
             )}
@@ -129,7 +129,7 @@ function ResetPasswordForm() {
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             className={cn(
-              'h-12 px-3 border border-muted bg-background',
+              'h-12 px-3 border border-field-border bg-background',
               'font-body text-[14px] text-ink',
               'focus:outline-none focus:ring-1 focus:ring-umber',
             )}

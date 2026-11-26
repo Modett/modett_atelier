@@ -78,7 +78,7 @@ export function NotifyMeForm({
           required
           className={cn(
             'w-full h-10 px-3',
-            'border border-muted bg-transparent',
+            'border border-field-border bg-transparent',
             'font-body font-light text-[13px] text-umber',
             'placeholder:text-muted-foreground/60',
             'focus:outline-none focus:border-umber',

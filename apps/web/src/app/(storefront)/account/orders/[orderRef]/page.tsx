@@ -357,7 +357,7 @@ export default function AccountOrderDetailPage() {
                               value={selectedItems[item.id] ?? 1}
                               onChange={(e) =>
                                 setItemQty(item.id, Number(e.target.value), item.qty)}
-                              className="h-9 border border-muted px-2 font-body text-[13px] text-umber bg-background rounded-none"
+                              className="h-9 border border-field-border px-2 font-body text-[13px] text-umber bg-background rounded-none"
                             >
                               {Array.from({ length: item.qty }, (_, i) => i + 1).map(
                                 (n) => (
@@ -381,7 +381,7 @@ export default function AccountOrderDetailPage() {
                   <select
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    className="w-full h-12 border border-muted px-4 font-body text-[14px] text-umber bg-background rounded-none"
+                    className="w-full h-12 border border-field-border px-4 font-body text-[14px] text-umber bg-background rounded-none"
                   >
                     {RETURN_REASONS.map((r) => (
                       <option key={r} value={r}>

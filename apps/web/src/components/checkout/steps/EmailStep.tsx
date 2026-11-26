@@ -191,7 +191,7 @@ export function EmailStep() {
             onBlur={handleEmailBlur}
             className={cn(
               'w-full h-13 px-4 pr-10 bg-background',
-              'border border-muted rounded-none',
+              'border border-field-border rounded-none',
               'font-body font-light text-[16px] md:text-[14px] text-umber',
               'placeholder:text-muted-foreground/60',
               'outline-none focus:border-umber',
@@ -229,7 +229,7 @@ export function EmailStep() {
               }}
               className={cn(
                 'w-full h-13 px-4 pr-10 bg-background',
-                'border border-muted rounded-none',
+                'border border-field-border rounded-none',
                 'font-body font-light text-[16px] md:text-[14px] text-umber',
                 'placeholder:text-muted-foreground/60',
                 'outline-none focus:border-umber',

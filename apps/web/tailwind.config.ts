@@ -74,6 +74,7 @@ const config: Config = {
         deep:               '#3E5460',
         sage:               '#C1D2CC',
         umber:              '#765C4D',
+        'field-border':     '#8F7A6C', // visible resting border for form fields (~3.1:1 on alabaster)
         'hero-border':      'rgba(248, 245, 242, 0.25)',
 
         // shadcn/ui (admin) — maps to CSS variables in globals.css :root

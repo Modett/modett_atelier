@@ -189,7 +189,7 @@ export function ShippingStep() {
             onChange={(e) => setSelectedBoutiqueId(e.target.value)}
             className={cn(
               'w-full h-13 px-4 bg-background appearance-none',
-              'border border-muted rounded-none',
+              'border border-field-border rounded-none',
               'font-body font-light text-[16px] md:text-[14px] text-umber',
               'outline-none focus:border-umber',
               'transition-colors duration-200',
@@ -293,7 +293,7 @@ export function ShippingStep() {
                     placeholder="Write your message here..."
                     className={cn(
                       'w-full h-24 p-3 bg-background resize-none',
-                      'border border-muted rounded-none',
+                      'border border-field-border rounded-none',
                       'font-body font-light text-[13px] text-umber',
                       'placeholder:text-muted-foreground/60',
                       'outline-none focus:border-umber',

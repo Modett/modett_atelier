@@ -232,7 +232,7 @@ function LockedField({
         readOnly
         disabled
         className={cn(
-          'bg-surface-raised border border-muted/50 text-umber',
+          'bg-surface-raised border border-field-border text-umber',
           'h-12 px-4 w-full font-body font-light text-[14px]',
           'cursor-not-allowed rounded-none',
         )}
@@ -271,7 +271,7 @@ function PasswordField({
           autoComplete={autoComplete}
           onChange={(e) => onChange(e.target.value)}
           className={cn(
-            'w-full h-12 border border-muted px-4 pr-12 rounded-none',
+            'w-full h-12 border border-field-border px-4 pr-12 rounded-none',
             'font-body font-light text-[14px] text-umber',
             'outline-none focus:border-umber',
           )}

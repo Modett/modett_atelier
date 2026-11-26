@@ -281,7 +281,7 @@ export default function AdminOrdersPage() {
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
                     placeholder="Search by order ref or email..."
-                    className="w-full rounded-lg border border-gray-200 py-2 pr-4 pl-10 text-sm focus:ring-2 focus:ring-gray-200 focus:outline-none"
+                    className="w-full rounded-lg border border-gray-300 py-2 pr-4 pl-10 text-sm focus:ring-2 focus:ring-gray-200 focus:outline-none"
                   />
                 </div>
                 <Button type="submit" variant="outline" size="sm">

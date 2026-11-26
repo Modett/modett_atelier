@@ -346,7 +346,7 @@ function AdminInventoryPage() {
               id="inv-search"
               type="search"
               placeholder="Product name, code, or SKU group"
-              className="mt-1 h-9 w-full rounded-md border border-gray-200 px-3 text-sm"
+              className="mt-1 h-9 w-full rounded-md border border-gray-300 px-3 text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

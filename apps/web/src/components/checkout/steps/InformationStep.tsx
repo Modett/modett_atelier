@@ -635,7 +635,7 @@ export function SharedAddressForm({
             'font-body font-light text-[16px] md:text-[14px] text-umber',
             'outline-none focus:border-umber',
             'transition-colors duration-200',
-            errors.countryCode ? 'border-red-400' : 'border-muted',
+            errors.countryCode ? 'border-red-400' : 'border-field-border',
           )}
         >
           <option value="">Select country</option>
@@ -740,7 +740,7 @@ function FormField({
           'placeholder:text-muted-foreground/60',
           'outline-none focus:border-umber',
           'transition-colors duration-200',
-          error ? 'border-red-400' : 'border-muted',
+          error ? 'border-red-400' : 'border-field-border',
         )}
       />
       {hint && !error && (

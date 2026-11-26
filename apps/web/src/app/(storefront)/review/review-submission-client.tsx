@@ -269,7 +269,7 @@ export function ReviewSubmissionClient() {
             onChange={(e) => setBody(e.target.value)}
             placeholder="Tell us about the fit, fabric, and how it makes you feel…"
             className={cn(
-              'w-full border border-muted bg-background px-3 py-3',
+              'w-full border border-field-border bg-background px-3 py-3',
               'font-body font-light text-[14px] text-umber',
               'rounded-none resize-y min-h-[120px]',
               'focus:outline-none focus:ring-1 focus:ring-umber/30',

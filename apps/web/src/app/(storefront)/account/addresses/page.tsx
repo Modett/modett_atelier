@@ -301,7 +301,7 @@ export default function AccountAddressesPage() {
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Home, Office…"
               className={cn(
-                'w-full h-12 px-4 border border-muted rounded-none',
+                'w-full h-12 px-4 border border-field-border rounded-none',
                 'font-body font-light text-[14px] text-umber',
                 'outline-none focus:border-umber',
               )}
@@ -357,7 +357,7 @@ export default function AccountAddressesPage() {
                 value={phonePrefix}
                 onChange={(e) => setPhonePrefix(e.target.value)}
                 className={cn(
-                  'w-28 flex-shrink-0 h-12 px-2 border border-muted rounded-none bg-background',
+                  'w-28 flex-shrink-0 h-12 px-2 border border-field-border rounded-none bg-background',
                   'font-body font-light text-[12px] text-umber',
                   'outline-none focus:border-umber',
                 )}
@@ -373,7 +373,7 @@ export default function AccountAddressesPage() {
                 value={phoneNational}
                 onChange={(e) => setPhoneNational(e.target.value)}
                 className={cn(
-                  'flex-1 h-12 px-4 border border-muted rounded-none',
+                  'flex-1 h-12 px-4 border border-field-border rounded-none',
                   'font-body font-light text-[14px] text-umber',
                   'outline-none focus:border-umber',
                 )}
@@ -440,7 +440,7 @@ export default function AccountAddressesPage() {
               onChange={(e) => updateField('countryCode', e.target.value)}
               autoComplete="country"
               className={cn(
-                'w-full h-12 px-4 border border-muted rounded-none bg-background',
+                'w-full h-12 px-4 border border-field-border rounded-none bg-background',
                 'font-body font-light text-[14px] text-umber',
                 'outline-none focus:border-umber',
                 errors.countryCode ? 'border-red-400' : '',
@@ -553,7 +553,7 @@ function FormInput({
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          'w-full h-12 px-4 border border-muted rounded-none',
+          'w-full h-12 px-4 border border-field-border rounded-none',
           'font-body font-light text-[14px] text-umber',
           'outline-none focus:border-umber',
           error ? 'border-red-400' : '',

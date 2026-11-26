@@ -141,7 +141,7 @@ export function PromoCodeInput() {
               'outline-none transition-colors duration-200',
               error
                 ? 'border-red-400 focus:border-red-400'
-                : 'border-muted focus:border-umber',
+                : 'border-field-border focus:border-umber',
             )}
           />
           <button
