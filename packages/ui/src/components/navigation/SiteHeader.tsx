@@ -39,7 +39,8 @@ export interface SiteHeaderProps {
 }
 
 const DEFAULT_NAV_LINKS = [
-  { label: 'NEW ARRIVALS', href: '/new-arrivals' },
+  // Temporarily hidden — uncomment to restore.
+  // { label: 'NEW ARRIVALS', href: '/new-arrivals' },
   { label: 'COLLECTIONS', href: '/collections' },
   { label: 'BRAND PHILOSOPHY', href: '/brand-philosophy' },
   { label: 'CONTACT', href: '/contact' },
